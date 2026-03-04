@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -17,4 +18,7 @@ async def health():
     return {"status": "ok"}
 
 app.include_router(router)
-app.mount("/", StaticFiles(directory="/opt/cc/web", html=True), name="web")
+
+_web_dir = os.environ.get("WEB_DIR", "/opt/cc/web")
+if os.path.isdir(_web_dir):
+    app.mount("/", StaticFiles(directory=_web_dir, html=True), name="web")
