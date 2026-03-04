@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+HOST="${1:?usage: bin/deploy <user@host>}"
+DIR="/opt/cc"
+
+echo "running tests..."
+bin/test
+echo "tests passed."
+
+ssh "$HOST" "command -v docker >/dev/null || (curl -fsSL https://get.docker.com | sh)"
+ssh "$HOST" "command -v docker-compose >/dev/null || (apt-get install -y docker-compose-plugin 2>/dev/null; ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose 2>/dev/null || true)"
+ssh "$HOST" "mkdir -p $DIR"
+rsync -az --delete --exclude '.git' --exclude '__pycache__' --exclude '.env' . "$HOST:$DIR/"
+ssh "$HOST" "cd $DIR && docker-compose up -d --build"
+echo "done: http://$HOST:8080"

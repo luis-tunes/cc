@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd "$(dirname "$0")/.."
+docker-compose run --rm -e DATABASE_URL=postgresql://cc:cc@db:5432/cc app python -m pytest app/tests/ -v "$@"

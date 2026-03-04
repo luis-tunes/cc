@@ -1,0 +1,31 @@
+# Template para faturas e recibos portugueses
+issuer: Portuguese Invoice
+fields:
+  amount:
+    parser: regex
+    regex: (?:Total|Amount|Montante|Valor Total|TOTAL A PAGAR|Importe)\s*[:\s]*(?:[A-Z]{0,3}\s*)?([\d.,]+)\s*(?:EUR|€)?
+    type: float
+  vat:
+    parser: regex
+    regex: (?:IVA|VAT|Taxa IVA)\s*(?:\d+\s*%\s*[-–]\s*)?([\d.,]+)\s*(?:EUR|€)?
+    type: float
+  issuer_nif:
+    parser: regex
+    regex: (?:NIF|NIPC|Contribuinte|N\.º\s*Contribuinte)\s*[:\s]*(\d{9})
+  client_nif:
+    parser: regex
+    regex: (?:NIF|Contribuinte)\s*(?:do\s*)?(?:Cliente|Adquirente|Comprador)\s*[:\s]*(\d{9})
+  date:
+    parser: regex
+    regex: (?:Data|Date|Emitida em|Data de emissão)\s*[:\s]*(\d{1,2}[-/. ]\w{2,9}[-/. ]\d{2,4})
+  invoice_type:
+    parser: static
+    value: invoice
+keywords:
+  - Fatura
+  - NIF
+options:
+  currency: EUR
+  decimal_separator: ","
+  languages:
+    - pt

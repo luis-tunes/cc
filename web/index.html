@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CC — Contabilidade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo">
+      <div class="logo-mark">CC</div>
+      <div>
+        <div class="logo-name">CC</div>
+        <div class="logo-sub">Contabilidade</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">
+      <div class="nav-label">Principal</div>
+      <button class="nav-btn active" onclick="showTab('dashboard',this)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-btn" onclick="showTab('faturas',this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Faturas
+      </button>
+      <button class="nav-btn" onclick="showTab('banco',this)">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Banco
+      </button>
+      <button class="nav-btn" onclick="showTab('reconciliar',this)">
+        <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+        Reconciliar
+      </button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Relatórios</div>
+      <button class="nav-btn" onclick="showTab('iva',this)">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        IVA
+      </button>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>
+    <span class="status-text">Sistema operacional</span>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title" id="topbarTitle">Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span id="badge" class="pill pill-ok">—</span>
+    </div>
+  </header>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar" id="summaryBar">
+    <div class="sbar-item"><span class="sbar-val">—</span><span class="sbar-lbl">documentos</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><span class="sbar-val">—</span><span class="sbar-lbl">faturado</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><span class="sbar-val">—</span><span class="sbar-lbl">movimentos</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><span class="sbar-val">—</span><span class="sbar-lbl">reconciliados</span></div>
+    <div class="sbar-div"></div>
+    <div class="sbar-item"><span class="sbar-val">—</span><span class="sbar-lbl">por reconciliar</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="kpi-row" id="kpiGrid">
+        <div class="kpi" data-dot="blue"><div class="kpi-header"><span class="kpi-tag">DOCS</span><span class="kpi-dot blue"></span></div><div class="kpi-val">—</div><div class="kpi-label">Documentos</div></div>
+        <div class="kpi" data-dot="blue"><div class="kpi-header"><span class="kpi-tag">EUR</span><span class="kpi-dot blue"></span></div><div class="kpi-val">—</div><div class="kpi-label">Total Faturado</div></div>
+        <div class="kpi"><div class="kpi-header"><span class="kpi-tag">BANK</span><span class="kpi-dot neutral"></span></div><div class="kpi-val">—</div><div class="kpi-label">Movimentos</div></div>
+        <div class="kpi" data-dot="green"><div class="kpi-header"><span class="kpi-tag">OK</span><span class="kpi-dot green"></span></div><div class="kpi-val">—</div><div class="kpi-label">Reconciliados</div></div>
+        <div class="kpi" data-dot="green"><div class="kpi-header"><span class="kpi-tag">PEND</span><span class="kpi-dot green"></span></div><div class="kpi-val">—</div><div class="kpi-label">Por Reconciliar</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="panel">
+          <div class="panel-hdr"><span class="panel-title">Reconciliação</span></div>
+          <div class="donut-wrap">
+            <canvas id="donutChart"></canvas>
+            <div class="donut-center">
+              <div class="donut-big" id="donutPct">—</div>
+              <div class="donut-small">reconciliados</div>
+            </div>
+          </div>
+          <div class="donut-legend">
+            <div class="legend-row"><div class="legend-pip" style="background:var(--green)"></div> Reconciliados</div>
+            <div class="legend-row"><div class="legend-pip" style="background:var(--red)"></div> Pendentes</div>
+          </div>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column">
+          <div class="panel-hdr"><span class="panel-title">IVA Mensal</span></div>
+          <div style="flex:1;min-height:200px;position:relative">
+            <canvas id="barChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FATURAS -->
+    <div class="tab-pane" id="tab-faturas">
+
+      <!-- Paperless hint -->
+      <div class="paperless-hint">
+        <div class="paperless-hint-text">
+          <strong>Paperless-ngx</strong> — OCR automático, arquivo e pesquisa de documentos
+          <span>Visualiza, corrige e gere os documentos processados directamente no Paperless</span>
+        </div>
+        <a class="btn-paperless" href="http://localhost:8000" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Abrir Paperless
+        </a>
+      </div>
+
+      <div class="mb2">
+        <div class="upload-zone" id="dropzone">
+          <input type="file" id="pdfInput" accept=".pdf" multiple hidden>
+          <div class="uz-ico">
+            <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          </div>
+          <div class="uz-title">Arrasta PDFs aqui ou clica para selecionar</div>
+          <div class="uz-sub">Paperless faz OCR (~30s) · extrai NIF, total e IVA automaticamente</div>
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <div id="uploadInfo"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Documentos extraídos</span>
+          <div class="card-actions">
+            <button class="btn btn-ghost" onclick="loadDocs()">
+              <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualizar
+            </button>
+            <button class="btn btn-ghost" onclick="exportCSV()">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar CSV
+            </button>
+          </div>
+        </div>
+        <div id="docsTable"></div>
+      </div>
+    </div>
+
+    <!-- BANCO -->
+    <div class="tab-pane" id="tab-banco">
+      <div class="mb2">
+        <div class="section-top">
+          <p class="section-desc">Importa extracto bancário em CSV. Colunas obrigatórias: <code>date</code> <code>description</code> <code>amount</code> — separador <code>;</code></p>
+        </div>
+        <div class="csv-row mb1">
+          <label class="file-label">
+            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            Escolher CSV
+            <input type="file" id="csvFile" accept=".csv">
+          </label>
+          <button class="btn btn-primary" onclick="uploadCSV()">Importar movimentos</button>
+        </div>
+        <div id="uploadMsg"></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Movimentos bancários</span></div>
+        <div id="txsTable"></div>
+      </div>
+    </div>
+
+    <!-- RECONCILIAR -->
+    <div class="tab-pane" id="tab-reconciliar">
+      <div class="section-top mb2">
+        <p class="section-desc">Cruza automaticamente faturas com movimentos bancários por valor e data.</p>
+        <button class="btn btn-success" id="reconcileBtn" onclick="runReconcile()">
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Reconciliar agora
+        </button>
+      </div>
+      <div id="reconMsg"></div>
+      <div id="recsView"></div>
+    </div>
+
+    <!-- IVA -->
+    <div class="tab-pane" id="tab-iva">
+      <div id="ivaTable"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

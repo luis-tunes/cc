@@ -1,0 +1,5 @@
+fastapi[standard]
+psycopg[binary,pool]
+invoice2data
+httpx
+pytest
