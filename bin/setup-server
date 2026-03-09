@@ -10,7 +10,6 @@
 #
 set -euo pipefail
 
-REPO="https://github.com/xzero-ai/cc.git"
 DIR="/opt/cc"
 USER="cc"
 
@@ -50,13 +49,41 @@ else
   usermod -aG docker "$USER" 2>/dev/null || true
 fi
 
-# ── 5. Clone repo ────────────────────────
+# ── 5. Setup GitHub access & clone repo ──
+DEPLOY_SSH_KEY="/home/$USER/.ssh/github_deploy"
+if [ ! -f "$DEPLOY_SSH_KEY" ]; then
+  echo "→ Generating GitHub deploy key..."
+  sudo -u "$USER" mkdir -p /home/$USER/.ssh
+  sudo -u "$USER" ssh-keygen -t ed25519 -f "$DEPLOY_SSH_KEY" -N "" -q -C "cc-deploy@$(hostname)"
+  # Configure git to use this key for github.com
+  cat >> /home/$USER/.ssh/config << EOF
+Host github.com
+  IdentityFile $DEPLOY_SSH_KEY
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+  chown "$USER:$USER" /home/$USER/.ssh/config
+  chmod 600 /home/$USER/.ssh/config
+
+  echo ""
+  echo "══════════════════════════════════════"
+  echo "  ⚠️  Add this deploy key to GitHub:"
+  echo "  github.com/xzero-ai/cc → Settings → Deploy keys → Add"
+  echo "══════════════════════════════════════"
+  echo ""
+  cat "$DEPLOY_SSH_KEY.pub"
+  echo ""
+  echo "  Press ENTER after adding the key..."
+  read -r
+fi
+
+REPO_SSH="git@github.com:xzero-ai/cc.git"
 if [ -d "$DIR/.git" ]; then
   echo "→ Updating repo..."
-  cd "$DIR" && git pull --ff-only
+  cd "$DIR" && sudo -u "$USER" git pull --ff-only
 else
   echo "→ Cloning repo..."
-  git clone "$REPO" "$DIR"
+  sudo -u "$USER" git clone "$REPO_SSH" "$DIR"
 fi
 chown -R "$USER:$USER" "$DIR"
 
