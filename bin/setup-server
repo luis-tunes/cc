@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+#
+# CC — One-command server setup
+#
+# Usage (from YOUR laptop):
+#   ssh root@IP 'bash -s' < bin/setup-server
+#
+# Or if already on the server:
+#   curl -fsSL https://raw.githubusercontent.com/xzero-ai/cc/main/bin/setup-server | bash
+#
+set -euo pipefail
+
+REPO="https://github.com/xzero-ai/cc.git"
+DIR="/opt/cc"
+USER="cc"
+
+echo "──────────────────────────────────────"
+echo "  CC — Automated Server Setup"
+echo "──────────────────────────────────────"
+
+# ── 1. System packages ──────────────────
+echo "→ Updating system..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq && apt-get upgrade -y -qq
+
+# ── 2. Docker ────────────────────────────
+if ! command -v docker &>/dev/null; then
+  echo "→ Installing Docker..."
+  curl -fsSL https://get.docker.com | sh
+else
+  echo "→ Docker already installed"
+fi
+
+# ── 3. Firewall ──────────────────────────
+echo "→ Configuring firewall..."
+apt-get install -y -qq ufw
+ufw allow 22/tcp   >/dev/null 2>&1 || true
+ufw allow 80/tcp   >/dev/null 2>&1 || true
+ufw allow 443/tcp  >/dev/null 2>&1 || true
+ufw allow 8080/tcp >/dev/null 2>&1 || true
+ufw --force enable >/dev/null 2>&1 || true
+
+# ── 4. App user ──────────────────────────
+if ! id "$USER" &>/dev/null; then
+  echo "→ Creating user '$USER'..."
+  adduser --disabled-password --gecos "" "$USER"
+  usermod -aG docker "$USER"
+else
+  echo "→ User '$USER' already exists"
+  usermod -aG docker "$USER" 2>/dev/null || true
+fi
+
+# ── 5. Clone repo ────────────────────────
+if [ -d "$DIR/.git" ]; then
+  echo "→ Updating repo..."
+  cd "$DIR" && git pull --ff-only
+else
+  echo "→ Cloning repo..."
+  git clone "$REPO" "$DIR"
+fi
+chown -R "$USER:$USER" "$DIR"
+
+# ── 6. Generate .env with strong passwords ─
+cd "$DIR"
+if [ ! -f .env ]; then
+  echo "→ Generating .env with random passwords..."
+  PG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+  PL_SECRET=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+  PL_ADMIN_PASS=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
+
+  cat > .env << EOF
+POSTGRES_DB=cc
+POSTGRES_USER=cc
+POSTGRES_PASSWORD=${PG_PASS}
+PAPERLESS_SECRET_KEY=${PL_SECRET}
+PAPERLESS_ADMIN_USER=admin
+PAPERLESS_ADMIN_PASSWORD=${PL_ADMIN_PASS}
+PAPERLESS_TOKEN=
+EOF
+  chown "$USER:$USER" .env
+  chmod 600 .env
+  echo "   Paperless admin password: ${PL_ADMIN_PASS}"
+else
+  echo "→ .env already exists — keeping it"
+fi
+
+# ── 7. Build & start ────────────────────
+echo "→ Starting containers..."
+cd "$DIR"
+sudo -u "$USER" docker compose up -d --build 2>&1 | tail -5
+
+# ── 8. Wait for Paperless to be ready ───
+echo "→ Waiting for Paperless to start (can take ~60s)..."
+for i in $(seq 1 60); do
+  if sudo -u "$USER" docker compose exec -T paperless curl -sf http://localhost:8000/api/ >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+# ── 9. Create Paperless API token ────────
+echo "→ Creating Paperless API token..."
+TOKEN=$(sudo -u "$USER" docker compose exec -T paperless python3 manage.py shell -c "
+from rest_framework.authtoken.models import Token
+from django.contrib.auth.models import User
+u = User.objects.get(username='admin')
+t, _ = Token.objects.get_or_create(user=u)
+print(t.key)
+" 2>/dev/null | tr -d '[:space:]')
+
+if [ -n "$TOKEN" ] && [ "$TOKEN" != "" ]; then
+  # Update .env with token
+  if grep -q "^PAPERLESS_TOKEN=" .env; then
+    sed -i "s|^PAPERLESS_TOKEN=.*|PAPERLESS_TOKEN=${TOKEN}|" .env
+  else
+    echo "PAPERLESS_TOKEN=${TOKEN}" >> .env
+  fi
+  echo "   Token: ${TOKEN}"
+
+  # Restart app to pick up token
+  sudo -u "$USER" docker compose restart app >/dev/null 2>&1
+else
+  echo "   ⚠️  Could not generate token — Paperless may still be starting"
+  echo "   Run this later: cd $DIR && docker compose exec paperless python3 manage.py shell -c \\"
+  echo "     \"from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; t,_=Token.objects.get_or_create(user=User.objects.get(username='admin')); print(t.key)\""
+fi
+
+# ── 10. Setup SSH deploy key for GitHub Actions ─
+if [ ! -f /home/$USER/.ssh/deploy ]; then
+  echo "→ Generating deploy SSH key..."
+  sudo -u "$USER" mkdir -p /home/$USER/.ssh
+  sudo -u "$USER" ssh-keygen -t ed25519 -f /home/$USER/.ssh/deploy -N "" -q
+  cat /home/$USER/.ssh/deploy.pub >> /home/$USER/.ssh/authorized_keys
+  chmod 600 /home/$USER/.ssh/authorized_keys
+  chown "$USER:$USER" /home/$USER/.ssh/authorized_keys
+fi
+
+# ── Done ─────────────────────────────────
+IP=$(curl -sf https://api.ipify.org || hostname -I | awk '{print $1}')
+
+echo ""
+echo "══════════════════════════════════════"
+echo "  ✅  CC is live!"
+echo "══════════════════════════════════════"
+echo ""
+echo "  App:       http://${IP}:8080"
+echo "  Paperless: http://${IP}:8000"
+echo ""
+echo "  Paperless login: admin / $(grep PAPERLESS_ADMIN_PASSWORD .env | cut -d= -f2)"
+echo ""
+echo "  ── GitHub Actions (optional) ──"
+echo "  Go to: github.com/xzero-ai/cc → Settings → Secrets → Actions"
+echo "  DEPLOY_HOST = cc@${IP}"
+echo "  DEPLOY_KEY  = (contents below)"
+echo ""
+if [ -f /home/$USER/.ssh/deploy ]; then
+  cat /home/$USER/.ssh/deploy
+fi
+echo ""
+echo "══════════════════════════════════════"
