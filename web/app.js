@@ -17,6 +17,40 @@ const fmt = v => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, m
 const amtCls = v => Number(v) < 0 ? 'neg' : 'pos';
 function eur(v) { return '\u20ac\u202f' + fmt(v); }
 
+/* ── SKELETON ─────────────────────────────────────── */
+function docSkeleton() {
+  const rows = Array.from({ length: 5 }, () => `
+    <div class="skeleton-row">
+      <div class="sk sk-sm sk-id"></div>
+      <div class="sk sk-sm sk-nif"></div>
+      <div class="sk sk-sm sk-nif"></div>
+      <div class="sk sk-sm sk-val"></div>
+      <div class="sk sk-sm sk-val"></div>
+      <div class="sk sk-sm sk-dt"></div>
+      <div class="sk sk-sm sk-tag"></div>
+    </div>`).join('');
+  return `<div>${rows}</div>`;
+}
+
+function txSkeleton() {
+  return Array.from({ length: 5 }, () => `
+    <div class="skeleton-row">
+      <div class="sk sk-sm sk-id"></div>
+      <div class="sk sk-sm sk-dt"></div>
+      <div class="sk sk-sm sk-desc"></div>
+      <div class="sk sk-sm sk-val"></div>
+    </div>`).join('');
+}
+
+function recSkeleton() {
+  return Array.from({ length: 3 }, () => `
+    <div class="match-grid" style="opacity:.4">
+      <div class="match-side"><div class="sk sk-sm sk-tag" style="margin-bottom:.5rem"></div><div class="sk sk-sm sk-nif" style="margin-bottom:.35rem"></div><div class="sk sk-md sk-val"></div></div>
+      <div class="match-mid"><div class="sk sk-sm" style="width:24px;margin:0 auto"></div></div>
+      <div class="match-side right"><div class="sk sk-sm sk-tag" style="margin-bottom:.5rem;margin-left:auto"></div><div class="sk sk-md sk-val" style="margin-left:auto"></div></div>
+    </div>`).join('');
+}
+
 /* ── TABS ─────────────────────────────────────────── */
 const TAB_TITLES = { dashboard: 'Dashboard', faturas: 'Faturas', banco: 'Banco', reconciliar: 'Reconciliar', iva: 'IVA' };
 
@@ -147,10 +181,11 @@ async function loadSummary() {
 
 /* ── LOAD MONTHLY ─────────────────────────────────── */
 async function loadMonthly() {
+  const el = document.getElementById('ivaTable');
+  el.innerHTML = `<div style="padding:1.5rem">${txSkeleton()}</div>`;
   try {
     const rows = await api('/dashboard/monthly');
     renderBar(rows);
-    const el = document.getElementById('ivaTable');
     if (!rows.length) { el.innerHTML = emptyState('iva', 'Sem dados de IVA', 'Carrega faturas para ver resumo mensal'); return; }
     el.innerHTML = `
       <div class="card">
@@ -167,15 +202,26 @@ async function loadMonthly() {
           </tbody>
         </table>
       </div>`;
-  } catch (e) { console.error('monthly:', e); }
+  } catch (e) { el.innerHTML = errState('Erro ao carregar dados de IVA', e.message); }
 }
 
 /* ── LOAD DOCS ────────────────────────────────────── */
 async function loadDocs() {
+  const el = document.getElementById('docsTable');
+  el.innerHTML = docSkeleton();
+
+  const params = new URLSearchParams();
+  const nif  = document.getElementById('filterNif')?.value.trim();
+  const from = document.getElementById('filterFrom')?.value;
+  const to   = document.getElementById('filterTo')?.value;
+  if (nif)  params.set('supplier_nif', nif);
+  if (from) params.set('date_from', from);
+  if (to)   params.set('date_to', to);
+
+  const qs = params.toString() ? '?' + params.toString() : '';
   try {
-    const docs = await api('/documents');
-    const el = document.getElementById('docsTable');
-    if (!docs.length) { el.innerHTML = emptyState('doc', 'Sem documentos', 'Arrasta PDFs para come\u00e7ar'); return; }
+    const docs = await api('/documents' + qs);
+    if (!docs.length) { el.innerHTML = emptyState('doc', 'Sem documentos', nif || from || to ? 'Nenhum documento encontrado com estes filtros' : 'Arrasta PDFs para come\u00e7ar'); return; }
     el.innerHTML = `
       <table>
         <thead><tr><th>ID</th><th>Fornecedor</th><th>Cliente</th><th>Total</th><th>IVA</th><th>Data</th><th>Tipo</th></tr></thead>
@@ -191,14 +237,25 @@ async function loadDocs() {
           </tr>`).join('')}
         </tbody>
       </table>`;
-  } catch (e) { console.error('docs:', e); }
+  } catch (e) { el.innerHTML = errState('Erro ao carregar documentos', e.message); }
+}
+
+function clearDocFilter() {
+  const nif  = document.getElementById('filterNif');
+  const from = document.getElementById('filterFrom');
+  const to   = document.getElementById('filterTo');
+  if (nif)  nif.value  = '';
+  if (from) from.value = '';
+  if (to)   to.value   = '';
+  loadDocs();
 }
 
 /* ── LOAD TXS ─────────────────────────────────────── */
 async function loadTxs() {
+  const el = document.getElementById('txsTable');
+  el.innerHTML = `<div style="padding:1rem">${txSkeleton()}</div>`;
   try {
     const txs = await api('/bank-transactions');
-    const el = document.getElementById('txsTable');
     if (!txs.length) { el.innerHTML = emptyState('bank', 'Sem movimentos', 'Importa um extracto banc\u00e1rio em CSV'); return; }
     el.innerHTML = `
       <table>
@@ -212,16 +269,51 @@ async function loadTxs() {
           </tr>`).join('')}
         </tbody>
       </table>`;
-  } catch (e) { console.error('txs:', e); }
+  } catch (e) { el.innerHTML = errState('Erro ao carregar movimentos', e.message); }
 }
 
 /* ── LOAD RECS ────────────────────────────────────── */
 async function loadRecs() {
+  const el = document.getElementById('recsView');
+  const uEl = document.getElementById('unmatchedView');
+  el.innerHTML = recSkeleton();
+  uEl.innerHTML = '';
   try {
-    const recs = await api('/reconciliations');
-    const el = document.getElementById('recsView');
+    const [recs, docs] = await Promise.all([
+      api('/reconciliations'),
+      api('/documents'),
+    ]);
+
+    const matchedIds = new Set(recs.map(r => r.document_id));
+    const unmatched = docs.filter(d => !matchedIds.has(d.id));
+
+    if (unmatched.length) {
+      uEl.innerHTML = `
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          ${unmatched.length} por reconciliar
+        </div>
+        ${unmatched.map(d => `
+          <div class="unmatched-row">
+            <div class="unmatched-left">
+              <span class="u-id">#${d.id}</span>
+              <span class="u-nif">${d.supplier_nif}</span>
+              <span class="tag">${d.type}</span>
+            </div>
+            <div class="unmatched-right">
+              <div class="u-amt">${eur(d.total)}</div>
+              <div class="u-date">${d.date}</div>
+            </div>
+          </div>`).join('')}`;
+    }
+
     if (!recs.length) { el.innerHTML = emptyState('shuffle', 'Sem reconcilia\u00e7\u00f5es', 'Carrega documentos e movimentos, depois clica Reconciliar'); return; }
-    el.innerHTML = recs.map(r => `
+    el.innerHTML = `
+      <div class="section-label" style="margin-top:${unmatched.length ? '1.5rem' : '0'}">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        ${recs.length} reconciliado${recs.length !== 1 ? 's' : ''}
+      </div>
+      ${recs.map(r => `
       <div class="match-grid">
         <div class="match-side">
           <div class="m-tag">Fatura #${r.document_id}</div>
@@ -239,11 +331,14 @@ async function loadRecs() {
           <div class="m-desc">${r.description}</div>
           <div class="m-date">${r.tx_date}</div>
         </div>
-      </div>`).join('');
-  } catch (e) { console.error('recs:', e); }
+      </div>`).join('')}`;
+  } catch (e) {
+    el.innerHTML = errState('Erro ao carregar reconcilia\u00e7\u00f5es', e.message);
+    uEl.innerHTML = '';
+  }
 }
 
-/* ── EMPTY STATES ─────────────────────────────────── */
+/* ── EMPTY / ERROR STATES ─────────────────────────── */
 const EMPTY_ICONS = {
   doc:     '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><polyline points="14 2 14 8 20 8"/></svg>',
   bank:    '<svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
@@ -253,6 +348,10 @@ const EMPTY_ICONS = {
 
 function emptyState(icon, title, sub) {
   return `<div class="empty"><div class="empty-icon">${EMPTY_ICONS[icon] || ''}</div><div class="empty-title">${title}</div><div class="empty-sub">${sub}</div></div>`;
+}
+
+function errState(title, detail) {
+  return `<div class="empty"><div class="empty-icon" style="border-color:rgba(255,51,102,.28);background:var(--pinkbg)"><svg viewBox="0 0 24 24" width="22" height="22" stroke="var(--red)" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="empty-title" style="color:var(--red)">${title}</div><div class="empty-sub">${detail}</div></div>`;
 }
 
 /* ── UPLOAD PDFs — XHR with progress bar ─────────── */

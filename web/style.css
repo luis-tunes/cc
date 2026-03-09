@@ -525,6 +525,71 @@ tbody tr:hover td { background: rgba(255,209,102,.04) }
 .iva-table thead th:not(:first-child) { text-align: right }
 .iva-table tbody td:not(:first-child) { text-align: right }
 
+/* ── SKELETON LOADER ─────────────────────────────────────── */
+.skeleton-row {
+  display: flex; gap: .75rem; padding: .7rem 1.375rem;
+  border-bottom: 1px solid var(--b0); align-items: center;
+}
+.skeleton-row:last-child { border-bottom: none }
+.sk {
+  border-radius: 4px; background: var(--s2);
+  animation: skshimmer 1.4s ease infinite;
+  flex-shrink: 0;
+}
+.sk-sm  { height: 12px }
+.sk-md  { height: 14px }
+.sk-id  { width: 32px }
+.sk-nif { width: 88px }
+.sk-val { width: 72px }
+.sk-dt  { width: 80px }
+.sk-tag { width: 48px }
+.sk-desc{ width: 180px }
+@keyframes skshimmer {
+  0%   { opacity: .35 }
+  50%  { opacity: .65 }
+  100% { opacity: .35 }
+}
+
+/* ── FILTER BAR ──────────────────────────────────────────── */
+.filter-bar {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: .625rem 1.375rem; border-bottom: 1px solid var(--b1);
+  background: rgba(0,0,0,.15);
+}
+.filter-input {
+  padding: .38rem .65rem; border-radius: var(--rs);
+  background: var(--s2); border: 1px solid var(--b2);
+  color: var(--t0); font-size: .775rem; font-family: inherit;
+  outline: none; transition: border-color .14s;
+  min-width: 0;
+}
+.filter-input::placeholder { color: var(--t3) }
+.filter-input:focus { border-color: var(--b3) }
+.filter-sep { width: 1px; height: 18px; background: var(--b2); flex-shrink: 0 }
+
+/* ── UNMATCHED SECTION ───────────────────────────────────── */
+.section-label {
+  font-size: .6rem; font-weight: 700; color: var(--t2);
+  letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: .625rem; margin-top: 1.5rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.section-label:first-child { margin-top: 0 }
+.unmatched-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: .75rem 1.125rem;
+  background: var(--s1); border: 1px solid rgba(255,51,102,.18);
+  border-radius: var(--rs); margin-bottom: .375rem;
+  transition: border-color .2s;
+}
+.unmatched-row:hover { border-color: rgba(255,51,102,.35) }
+.unmatched-left  { display: flex; align-items: center; gap: .75rem; min-width: 0 }
+.unmatched-right { flex-shrink: 0; text-align: right }
+.u-id   { font-size: .68rem; color: var(--t3); font-family: 'SF Mono', ui-monospace, monospace }
+.u-nif  { font-size: .72rem; font-family: 'SF Mono', ui-monospace, monospace; color: var(--pink); background: var(--pinkbg); padding: .1rem .38rem; border-radius: 4px }
+.u-amt  { font-size: .92rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums }
+.u-date { font-size: .68rem; color: var(--t3); margin-top: .1rem }
+
 /* ── SCROLLBAR ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px }
 ::-webkit-scrollbar-track { background: transparent }

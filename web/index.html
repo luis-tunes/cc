@@ -161,6 +161,22 @@
             </button>
           </div>
         </div>
+        <div class="filter-bar">
+          <input class="filter-input" type="text" id="filterNif" placeholder="NIF fornecedor" maxlength="9" style="width:120px">
+          <div class="filter-sep"></div>
+          <input class="filter-input" type="date" id="filterFrom" title="De">
+          <span style="font-size:.72rem;color:var(--t3)">—</span>
+          <input class="filter-input" type="date" id="filterTo" title="Até">
+          <div class="filter-sep"></div>
+          <button class="btn btn-ghost" onclick="loadDocs()" style="padding:.3rem .7rem">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Filtrar
+          </button>
+          <button class="btn btn-ghost" onclick="clearDocFilter()" style="padding:.3rem .7rem;color:var(--t3)">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Limpar
+          </button>
+        </div>
         <div id="docsTable"></div>
       </div>
     </div>
@@ -197,6 +213,7 @@
         </button>
       </div>
       <div id="reconMsg"></div>
+      <div id="unmatchedView"></div>
       <div id="recsView"></div>
     </div>
 
