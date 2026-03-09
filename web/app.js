@@ -36,6 +36,11 @@ function showTab(id, btn) {
   if (id === 'iva')         loadMonthly();
 }
 
+function navigateTo(id) {
+  const btn = document.querySelector(`.nav-btn[onclick="showTab('${id}',this)"]`);
+  if (btn) showTab(id, btn);
+}
+
 /* ── CHARTS ───────────────────────────────────────── */
 let chartInst = null, barInst = null;
 
@@ -142,6 +147,8 @@ async function loadSummary() {
     setSummaryBar(s);
     setKpis(s);
     renderDonut(s.reconciliations, s.unmatched_documents);
+    const empty = s.documents.count === 0 && s.bank_transactions.count === 0;
+    document.getElementById('onboardWelcome').style.display = empty ? 'block' : 'none';
   } catch (e) { console.error('summary:', e); }
 }
 
@@ -171,16 +178,25 @@ async function loadMonthly() {
 }
 
 /* ── LOAD DOCS ────────────────────────────────────── */
+let _docsCache = {};
+let _docFilters = { nif: '', from: '', to: '' };
+
 async function loadDocs() {
   try {
-    const docs = await api('/documents');
+    let url = '/documents?limit=200';
+    if (_docFilters.nif)  url += '&supplier_nif=' + encodeURIComponent(_docFilters.nif);
+    if (_docFilters.from) url += '&date_from=' + _docFilters.from;
+    if (_docFilters.to)   url += '&date_to=' + _docFilters.to;
+    const docs = await api(url);
+    _docsCache = {};
+    docs.forEach(d => { _docsCache[d.id] = d; });
     const el = document.getElementById('docsTable');
-    if (!docs.length) { el.innerHTML = emptyState('doc', 'Sem documentos', 'Arrasta PDFs para come\u00e7ar'); return; }
+    if (!docs.length) { el.innerHTML = emptyState('doc', 'Sem documentos', 'Arrasta PDFs ou imagens para come\u00e7ar'); return; }
     el.innerHTML = `
       <table>
         <thead><tr><th>ID</th><th>Fornecedor</th><th>Cliente</th><th>Total</th><th>IVA</th><th>Data</th><th>Tipo</th></tr></thead>
         <tbody>
-          ${docs.map(d => `<tr>
+          ${docs.map(d => `<tr class="doc-row" onclick="openDocDetail(${d.id})">
             <td class="dimid mono">#${d.id}</td>
             <td><span class="chip">${d.supplier_nif}</span></td>
             <td><span class="chip">${d.client_nif}</span></td>
@@ -192,6 +208,78 @@ async function loadDocs() {
         </tbody>
       </table>`;
   } catch (e) { console.error('docs:', e); }
+}
+
+function applyDocFilter() {
+  _docFilters.nif  = document.getElementById('filterNif').value.trim();
+  _docFilters.from = document.getElementById('filterFrom').value;
+  _docFilters.to   = document.getElementById('filterTo').value;
+  loadDocs();
+}
+
+function clearDocFilter() {
+  _docFilters = { nif: '', from: '', to: '' };
+  document.getElementById('filterNif').value  = '';
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value   = '';
+  loadDocs();
+}
+
+/* ── DOCUMENT DETAIL MODAL ────────────────────────── */
+function openDocDetail(id) {
+  const d = _docsCache[id];
+  if (!d) return;
+  document.getElementById('modalTitle').textContent = 'Documento #' + d.id;
+  const paperlessLink = d.paperless_id
+    ? `<a class="modal-link" href="http://localhost:8000/documents/${d.paperless_id}/details/" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Ver no Paperless
+      </a>`
+    : '<span class="modal-val" style="color:var(--t3)">—</span>';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-row">
+      <div class="modal-field">
+        <div class="modal-label">NIF Fornecedor</div>
+        <div class="modal-val mono">${d.supplier_nif}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">NIF Cliente</div>
+        <div class="modal-val mono">${d.client_nif}</div>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <div class="modal-label">Total</div>
+        <div class="modal-val mono pos">${eur(d.total)}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">IVA</div>
+        <div class="modal-val mono" style="color:var(--amber)">${eur(d.vat)}</div>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <div class="modal-label">Data</div>
+        <div class="modal-val">${d.date}</div>
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">Tipo</div>
+        <div class="modal-val"><span class="tag">${d.type}</span></div>
+      </div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Paperless</div>
+      ${paperlessLink}
+    </div>`;
+  document.getElementById('docModal').classList.remove('hidden');
+}
+
+function closeDocModal(e) {
+  if (e.target.id === 'docModal') closeModal();
+}
+
+function closeModal() {
+  document.getElementById('docModal').classList.add('hidden');
 }
 
 /* ── LOAD TXS ─────────────────────────────────────── */
@@ -256,6 +344,13 @@ function emptyState(icon, title, sub) {
 }
 
 /* ── UPLOAD PDFs — XHR with progress bar ─────────── */
+const _ACCEPTED_EXTS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif']);
+
+function _isAccepted(name) {
+  const dot = name.lastIndexOf('.');
+  return dot !== -1 && _ACCEPTED_EXTS.has(name.slice(dot).toLowerCase());
+}
+
 function initDropzone() {
   const zone  = document.getElementById('dropzone');
   const input = document.getElementById('pdfInput');
@@ -267,12 +362,12 @@ function initDropzone() {
 }
 
 async function handleFiles(files) {
-  const pdfs = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-  if (!pdfs.length) return;
+  const accepted = Array.from(files).filter(f => _isAccepted(f.name));
+  if (!accepted.length) return;
 
   const list = document.getElementById('fileList');
 
-  for (const f of pdfs) {
+  for (const f of accepted) {
     const id = 'fr' + Date.now() + Math.random().toString(36).slice(2, 5);
 
     // Row with progress bar
@@ -384,6 +479,7 @@ async function pollForNewDoc(startTs) {
         setKpis(s);
         renderDonut(s.reconciliations, s.unmatched_documents);
         setBadge(s.unmatched_documents);
+        document.getElementById('onboardWelcome').style.display = 'none';
         return;
       }
     } catch {}
@@ -435,4 +531,5 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSummary();
   loadMonthly();
   setInterval(() => { loadSummary(); loadMonthly(); }, 30000);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 });

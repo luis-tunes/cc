@@ -88,6 +88,30 @@
 
     <!-- DASHBOARD -->
     <div class="tab-pane active" id="tab-dashboard">
+      <div class="onboard-card" id="onboardWelcome" style="display:none">
+        <div class="onboard-title">Bem-vindo ao CC — Contabilidade</div>
+        <div class="onboard-sub">Ainda não tens dados. Segue os passos abaixo para começar.</div>
+        <div class="onboard-steps">
+          <div class="onboard-step">
+            <div class="onboard-num">Passo 1</div>
+            <div class="onboard-name">Carrega uma fatura</div>
+            <div class="onboard-desc">Arrasta um PDF ou imagem para a tab <strong>Faturas</strong>. O Paperless faz OCR e extrai os dados automaticamente.</div>
+            <button class="btn btn-ghost onboard-btn" onclick="navigateTo('faturas')">Ir para Faturas</button>
+          </div>
+          <div class="onboard-step">
+            <div class="onboard-num">Passo 2</div>
+            <div class="onboard-name">Importa o extracto bancário</div>
+            <div class="onboard-desc">Exporta o extracto do teu banco em CSV e importa na tab <strong>Banco</strong>. Colunas: date; description; amount.</div>
+            <button class="btn btn-ghost onboard-btn" onclick="navigateTo('banco')">Ir para Banco</button>
+          </div>
+          <div class="onboard-step">
+            <div class="onboard-num">Passo 3</div>
+            <div class="onboard-name">Reconcilia automaticamente</div>
+            <div class="onboard-desc">Cruza faturas com movimentos bancários por valor e data. Confiança ≥ 99% num clique.</div>
+            <button class="btn btn-ghost onboard-btn" onclick="navigateTo('reconciliar')">Ir para Reconciliar</button>
+          </div>
+        </div>
+      </div>
       <div class="kpi-row" id="kpiGrid">
         <div class="kpi" data-dot="blue"><div class="kpi-header"><span class="kpi-tag">DOCS</span><span class="kpi-dot blue"></span></div><div class="kpi-val">—</div><div class="kpi-label">Documentos</div></div>
         <div class="kpi" data-dot="blue"><div class="kpi-header"><span class="kpi-tag">EUR</span><span class="kpi-dot blue"></span></div><div class="kpi-val">—</div><div class="kpi-label">Total Faturado</div></div>
@@ -136,12 +160,12 @@
 
       <div class="mb2">
         <div class="upload-zone" id="dropzone">
-          <input type="file" id="pdfInput" accept=".pdf" multiple hidden>
+          <input type="file" id="pdfInput" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif" multiple hidden>
           <div class="uz-ico">
             <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
           </div>
           <div class="uz-title">Arrasta PDFs aqui ou clica para selecionar</div>
-          <div class="uz-sub">Paperless faz OCR (~30s) · extrai NIF, total e IVA automaticamente</div>
+          <div class="uz-sub">PDF ou imagem (jpg, png, tiff) · Paperless faz OCR (~30s) · extrai NIF, total e IVA automaticamente</div>
         </div>
         <div class="file-list" id="fileList"></div>
         <div id="uploadInfo"></div>
@@ -160,6 +184,16 @@
               Exportar CSV
             </button>
           </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" id="filterNif" placeholder="NIF fornecedor" class="filter-input" maxlength="9">
+          <input type="date" id="filterFrom" class="filter-input" title="Data inicial">
+          <input type="date" id="filterTo" class="filter-input" title="Data final">
+          <button class="btn btn-ghost" onclick="applyDocFilter()">
+            <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filtrar
+          </button>
+          <button class="btn btn-ghost" onclick="clearDocFilter()">Limpar</button>
         </div>
         <div id="docsTable"></div>
       </div>
@@ -208,6 +242,19 @@
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /layout -->
+
+<!-- DOCUMENT DETAIL MODAL -->
+<div class="modal-overlay hidden" id="docModal" onclick="closeDocModal(event)">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-title" id="modalTitle">Documento</span>
+      <button class="modal-close" onclick="closeModal()" aria-label="Fechar">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="/app.js"></script>

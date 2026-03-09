@@ -14,6 +14,15 @@ from app.reconcile import reconcile_all
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 
+ACCEPTED_MIME: dict[str, str] = {
+    ".pdf":  "application/pdf",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png":  "image/png",
+    ".tiff": "image/tiff",
+    ".tif":  "image/tiff",
+}
+
 router = APIRouter()
 
 # --- Models ---
@@ -49,14 +58,18 @@ async def paperless_webhook(payload: WebhookPayload):
 
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile):
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=422, detail="only PDF files accepted")
+    if not file.filename:
+        raise HTTPException(status_code=422, detail="filename required")
+    ext = os.path.splitext(file.filename.lower())[1]
+    mime = ACCEPTED_MIME.get(ext)
+    if not mime:
+        raise HTTPException(status_code=422, detail="only PDF and image files (jpg, png, tiff) accepted")
     content = await file.read()
     headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
     r = httpx.post(
         f"{PAPERLESS_URL}/api/documents/post_document/",
         headers=headers,
-        files={"document": (file.filename, content, "application/pdf")},
+        files={"document": (file.filename, content, mime)},
         timeout=60,
     )
     if r.status_code not in (200, 202):
