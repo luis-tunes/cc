@@ -7,8 +7,8 @@ Partner (sales) gets 50% directly to their connected account.
 Platform (builder) keeps 50% as the application fee.
 
 Plans:
-  pro    — 150€/mo, unlimited docs, 5 seats
-  custom — enterprise, SLA + warranty, custom pricing (contact us)
+  pro    — 150€ + IVA/mês, documentos ilimitados, 5 utilizadores
+  custom — empresa, SLA + garantia, preço personalizado (contacte-nos)
 """
 
 import os
@@ -35,6 +35,7 @@ REVENUE_SPLIT_PERCENT = int(os.environ.get("REVENUE_SPLIT_PERCENT", "50"))
 PLANS = [
     {"id": "pro", "name": "Profissional", "price": 15000, "docs_per_month": -1, "seats": 5,
      "stripe_price_id": os.environ.get("STRIPE_PRICE_PRO", ""),
+     "vat_note": "Acresce IVA à taxa legal",
      "features": ["Documentos ilimitados", "5 utilizadores", "OCR automático", "Reconciliação bancária", "Exportação CSV", "Suporte por email"]},
     {"id": "custom", "name": "Empresa", "price": -1, "docs_per_month": -1, "seats": -1,
      "contact": CONTACT_EMAIL,
@@ -69,7 +70,8 @@ async def list_plans():
     return [{"id": p["id"], "name": p["name"], "price": p["price"],
              "docs_per_month": p["docs_per_month"], "seats": p["seats"],
              "features": p.get("features", []),
-             "contact": p.get("contact", "")}
+             "contact": p.get("contact", ""),
+             "vat_note": p.get("vat_note", "")}
             for p in PLANS]
 
 

@@ -235,6 +235,7 @@ export interface BillingPlan {
   seats: number;
   features: string[];
   contact: string;
+  vat_note: string;
 }
 
 export interface BillingStatus {

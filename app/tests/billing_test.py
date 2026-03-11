@@ -17,8 +17,9 @@ def test_plans_have_required_fields():
 
 def test_pro_plan_price():
     pro = next(p for p in PLANS if p["id"] == "pro")
-    assert pro["price"] == 15000  # 150 EUR in cents
+    assert pro["price"] == 15000  # 150 EUR + IVA in cents
     assert pro["seats"] == 5
+    assert pro["vat_note"]  # must mention IVA
 
 
 def test_custom_plan_is_contact():

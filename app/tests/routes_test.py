@@ -364,9 +364,10 @@ def test_billing_plans():
     plans = r.json()
     assert len(plans) == 2
     assert all("id" in p and "name" in p and "price" in p and "features" in p for p in plans)
-    # Pro is 150€, Custom has contact
+    # Pro is 150€ + IVA, Custom has contact
     pro = next(p for p in plans if p["id"] == "pro")
     assert pro["price"] == 15000
+    assert pro["vat_note"] != ""
     custom = next(p for p in plans if p["id"] == "custom")
     assert custom["contact"] != ""
 

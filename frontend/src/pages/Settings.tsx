@@ -67,6 +67,9 @@ export default function SettingsPage() {
                       <>
                         €{(plan.price / 100).toFixed(0)}
                         <span className="text-sm font-normal text-muted-foreground">/mês</span>
+                        {plan.vat_note && (
+                          <span className="block text-xs font-normal text-muted-foreground mt-1">{plan.vat_note}</span>
+                        )}
                       </>
                     )}
                   </p>

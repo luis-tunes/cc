@@ -137,9 +137,9 @@ CLERK_PEM_PUBLIC_KEY=...       # RSA PEM from Clerk dashboard
 AUTH_DISABLED=1                # set to 1 for dev (skips JWT validation)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_PRO=price_...     # Stripe price ID for 150€/mo plan
+STRIPE_PRICE_PRO=price_...     # Stripe price ID for 150€ + IVA/mês
 APP_URL=http://localhost:3000  # Stripe redirect URL
-CONTACT_EMAIL=info@tim.pt     # Enterprise plan contact
+CONTACT_EMAIL=info@tim.pt     # Contacto plano Empresa
 PARTNER_STRIPE_ACCOUNT=acct_... # Partner connected account (50/50 split)
 REVENUE_SPLIT_PERCENT=50       # Platform keeps 50%, partner gets 50%
 
