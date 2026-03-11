@@ -1,77 +1,89 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Loader2 } from "lucide-react";
 
-// Auth pages
+// Auth pages (small — keep eager)
 import SignInPage from "@/pages/SignIn";
 import SignUpPage from "@/pages/SignUp";
 
-// App pages
-import Dashboard from "@/pages/Dashboard";
-import ActivityFeed from "@/pages/ActivityFeed";
-import InboxPage from "@/pages/Inbox";
-import Documents from "@/pages/Documents";
-import BankMovements from "@/pages/BankMovements";
-import Reconciliation from "@/pages/Reconciliation";
-import Classifications from "@/pages/Classifications";
-import AutoClassification from "@/pages/AutoClassification";
-import TaxCenter from "@/pages/TaxCenter";
-import Obligations from "@/pages/Obligations";
-import Assets from "@/pages/Assets";
-import Reports from "@/pages/Reports";
-import AiAssistant from "@/pages/AiAssistant";
-import Insights from "@/pages/Insights";
-import Forecasts from "@/pages/Forecasts";
-import CostOptimization from "@/pages/CostOptimization";
-import EntityProfile from "@/pages/EntityProfile";
-import IntegrationsPage from "@/pages/Integrations";
-import SettingsPage from "@/pages/Settings";
-import UserProfile from "@/pages/UserProfile";
-import NotFound from "@/pages/NotFound";
+// Lazy-loaded app pages
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
+const InboxPage = lazy(() => import("@/pages/Inbox"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const BankMovements = lazy(() => import("@/pages/BankMovements"));
+const Reconciliation = lazy(() => import("@/pages/Reconciliation"));
+const Classifications = lazy(() => import("@/pages/Classifications"));
+const AutoClassification = lazy(() => import("@/pages/AutoClassification"));
+const TaxCenter = lazy(() => import("@/pages/TaxCenter"));
+const Obligations = lazy(() => import("@/pages/Obligations"));
+const Assets = lazy(() => import("@/pages/Assets"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const AiAssistant = lazy(() => import("@/pages/AiAssistant"));
+const Insights = lazy(() => import("@/pages/Insights"));
+const Forecasts = lazy(() => import("@/pages/Forecasts"));
+const CostOptimization = lazy(() => import("@/pages/CostOptimization"));
+const EntityProfile = lazy(() => import("@/pages/EntityProfile"));
+const IntegrationsPage = lazy(() => import("@/pages/Integrations"));
+const SettingsPage = lazy(() => import("@/pages/Settings"));
+const UserProfile = lazy(() => import("@/pages/UserProfile"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-full min-h-[50vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <TooltipProvider>
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<Navigate to="/painel" replace />} />
-        <Route path="/auth/sign-in/*" element={<SignInPage />} />
-        <Route path="/auth/sign-up/*" element={<SignUpPage />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<Navigate to="/painel" replace />} />
+          <Route path="/auth/sign-in/*" element={<SignInPage />} />
+          <Route path="/auth/sign-up/*" element={<SignUpPage />} />
 
-        {/* Protected — inside layout */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/painel" element={<Dashboard />} />
-          <Route path="/atividade" element={<ActivityFeed />} />
-          <Route path="/caixa-entrada" element={<InboxPage />} />
-          <Route path="/documentos" element={<Documents />} />
-          <Route path="/movimentos" element={<BankMovements />} />
-          <Route path="/reconciliacao" element={<Reconciliation />} />
-          <Route path="/classificacoes" element={<Classifications />} />
-          <Route path="/auto-classificacao" element={<AutoClassification />} />
-          <Route path="/centro-fiscal" element={<TaxCenter />} />
-          <Route path="/obrigacoes" element={<Obligations />} />
-          <Route path="/ativos" element={<Assets />} />
-          <Route path="/relatorios" element={<Reports />} />
-          <Route path="/assistente" element={<AiAssistant />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/previsoes" element={<Forecasts />} />
-          <Route path="/otimizacao" element={<CostOptimization />} />
-          <Route path="/entidade" element={<EntityProfile />} />
-          <Route path="/integracoes" element={<IntegrationsPage />} />
-          <Route path="/definicoes" element={<SettingsPage />} />
-          <Route path="/perfil" element={<UserProfile />} />
-        </Route>
+          {/* Protected — inside layout */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/painel" element={<Dashboard />} />
+            <Route path="/atividade" element={<ActivityFeed />} />
+            <Route path="/caixa-entrada" element={<InboxPage />} />
+            <Route path="/documentos" element={<Documents />} />
+            <Route path="/movimentos" element={<BankMovements />} />
+            <Route path="/reconciliacao" element={<Reconciliation />} />
+            <Route path="/classificacoes" element={<Classifications />} />
+            <Route path="/auto-classificacao" element={<AutoClassification />} />
+            <Route path="/centro-fiscal" element={<TaxCenter />} />
+            <Route path="/obrigacoes" element={<Obligations />} />
+            <Route path="/ativos" element={<Assets />} />
+            <Route path="/relatorios" element={<Reports />} />
+            <Route path="/assistente" element={<AiAssistant />} />
+            <Route path="/insights" element={<Insights />} />
+            <Route path="/previsoes" element={<Forecasts />} />
+            <Route path="/otimizacao" element={<CostOptimization />} />
+            <Route path="/entidade" element={<EntityProfile />} />
+            <Route path="/integracoes" element={<IntegrationsPage />} />
+            <Route path="/definicoes" element={<SettingsPage />} />
+            <Route path="/perfil" element={<UserProfile />} />
+          </Route>
 
-        {/* 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </TooltipProvider>
   );
 }

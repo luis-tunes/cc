@@ -1,11 +1,55 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { mockDocuments, type DocumentRecord } from "@/lib/documents-data";
+import { fetchDocuments, type Document } from "@/lib/api";
+import { type DocumentRecord, type DocumentType } from "@/lib/documents-data";
 
 /**
- * Hook to fetch documents.
- * Currently returns mock data from TIM.
- * TODO: Replace with fetchDocuments() from @/lib/api once backend
- * has the enriched document fields (document_type, extraction_confidence, etc.)
+ * Map a backend Document to the frontend DocumentRecord shape.
+ * The frontend expects richer fields than the backend currently stores,
+ * so we synthesize some values from what we have.
+ */
+function toDocumentRecord(doc: Document): DocumentRecord {
+  const typeMap: Record<string, DocumentType> = {
+    fatura: "fatura",
+    recibo: "recibo",
+    "nota-credito": "nota-credito",
+    "nota-debito": "nota-debito",
+    extrato: "extrato",
+  };
+
+  const statusMap: Record<string, DocumentRecord["classificationStatus"]> = {
+    pendente: "pendente",
+    "a processar": "pendente",
+    extraído: "extraído",
+    classificado: "classificado",
+    revisto: "revisto",
+    erro: "rejeitado",
+    arquivado: "arquivado",
+  };
+
+  const hasReconciliation = false; // TODO: backend should return this flag
+
+  return {
+    id: String(doc.id),
+    fileName: doc.filename || `documento-${doc.id}.pdf`,
+    fileType: "pdf",
+    documentType: typeMap[doc.type] || "outro",
+    supplier: doc.supplier_nif || undefined,
+    nif: doc.supplier_nif || undefined,
+    total: doc.total || undefined,
+    vat: doc.vat || undefined,
+    date: doc.date || undefined,
+    extractionConfidence: doc.raw_text ? 85 : 50,
+    classificationStatus: statusMap[doc.status] || "pendente",
+    reconciliationStatus: hasReconciliation ? "reconciliado" : "pendente",
+    source: "upload",
+    uploadedAt: doc.created_at || new Date().toISOString(),
+    needsReview: ["pendente", "a processar", "extraído"].includes(doc.status),
+  };
+}
+
+/**
+ * Hook to fetch documents from the real API.
+ * Returns DocumentRecord[] matching the frontend shape.
  */
 export function useDocuments() {
   const queryClient = useQueryClient();
@@ -13,10 +57,8 @@ export function useDocuments() {
   const { data: documents = [], isLoading, error } = useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
-      // TODO: fetch from API and map to DocumentRecord
-      // const raw = await fetchDocuments();
-      // return raw.map(mapToDocumentRecord);
-      return mockDocuments;
+      const raw = await fetchDocuments();
+      return raw.map(toDocumentRecord);
     },
   });
 

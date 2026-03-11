@@ -2,4 +2,6 @@ fastapi[standard]
 psycopg[binary,pool]
 invoice2data
 httpx
+clerk-backend-api
+PyJWT[crypto]
 pytest

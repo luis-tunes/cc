@@ -106,15 +106,17 @@ def ingest_document(paperless_id: int) -> int:
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 
+    # Always fetch OCR text for storage
+    raw_text = fetch_document_text(paperless_id)
+
     # ── Fallback: use Paperless OCR text when invoice2data finds nothing ──
     if not data:
-        text = fetch_document_text(paperless_id)
         try:
-            total = _parse_amount_from_text(text)
+            total = _parse_amount_from_text(raw_text)
         except ValueError:
             raise ValueError("could not extract amount from document")
-        doc_date = _parse_date_from_text(text)
-        nifs = [n for n in _NIF_RE.findall(text) if validate_nif(n)]
+        doc_date = _parse_date_from_text(raw_text)
+        nifs = [n for n in _NIF_RE.findall(raw_text) if validate_nif(n)]
         supplier_nif = nifs[0] if len(nifs) >= 1 else "000000000"
         client_nif   = nifs[1] if len(nifs) >= 2 else "000000000"
         data = {
@@ -143,16 +145,20 @@ def ingest_document(paperless_id: int) -> int:
             doc_date = date.today()
     doc_type = str(data.get("invoice_type", "invoice"))
 
+    # Determine status based on extraction quality
+    status = "extraído" if total > 0 else "pendente"
+
     with get_conn() as conn:
         row = conn.execute(
-            """INSERT INTO documents (supplier_nif, client_nif, total, vat, date, type, paperless_id)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """INSERT INTO documents (supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (paperless_id) DO UPDATE
                  SET total=EXCLUDED.total, vat=EXCLUDED.vat, date=EXCLUDED.date,
                      type=EXCLUDED.type, supplier_nif=EXCLUDED.supplier_nif,
-                     client_nif=EXCLUDED.client_nif
+                     client_nif=EXCLUDED.client_nif, raw_text=EXCLUDED.raw_text,
+                     status=EXCLUDED.status
                RETURNING id""",
-            (supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id),
+            (supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
         ).fetchone()
         conn.commit()
     return row["id"]

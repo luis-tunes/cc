@@ -3,6 +3,7 @@ import io
 import os
 from datetime import date
 from decimal import Decimal
+from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException, UploadFile, Query
 from fastapi.responses import StreamingResponse
@@ -24,9 +25,23 @@ class DocumentOut(BaseModel):
     client_nif: str
     total: Decimal
     vat: Decimal
-    date: date
+    date: date | None
     type: str
-    paperless_id: int | None
+    filename: str | None = None
+    raw_text: str | None = None
+    status: str = "pendente"
+    paperless_id: int | None = None
+    created_at: str | None = None
+
+class DocumentPatch(BaseModel):
+    status: Optional[str] = None
+    type: Optional[str] = None
+    supplier_nif: Optional[str] = None
+    client_nif: Optional[str] = None
+    total: Optional[Decimal] = None
+    vat: Optional[Decimal] = None
+    date: Optional[date] = None
+    filename: Optional[str] = None
 
 class BankTransactionOut(BaseModel):
     id: int
@@ -52,6 +67,17 @@ async def upload_document(file: UploadFile):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="only PDF files accepted")
     content = await file.read()
+
+    # Save a record immediately so frontend sees it
+    with get_conn() as conn:
+        row = conn.execute(
+            "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status) VALUES ('','',0,0,'outro',%s,'a processar') RETURNING id",
+            (file.filename,),
+        ).fetchone()
+        conn.commit()
+        local_id = row["id"]
+
+    # Forward to Paperless for OCR
     headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
     r = httpx.post(
         f"{PAPERLESS_URL}/api/documents/post_document/",
@@ -60,8 +86,12 @@ async def upload_document(file: UploadFile):
         timeout=60,
     )
     if r.status_code not in (200, 202):
+        # Mark as failed but keep the record
+        with get_conn() as conn:
+            conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
+            conn.commit()
         raise HTTPException(status_code=502, detail=f"paperless rejected: {r.text}")
-    return {"status": "accepted", "filename": file.filename}
+    return {"status": "accepted", "filename": file.filename, "id": local_id}
 
 # --- Documents ---
 
@@ -70,6 +100,8 @@ async def list_documents(
     supplier_nif: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    status: str | None = None,
+    search: str | None = None,
     limit: int = Query(default=100, le=1000),
     offset: int = 0,
 ):
@@ -84,11 +116,18 @@ async def list_documents(
     if date_to:
         clauses.append("date <= %s")
         params.append(date_to)
+    if status:
+        clauses.append("status = %s")
+        params.append(status)
+    if search:
+        clauses.append("(supplier_nif ILIKE %s OR client_nif ILIKE %s OR filename ILIKE %s)")
+        q = f"%{search}%"
+        params.extend([q, q, q])
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, paperless_id FROM documents {where} ORDER BY date DESC LIMIT %s OFFSET %s",
+            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall()
     return rows
@@ -97,9 +136,30 @@ async def list_documents(
 async def get_document(doc_id: int):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, supplier_nif, client_nif, total, vat, date, type, paperless_id FROM documents WHERE id = %s",
+            "SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents WHERE id = %s",
             (doc_id,),
         ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="document not found")
+    return row
+
+@router.patch("/documents/{doc_id}", response_model=DocumentOut)
+async def update_document(doc_id: int, patch: DocumentPatch):
+    updates = patch.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="no fields to update")
+    set_parts = []
+    params = []
+    for k, v in updates.items():
+        set_parts.append(f"{k} = %s")
+        params.append(v)
+    params.append(doc_id)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE documents SET {', '.join(set_parts)} WHERE id = %s RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at",
+            params,
+        ).fetchone()
+        conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
     return row
@@ -184,11 +244,15 @@ async def dashboard_summary():
         unmatched = conn.execute(
             "SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations)"
         ).fetchone()
+        pending = conn.execute("SELECT COUNT(*) as count FROM documents WHERE status = 'pendente'").fetchone()
+        classified = conn.execute("SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto')").fetchone()
     return {
         "documents": {"count": docs["count"], "total": str(docs["total"])},
         "bank_transactions": {"count": txs["count"], "total": str(txs["total"])},
         "reconciliations": recs["count"],
         "unmatched_documents": unmatched["count"],
+        "pending_review": pending["count"],
+        "classified": classified["count"],
     }
 
 @router.get("/dashboard/monthly")

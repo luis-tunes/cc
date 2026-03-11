@@ -6,10 +6,12 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 
+export type { BankTransaction };
+
 export function useBankTransactions() {
   return useQuery<BankTransaction[]>({
     queryKey: ["bank-transactions"],
-    queryFn: fetchBankTransactions,
+    queryFn: () => fetchBankTransactions(),
   });
 }
 

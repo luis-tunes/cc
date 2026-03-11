@@ -6,6 +6,8 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 
+export type { Reconciliation };
+
 export function useReconciliations() {
   return useQuery<Reconciliation[]>({
     queryKey: ["reconciliations"],
@@ -21,7 +23,7 @@ export function useRunReconciliation() {
       qc.invalidateQueries({ queryKey: ["reconciliations"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["documents"] });
-      toast.success(`${data.new_matches} novos matches encontrados`);
+      toast.success(`${data.matched} matches encontrados`);
     },
     onError: (err: Error) => {
       toast.error(`Erro na reconciliação: ${err.message}`);

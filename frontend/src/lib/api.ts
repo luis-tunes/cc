@@ -6,16 +6,36 @@
 
 const BASE = "/api";
 
+/** Get the Clerk session token for API calls */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const clerk = (window as any).__clerk;
+    if (clerk?.session) {
+      return await clerk.session.getToken();
+    }
+  } catch {
+    // No clerk available (dev mode, etc.)
+  }
+  return null;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  const token = await getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -23,8 +43,31 @@ async function request<T>(
     throw new Error(`API ${res.status}: ${body || res.statusText}`);
   }
 
-  // 204 No Content
   if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+async function requestFormData<T>(
+  path: string,
+  form: FormData
+): Promise<T> {
+  const headers: Record<string, string> = {};
+
+  const token = await getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Upload failed ${res.status}: ${body}`);
+  }
 
   return res.json();
 }
@@ -33,44 +76,64 @@ async function request<T>(
 
 export interface Document {
   id: number;
-  filename: string;
-  issuer_name: string | null;
-  issuer_nif: string | null;
-  amount: number | null;
-  doc_date: string | null;
+  supplier_nif: string;
+  client_nif: string;
+  total: number;
+  vat: number;
+  date: string | null;
+  type: string;
+  filename: string | null;
   raw_text: string | null;
   status: string;
-  created_at: string;
+  paperless_id: number | null;
+  created_at: string | null;
+}
+
+export interface DocumentPatch {
+  status?: string;
+  type?: string;
+  supplier_nif?: string;
+  client_nif?: string;
+  total?: number;
+  vat?: number;
+  date?: string;
+  filename?: string;
 }
 
 export interface BankTransaction {
   id: number;
-  tx_date: string;
+  date: string;
   description: string;
   amount: number;
-  balance: number | null;
-  created_at: string;
 }
 
 export interface Reconciliation {
   id: number;
   document_id: number;
-  transaction_id: number;
-  matched_on: string;
-  created_at: string;
+  bank_transaction_id: number;
+  match_confidence: number;
+  supplier_nif?: string;
+  total?: number;
+  doc_date?: string;
+  description?: string;
+  amount?: number;
+  tx_date?: string;
 }
 
 export interface DashboardSummary {
-  total_documents: number;
-  total_transactions: number;
-  total_reconciled: number;
-  unreconciled_documents: number;
+  documents: { count: number; total: string };
+  bank_transactions: { count: number; total: string };
+  reconciliations: number;
+  unmatched_documents: number;
+  pending_review: number;
+  classified: number;
 }
 
 export interface MonthlyData {
   month: string;
-  invoices: number;
-  total: number;
+  doc_count: number;
+  total: string;
+  vat: string;
 }
 
 // ── Documents ────────────────────────────────────────────────────────
@@ -78,10 +141,20 @@ export interface MonthlyData {
 export async function fetchDocuments(params?: {
   status?: string;
   search?: string;
+  supplier_nif?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
 }): Promise<Document[]> {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.search) qs.set("search", params.search);
+  if (params?.supplier_nif) qs.set("supplier_nif", params.supplier_nif);
+  if (params?.date_from) qs.set("date_from", params.date_from);
+  if (params?.date_to) qs.set("date_to", params.date_to);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
   const query = qs.toString();
   return request<Document[]>(`/documents${query ? `?${query}` : ""}`);
 }
@@ -90,38 +163,40 @@ export async function fetchDocument(id: number): Promise<Document> {
   return request<Document>(`/documents/${id}`);
 }
 
-export async function uploadDocument(file: File): Promise<Document> {
+export async function patchDocument(id: number, patch: DocumentPatch): Promise<Document> {
+  return request<Document>(`/documents/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function uploadDocument(file: File): Promise<{ status: string; filename: string; id: number }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/documents/upload`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Upload failed ${res.status}: ${body}`);
-  }
-  return res.json();
+  return requestFormData("/documents/upload", form);
 }
 
 // ── Bank Transactions ────────────────────────────────────────────────
 
-export async function fetchBankTransactions(): Promise<BankTransaction[]> {
-  return request<BankTransaction[]>("/bank-transactions");
+export async function fetchBankTransactions(params?: {
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<BankTransaction[]> {
+  const qs = new URLSearchParams();
+  if (params?.date_from) qs.set("date_from", params.date_from);
+  if (params?.date_to) qs.set("date_to", params.date_to);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  const query = qs.toString();
+  return request<BankTransaction[]>(`/bank-transactions${query ? `?${query}` : ""}`);
 }
 
 export async function uploadBankCSV(file: File): Promise<{ imported: number }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/bank-transactions/upload`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`CSV upload failed ${res.status}: ${body}`);
-  }
-  return res.json();
+  return requestFormData("/bank-transactions/upload", form);
 }
 
 // ── Reconciliation ───────────────────────────────────────────────────
@@ -130,8 +205,8 @@ export async function fetchReconciliations(): Promise<Reconciliation[]> {
   return request<Reconciliation[]>("/reconciliations");
 }
 
-export async function runReconciliation(): Promise<{ new_matches: number }> {
-  return request<{ new_matches: number }>("/reconcile", { method: "POST" });
+export async function runReconciliation(): Promise<{ matched: number; matches: any[] }> {
+  return request<{ matched: number; matches: any[] }>("/reconcile", { method: "POST" });
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────

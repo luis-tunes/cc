@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
 import { type DocumentRecord, type UploadingFile } from "@/lib/documents-data";
+import { uploadDocument } from "@/lib/api";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { toast } from "sonner";
@@ -59,7 +60,7 @@ export default function InboxPage() {
     });
   }, [filters]);
 
-  // Mock upload handler
+  // Real upload handler — sends to /api/documents/upload
   const handleUpload = useCallback((files: File[]) => {
     const newItems: UploadingFile[] = files.map((f, i) => ({
       id: `up-${Date.now()}-${i}`,
@@ -71,44 +72,51 @@ export default function InboxPage() {
     setUploadQueue((prev) => [...prev, ...newItems]);
     setShowIntake(true);
 
-    // Simulate progress
-    newItems.forEach((item) => {
+    // Upload each file to the API
+    newItems.forEach(async (item, idx) => {
+      const file = files[idx];
+
+      // Show progress animation
       let progress = 0;
       const interval = setInterval(() => {
-        progress += Math.random() * 25;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90; // cap at 90% until API responds
+        setUploadQueue((prev) =>
+          prev.map((f) => (f.id === item.id ? { ...f, progress } : f))
+        );
+      }, 200);
+
+      try {
+        await uploadDocument(file);
+        clearInterval(interval);
+        setUploadQueue((prev) =>
+          prev.map((f) =>
+            f.id === item.id ? { ...f, progress: 100, status: "processing" } : f
+          )
+        );
+        // After a short delay, mark as extracted and refetch
+        setTimeout(() => {
           setUploadQueue((prev) =>
             prev.map((f) =>
-              f.id === item.id ? { ...f, progress: 100, status: "processing" } : f
+              f.id === item.id ? { ...f, status: "extracted" } : f
             )
           );
-          // Simulate extraction
-          setTimeout(() => {
-            const success = Math.random() > 0.15;
-            setUploadQueue((prev) =>
-              prev.map((f) =>
-                f.id === item.id
-                  ? {
-                      ...f,
-                      status: success ? "extracted" : "failed",
-                      error: success ? undefined : "Falha na extração OCR — formato não suportado",
-                    }
-                  : f
-              )
-            );
-            if (success) toast.success(`${item.name} — extração concluída`);
-            else toast.error(`${item.name} — falha na extração`);
-          }, 1500 + Math.random() * 1500);
-        } else {
-          setUploadQueue((prev) =>
-            prev.map((f) => (f.id === item.id ? { ...f, progress } : f))
-          );
-        }
-      }, 300);
+          toast.success(`${item.name} — enviado para processamento OCR`);
+          refetch();
+        }, 1000);
+      } catch (err: any) {
+        clearInterval(interval);
+        setUploadQueue((prev) =>
+          prev.map((f) =>
+            f.id === item.id
+              ? { ...f, status: "failed", error: err.message || "Erro no upload" }
+              : f
+          )
+        );
+        toast.error(`${item.name} — falha no upload`);
+      }
     });
-  }, []);
+  }, [refetch]);
 
   const handleDismissUpload = useCallback((id: string) => {
     setUploadQueue((prev) => prev.filter((f) => f.id !== id));

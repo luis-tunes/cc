@@ -26,18 +26,23 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id            SERIAL PRIMARY KEY,
-                supplier_nif  VARCHAR(9) NOT NULL,
-                client_nif    VARCHAR(9) NOT NULL,
-                total         NUMERIC(12,2) NOT NULL,
-                vat           NUMERIC(12,2) NOT NULL,
-                date          DATE NOT NULL,
-                type          VARCHAR(32) NOT NULL,
+                tenant_id     TEXT,
+                supplier_nif  VARCHAR(9) NOT NULL DEFAULT '',
+                client_nif    VARCHAR(9) NOT NULL DEFAULT '',
+                total         NUMERIC(12,2) NOT NULL DEFAULT 0,
+                vat           NUMERIC(12,2) NOT NULL DEFAULT 0,
+                date          DATE,
+                type          VARCHAR(32) NOT NULL DEFAULT 'outro',
+                filename      TEXT,
+                raw_text      TEXT,
+                status        VARCHAR(32) NOT NULL DEFAULT 'pendente',
                 paperless_id  INTEGER UNIQUE,
                 created_at    TIMESTAMPTZ DEFAULT now()
             );
 
             CREATE TABLE IF NOT EXISTS bank_transactions (
                 id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT,
                 date        DATE NOT NULL,
                 description TEXT NOT NULL,
                 amount      NUMERIC(12,2) NOT NULL,
@@ -46,6 +51,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS reconciliations (
                 id                  SERIAL PRIMARY KEY,
+                tenant_id           TEXT,
                 document_id         INTEGER NOT NULL REFERENCES documents(id),
                 bank_transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id),
                 match_confidence    NUMERIC(5,4) NOT NULL,
@@ -53,6 +59,26 @@ def init_db():
                 UNIQUE(document_id, bank_transaction_id)
             );
         """)
+        # Add columns if they don't exist yet (migration for existing DBs)
+        for col, typ in [
+            ("tenant_id", "TEXT"),
+            ("filename", "TEXT"),
+            ("raw_text", "TEXT"),
+            ("status", "VARCHAR(32) DEFAULT 'pendente'"),
+        ]:
+            conn.execute(f"""
+                DO $$ BEGIN
+                    ALTER TABLE documents ADD COLUMN {col} {typ};
+                EXCEPTION WHEN duplicate_column THEN NULL;
+                END $$;
+            """)
+        for tbl in ("bank_transactions", "reconciliations"):
+            conn.execute(f"""
+                DO $$ BEGIN
+                    ALTER TABLE {tbl} ADD COLUMN tenant_id TEXT;
+                EXCEPTION WHEN duplicate_column THEN NULL;
+                END $$;
+            """)
         conn.commit()
 
 
