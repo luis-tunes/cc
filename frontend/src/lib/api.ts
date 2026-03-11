@@ -233,6 +233,8 @@ export interface BillingPlan {
   price: number;
   docs_per_month: number;
   seats: number;
+  features: string[];
+  contact: string;
 }
 
 export interface BillingStatus {

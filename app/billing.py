@@ -3,9 +3,8 @@ Stripe billing — checkout sessions, webhooks, plan status.
 Clerk handles auth; Stripe handles money. They connect via metadata.
 
 Plans:
-  free   — 0€/mo, 50 docs/month
-  pro    — 25€/mo, unlimited docs
-  team   — 49€/mo, unlimited + 5 seats
+  pro    — 150€/mo, unlimited docs, 5 seats
+  custom — enterprise, SLA + warranty, custom pricing (contact us)
 """
 
 import os
@@ -22,13 +21,15 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API = "https://api.stripe.com/v1"
 APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@tim.pt")
 
 PLANS = [
-    {"id": "free", "name": "Grátis", "price": 0, "docs_per_month": 50, "seats": 1},
-    {"id": "pro", "name": "Pro", "price": 2500, "docs_per_month": -1, "seats": 1,
-     "stripe_price_id": os.environ.get("STRIPE_PRICE_PRO", "")},
-    {"id": "team", "name": "Equipa", "price": 4900, "docs_per_month": -1, "seats": 5,
-     "stripe_price_id": os.environ.get("STRIPE_PRICE_TEAM", "")},
+    {"id": "pro", "name": "Profissional", "price": 15000, "docs_per_month": -1, "seats": 5,
+     "stripe_price_id": os.environ.get("STRIPE_PRICE_PRO", ""),
+     "features": ["Documentos ilimitados", "5 utilizadores", "OCR automático", "Reconciliação bancária", "Exportação CSV", "Suporte por email"]},
+    {"id": "custom", "name": "Empresa", "price": -1, "docs_per_month": -1, "seats": -1,
+     "contact": CONTACT_EMAIL,
+     "features": ["Tudo do Profissional", "Utilizadores ilimitados", "SLA com garantia", "Onboarding dedicado", "Integrações personalizadas", "Suporte prioritário"]},
 ]
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -57,7 +58,9 @@ def _stripe(method: str, path: str, data: dict | None = None) -> dict:
 async def list_plans():
     """Return available billing plans."""
     return [{"id": p["id"], "name": p["name"], "price": p["price"],
-             "docs_per_month": p["docs_per_month"], "seats": p["seats"]}
+             "docs_per_month": p["docs_per_month"], "seats": p["seats"],
+             "features": p.get("features", []),
+             "contact": p.get("contact", "")}
             for p in PLANS]
 
 
@@ -73,8 +76,10 @@ async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
 async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
     """Create a Stripe Checkout Session for upgrading."""
     plan = next((p for p in PLANS if p["id"] == plan_id), None)
-    if not plan or plan["id"] == "free":
+    if not plan:
         raise HTTPException(status_code=400, detail="Invalid plan")
+    if plan["id"] == "custom":
+        raise HTTPException(status_code=400, detail=f"Plano Empresa: contacte {CONTACT_EMAIL}")
     price_id = plan.get("stripe_price_id", "")
     if not price_id:
         raise HTTPException(status_code=503, detail="Stripe price not configured for this plan")

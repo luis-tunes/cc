@@ -362,8 +362,13 @@ def test_billing_plans():
     r = client.get("/api/billing/plans")
     assert r.status_code == 200
     plans = r.json()
-    assert len(plans) >= 2
-    assert all("id" in p and "name" in p and "price" in p for p in plans)
+    assert len(plans) == 2
+    assert all("id" in p and "name" in p and "price" in p and "features" in p for p in plans)
+    # Pro is 150€, Custom has contact
+    pro = next(p for p in plans if p["id"] == "pro")
+    assert pro["price"] == 15000
+    custom = next(p for p in plans if p["id"] == "custom")
+    assert custom["contact"] != ""
 
 
 def test_billing_status():

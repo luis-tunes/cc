@@ -2,7 +2,7 @@ import { useUser } from "@clerk/react";
 import { useBillingPlans, useBillingStatus, useCheckout } from "@/hooks/use-billing";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { cn } from "@/lib/utils";
-import { Check, CreditCard, Loader2 } from "lucide-react";
+import { Check, CreditCard, Loader2, Mail, Phone } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -10,7 +10,7 @@ export default function SettingsPage() {
   const { data: billing, isLoading: billingLoading } = useBillingStatus();
   const checkout = useCheckout();
   const isLoading = plansLoading || billingLoading;
-  const currentPlan = billing?.plan ?? "free";
+  const currentPlan = billing?.plan ?? "none";
 
   return (
     <PageContainer title="Definições" subtitle="Conta, faturação e configurações">
@@ -28,7 +28,9 @@ export default function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Plano atual</span>
-            <span className="font-medium text-tim-gold">{currentPlan.toUpperCase()}</span>
+            <span className="font-medium text-tim-gold">
+              {currentPlan === "pro" ? "Profissional" : currentPlan === "custom" ? "Empresa" : "—"}
+            </span>
           </div>
         </div>
       </div>
@@ -45,46 +47,59 @@ export default function SettingsPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 max-w-3xl">
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
+              const isCustom = plan.id === "custom";
               return (
                 <div
                   key={plan.id}
                   className={cn(
-                    "rounded-lg border p-5 transition-colors",
+                    "rounded-lg border p-6 transition-colors",
                     isCurrent ? "border-tim-gold bg-tim-gold/5" : "border-border hover:border-muted-foreground/30"
                   )}
                 >
-                  <h4 className="text-sm font-semibold text-foreground">{plan.name}</h4>
-                  <p className="mt-1 text-2xl font-bold text-foreground">
-                    {plan.price === 0 ? "Grátis" : `€${(plan.price / 100).toFixed(0)}`}
-                    {plan.price > 0 && <span className="text-xs font-normal text-muted-foreground">/mês</span>}
+                  <h4 className="text-base font-semibold text-foreground">{plan.name}</h4>
+                  <p className="mt-2 text-3xl font-bold text-foreground">
+                    {isCustom ? (
+                      <span className="text-lg">Preço personalizado</span>
+                    ) : (
+                      <>
+                        €{(plan.price / 100).toFixed(0)}
+                        <span className="text-sm font-normal text-muted-foreground">/mês</span>
+                      </>
+                    )}
                   </p>
-                  <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1.5">
-                      <Check className="h-3 w-3 text-tim-success" />
-                      {plan.docs_per_month === -1 ? "Docs ilimitados" : `${plan.docs_per_month} docs/mês`}
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="h-3 w-3 text-tim-success" />
-                      {plan.seats === 1 ? "1 utilizador" : `${plan.seats} utilizadores`}
-                    </li>
+                  <ul className="mt-5 space-y-2.5 text-sm text-muted-foreground">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-tim-success flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
                   </ul>
-                  <button
-                    disabled={isCurrent || checkout.isPending || plan.id === "free"}
-                    onClick={() => checkout.mutate(plan.id)}
-                    className={cn(
-                      "mt-4 w-full rounded-md px-3 py-2 text-xs font-medium transition-colors",
-                      isCurrent
-                        ? "bg-muted text-muted-foreground cursor-default"
-                        : plan.id === "free"
+                  {isCustom ? (
+                    <a
+                      href={`mailto:${plan.contact}`}
+                      className="mt-5 w-full flex items-center justify-center gap-2 rounded-md border border-tim-gold px-3 py-2.5 text-sm font-medium text-tim-gold hover:bg-tim-gold/10 transition-colors"
+                    >
+                      <Mail className="h-4 w-4" />
+                      Contacte-nos
+                    </a>
+                  ) : (
+                    <button
+                      disabled={isCurrent || checkout.isPending}
+                      onClick={() => checkout.mutate(plan.id)}
+                      className={cn(
+                        "mt-5 w-full rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                        isCurrent
                           ? "bg-muted text-muted-foreground cursor-default"
                           : "bg-tim-gold text-black hover:bg-tim-gold/90"
-                    )}
-                  >
-                    {isCurrent ? "Plano atual" : plan.id === "free" ? "Grátis" : "Upgrade"}
-                  </button>
+                      )}
+                    >
+                      {isCurrent ? "Plano atual" : "Subscrever"}
+                    </button>
+                  )}
                 </div>
               );
             })}
