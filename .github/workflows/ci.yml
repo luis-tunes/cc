@@ -8,20 +8,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      db:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: cc
-          POSTGRES_USER: cc
-          POSTGRES_PASSWORD: cc
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U cc"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 

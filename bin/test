@@ -2,9 +2,9 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# backend
-docker compose run --rm -e DATABASE_URL=postgresql://cc:cc@db:5432/cc app \
-  python -m pytest app/tests/ -v "$@"
+# backend — AUTH_DISABLED=1 + mock DB means no PG needed
+AUTH_DISABLED=1 DATABASE_URL="postgresql://cc:cc@localhost:5432/cc" \
+  python3 -m pytest app/tests/ -v "$@"
 
 # frontend
 cd frontend && npm run build

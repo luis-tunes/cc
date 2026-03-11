@@ -6,3 +6,4 @@ clerk-backend-api
 PyJWT[crypto]
 pytest
 pytest-asyncio
+setuptools<81
