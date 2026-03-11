@@ -1,5 +1,7 @@
 ### Stage 1 — Build React frontend ###
 FROM node:20-slim AS frontend-build
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
@@ -20,4 +22,5 @@ COPY app/ app/
 # Copy the built frontend instead of old vanilla web/
 COPY --from=frontend-build /build/dist web/
 
+EXPOSE 8080
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

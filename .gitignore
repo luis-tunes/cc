@@ -4,3 +4,8 @@ __pycache__/
 !.env.example
 *.egg-info/
 .venv/
+.DS_Store
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+docker-compose.override.yml

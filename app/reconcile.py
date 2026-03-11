@@ -5,15 +5,19 @@ from app.db import get_conn
 AMOUNT_TOLERANCE = Decimal("0.01")
 DATE_TOLERANCE = timedelta(days=5)
 
-def reconcile_all() -> list[dict]:
+def reconcile_all(tenant_id: str | None = None) -> list[dict]:
+    tf = " AND tenant_id = %s" if tenant_id else ""
+    tp = [tenant_id] if tenant_id else []
     with get_conn() as conn:
         docs = conn.execute(
-            """SELECT id, total, date FROM documents
-               WHERE id NOT IN (SELECT document_id FROM reconciliations)"""
+            f"""SELECT id, total, date FROM documents
+               WHERE id NOT IN (SELECT document_id FROM reconciliations){tf}""",
+            tp,
         ).fetchall()
         txs = conn.execute(
-            """SELECT id, amount, date FROM bank_transactions
-               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations)"""
+            f"""SELECT id, amount, date FROM bank_transactions
+               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations){tf}""",
+            tp,
         ).fetchall()
         matches = []
         used_tx = set()

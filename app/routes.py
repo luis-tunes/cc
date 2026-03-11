@@ -237,8 +237,9 @@ async def list_bank_transactions(
 # --- Reconciliation ---
 
 @router.post("/reconcile")
-async def run_reconciliation():
-    matches = reconcile_all()
+async def run_reconciliation(auth: AuthInfo | None = Depends(optional_auth)):
+    tid = auth.tenant_id if auth else None
+    matches = reconcile_all(tid)
     return {"matched": len(matches), "matches": matches}
 
 @router.get("/reconciliations")
@@ -264,7 +265,7 @@ async def list_reconciliations(
                JOIN bank_transactions b ON b.id = r.bank_transaction_id
                {where}
                ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
-            (limit, offset),
+            params,
         ).fetchall()
     return rows
 
@@ -316,12 +317,17 @@ async def monthly_summary(auth: AuthInfo | None = Depends(optional_auth)):
              "total": str(r["total"]), "vat": str(r["vat"])} for r in rows]
 
 @router.get("/export/csv")
-async def export_csv():
+async def export_csv(auth: AuthInfo | None = Depends(optional_auth)):
+    clauses: list[str] = []
+    params: list = []
+    _tenant_clause(auth, clauses, params)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     with get_conn() as conn:
         docs = conn.execute(
-            "SELECT id, supplier_nif, client_nif, total, vat, date, type FROM documents ORDER BY date DESC"
+            f"SELECT id, supplier_nif, client_nif, total, vat, date, type FROM documents {where} ORDER BY date DESC",
+            params,
         ).fetchall()
     w.writerow(["ID", "NIF Fornecedor", "NIF Cliente", "Total", "IVA", "Data", "Tipo"])
     for d in docs:
