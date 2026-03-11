@@ -1,30 +1,65 @@
-# CC
+# TIM — Time is Money
 
-Accounting for Portugal. Docs in → data out → reconcile with bank.
+Portuguese accounting SaaS. Docs in → OCR → data out → reconcile with bank.
+Multi-tenant via Clerk. React frontend, FastAPI backend.
+
+## Architecture
+
+```
+User → Clerk Auth → React SPA → /api/* → FastAPI → PostgreSQL
+                                           ↕
+                               Paperless-ngx (OCR container)
+```
 
 ## Dependencies
 
-Only what you can't write in an afternoon:
+### Backend (Python 3.11)
+| Package | Purpose | Cost |
+|---------|---------|------|
+| FastAPI + uvicorn | HTTP API | Free |
+| psycopg[binary,pool] | PostgreSQL driver, no ORM | Free |
+| invoice2data | Invoice parsing (templates) | Free |
+| httpx | HTTP client (Paperless API) | Free |
+| Paperless-ngx | OCR, runs as separate container | Free (self-hosted) |
+| pytest | Tests | Free |
 
-- Python 3.11
-- FastAPI + uvicorn (HTTP)
-- psycopg (PostgreSQL driver, no ORM)
-- invoice2data (invoice parsing)
-- Paperless-ngx (OCR, runs as separate container)
-- Docker
+### Frontend (Node 20 / React 18)
+| Package | Purpose | Cost |
+|---------|---------|------|
+| React 18 + ReactDOM | UI framework | Free |
+| Vite 7 | Build tool + dev server | Free |
+| TypeScript 5.9 | Type safety | Free |
+| @clerk/react | Auth (SSO, multi-tenant, Stripe-ready) | Free <10k MAU, $25/mo 10k+ |
+| Tailwind CSS 3 | Utility-first styles | Free |
+| Radix UI (16 primitives) | Accessible UI components (shadcn/ui) | Free |
+| TanStack React Query | Data fetching + cache | Free |
+| React Router DOM | Client-side routing | Free |
+| Recharts | Charts & graphs | Free |
+| Lucide React | Icons | Free |
+| Sonner | Toast notifications | Free |
+| cmdk | Command palette | Free |
 
-No ORM. No SQLAlchemy. No Pandas. No Celery. SQL is the interface to the database.
+### Infrastructure
+| Service | Purpose | Est. Cost |
+|---------|---------|-----------|
+| Clerk | Auth + user management | Free dev; $25/mo prod (10k MAU) |
+| PostgreSQL 16 | Database | Self-hosted (free) or $15/mo managed |
+| Redis 7 | Paperless cache | Self-hosted (free) |
+| VPS (Hetzner/DO) | Docker host | €5–20/mo |
+| Domain + DNS | tim.pt or similar | ~€10/year |
+| **Total monthly** | | **~€25–60/mo** |
 
 ## How It Flows
 
 ```
-doc arrives → Paperless (OCR) → post-consume script → curl webhook → parse (invoice2data) → PostgreSQL
+doc arrives → Paperless (OCR) → post-consume script → curl webhook
+→ parse (invoice2data) → PostgreSQL → React UI shows result
 ```
 
 ## Schema
 
 ```sql
-documents:         supplier_nif, client_nif, total, vat, date, type
+documents:         supplier_nif, client_nif, total, vat, date, type, status
 bank_transactions: date, description, amount
 reconciliations:   document_id, bank_transaction_id, match_confidence
 ```
@@ -36,41 +71,75 @@ reconciliations:   document_id, bank_transaction_id, match_confidence
 ## Layout
 
 ```
-app/
-  main.py
-  db.py
-  parse.py
-  reconcile.py
-  routes.py
-  pt_invoice.yml
+app/                          # Python backend
+  main.py                     # FastAPI app + SPA fallback
+  db.py                       # psycopg pool + schema
+  parse.py                    # invoice2data + Paperless OCR
+  reconcile.py                # Amount+date matching
+  routes.py                   # All API endpoints
+  pt_invoice.yml              # invoice2data template
   tests/
-web/
-  index.html   # HTML shell, no logic
-  style.css    # all styles
-  app.js       # all JS
-bin/
-  dev
-  test
-  clean
-  deploy
-  post-consume
-Makefile
+frontend/                     # React SPA
+  src/
+    App.tsx                   # Router + Clerk auth
+    main.tsx                  # Entry (ClerkProvider, QueryClient, BrowserRouter)
+    index.css                 # Tailwind + TIM theme CSS vars
+    components/
+      layout/                 # AppLayout, Sidebar, Topbar, PageContainer
+      auth/                   # ProtectedRoute
+      ui/                     # 49 shadcn/ui primitives
+      shared/                 # KpiCard, StatusBadge, EmptyState, CommandMenu...
+      documents/              # DocumentList, ReviewDrawer, FiltersBar
+      movements/              # MovementLedger, ImportPanel
+      reconciliation/         # MatchCard, ReconciliationCommandBar
+      dashboard/              # FinancialOverview, ReconciliationHealth
+      global/                 # GlobalUploadModal, QuickAddButton
+      alerts/                 # TopbarAlertDropdown, AlertCenter
+    hooks/                    # TanStack Query hooks (use-documents, etc.)
+    lib/
+      api.ts                  # FastAPI client (/api/*)
+      navigation.ts           # Sidebar nav config (5 groups, 20 items)
+      *-data.ts               # Mock data + TypeScript types
+    pages/                    # 20 page components
+  tailwind.config.ts          # TIM dark theme
+  vite.config.ts              # Proxy /api → :8080
+web/                          # Old vanilla frontend (deprecated)
+bin/                          # Scripts
+Dockerfile                    # Multi-stage: Node build → Python runtime
 docker-compose.yml
-Dockerfile
 ```
 
 ## Run
 
+```bash
+# Backend
+make dev               # or: cd app && uvicorn app.main:app --reload --port 8080
+
+# Frontend (dev)
+cd frontend && npm run dev   # Vite dev server on :5173, proxies /api → :8080
+
+# Full stack
+make deploy HOST=user@ip     # Docker build + push
+
+# Tests
+make test              # pytest
 ```
-make dev       # local
-make test      # tests
-make clean     # nuke volumes
-make deploy HOST=user@ip  # ship
+
+## Environment Variables
+
+```bash
+# .env (backend)
+DATABASE_URL=postgresql://user:pass@localhost:5432/tim
+PAPERLESS_URL=http://paperless:8000/api/
+PAPERLESS_TOKEN=...
+
+# frontend/.env (frontend)
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
 ## Won't Do
 
-Multi-tenant. AT integration. SAFT. ML. Complex auth. ORM.
+AT integration. SAFT. ML. Complex billing. ORM.
 
 ## Rules
 
@@ -81,34 +150,23 @@ Multi-tenant. AT integration. SAFT. ML. Complex auth. ORM.
 - Type hints on function signatures.
 - Pydantic for API request/response only.
 - Errors raise. Don't return None.
-- No dead code. No TODOs in committed code.
-- No unused imports. No dead variables.
 - SQL strings in the module that uses them. No query builder.
-- Clean up tempfiles. Always unlink.
 - Test with pytest. thing_test.py, not test_thing.py.
 - One function, one job. Extract on third repeat.
 - bin/ scripts are the source of truth. Makefile calls bin/. CI calls make.
 - UI text in Portuguese. Code, comments, commits in English.
 - Same docker-compose.yml everywhere. Only .env changes.
-- .env.example in repo. .env is local, never committed. Server .env created manually.
+- .env.example in repo. .env is local, never committed.
 
-## UI
+## UI Theme
 
-- Dark theme. Base `#0d1117`. Surfaces `--s0`…`--s4` (`#161b27`→`#2e3d52`). Never pure black.
-- Borders `rgba(255,255,255,.06/.10/.15/.22)`. More visible than old theme.
-- Text WCAG AA: `--t0 #e6edf3` / `--t1 #c9d1d9` / `--t2 #8b949e` / `--t3 #586069`.
-- Accent `--a #79a4f7` (brighter indigo). Green `#3ddc97`. Red `#f87171`. Amber `#fbbf24`.
-- KPI cards: colored left accent bar via `data-dot="blue|green|red"` + `::after` pseudo.
-- Upload: XHR with `xhr.upload progress` → `.fr-bar` width. OCR banner `.ocr-banner` + `.ocr-spin` after accept. Poll `/dashboard/summary` every 3s for 90s until doc count increases.
-- Paperless link: `.paperless-hint` callout at top of Faturas tab with `.btn-paperless`.
-- SVG stroke icons (stroke-width 1.75, stroke-linecap/linejoin round). No emojis.
-- Inter font. `SF Mono` / `ui-monospace` for NIFs and amounts.
-- Keyframes: `fadeUp` / `slideDown` / `pulse` / `spin`. All ≤250ms except `spin`.
-- `backdrop-filter: blur(20px)` on sticky topbar.
-- CSS in `web/style.css`. JS in `web/app.js`. `index.html` is a shell only.
-- No build tools. Chart.js CDN. Portuguese labels. English code.
+- Dark mode only. TIM dark theme with gold accent.
+- Colors: primary gold `hsl(40 80% 55%)`, success teal, danger red, info blue.
+- Sidebar: collapsible, 5 nav groups, active indicator with gold bar.
+- Inter font. Smooth scrollbars. WCAG AA contrast.
+- shadcn/ui components (Radix-based). No custom CSS except theme vars.
 
-## AI
+## AI Rules
 
 - Don't explain. Don't comment obvious things.
 - Don't create files when editing one works.
@@ -116,3 +174,5 @@ Multi-tenant. AT integration. SAFT. ML. Complex auth. ORM.
 - Don't add dependencies without asking.
 - Paperless at `http://paperless:8000/api/`. Webhook via PAPERLESS_POST_CONSUME_SCRIPT.
 - invoice2data templates in `app/` (yml files next to parse.py).
+- Frontend changes: React/TypeScript in `frontend/src/`. Never edit `web/`.
+- API routes go under `/api` prefix in routes.py.
