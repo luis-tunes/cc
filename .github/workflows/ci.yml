@@ -24,6 +24,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+
+      # Backend
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -31,6 +33,13 @@ jobs:
       - run: python -m pytest app/tests/ -v
         env:
           DATABASE_URL: postgresql://cc:cc@localhost:5432/cc
+          AUTH_DISABLED: '1'
+
+      # Frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: cd frontend && npm ci && npm run build
 
   deploy:
     needs: test
@@ -44,7 +53,7 @@ jobs:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_KEY" ]; then
-            echo "⚠️  DEPLOY_HOST / DEPLOY_KEY not configured — skipping deploy"
+            echo "DEPLOY_HOST / DEPLOY_KEY not configured — skipping"
             exit 0
           fi
           mkdir -p ~/.ssh
@@ -54,6 +63,7 @@ jobs:
           rsync -az --delete \
             --exclude '.git' \
             --exclude '__pycache__' \
+            --exclude 'node_modules' \
             --exclude '.env' \
             . "$DEPLOY_HOST:/opt/cc/"
-          ssh "$DEPLOY_HOST" "cd /opt/cc && docker-compose up -d --build"
+          ssh "$DEPLOY_HOST" "cd /opt/cc && docker compose up -d --build"

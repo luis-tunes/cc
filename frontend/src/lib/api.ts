@@ -224,3 +224,33 @@ export async function fetchMonthlyData(): Promise<MonthlyData[]> {
 export function getExportCSVUrl(): string {
   return `${BASE}/export/csv`;
 }
+
+// ── Billing ──────────────────────────────────────────────────────────
+
+export interface BillingPlan {
+  id: string;
+  name: string;
+  price: number;
+  docs_per_month: number;
+  seats: number;
+}
+
+export interface BillingStatus {
+  plan: string;
+  status: string;
+  stripe_customer?: string;
+}
+
+export async function fetchBillingPlans(): Promise<BillingPlan[]> {
+  return request<BillingPlan[]>("/billing/plans");
+}
+
+export async function fetchBillingStatus(): Promise<BillingStatus> {
+  return request<BillingStatus>("/billing/status");
+}
+
+export async function createCheckoutSession(planId: string): Promise<{ checkout_url: string }> {
+  return request<{ checkout_url: string }>(`/billing/checkout?plan_id=${planId}`, {
+    method: "POST",
+  });
+}

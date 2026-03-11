@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.db import close_pool, init_db
 from app.routes import router
+from app.billing import router as billing_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,9 +21,13 @@ async def health():
 
 # All API routes under /api
 app.include_router(router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
 
-# Also keep routes without prefix for backwards compatibility
-app.include_router(router)
+# Backward-compat: Paperless post-consume calls /webhook without /api prefix
+@app.post("/webhook")
+async def webhook_compat(payload: dict):
+    from app.routes import paperless_webhook, WebhookPayload
+    return await paperless_webhook(WebhookPayload(**payload))
 
 _web_dir = os.environ.get("WEB_DIR", "/opt/tim/web")
 if os.path.isdir(_web_dir):

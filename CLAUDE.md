@@ -1,14 +1,14 @@
 # TIM — Time is Money
 
 Portuguese accounting SaaS. Docs in → OCR → data out → reconcile with bank.
-Multi-tenant via Clerk. React frontend, FastAPI backend.
+Multi-tenant via Clerk. Stripe billing. React frontend, FastAPI backend.
 
 ## Architecture
 
 ```
 User → Clerk Auth → React SPA → /api/* → FastAPI → PostgreSQL
-                                           ↕
-                               Paperless-ngx (OCR container)
+                                  ↕                    ↕
+                            Stripe Billing    Paperless-ngx (OCR)
 ```
 
 ## Dependencies
@@ -22,6 +22,7 @@ User → Clerk Auth → React SPA → /api/* → FastAPI → PostgreSQL
 | httpx | HTTP client (Paperless API) | Free |
 | Paperless-ngx | OCR, runs as separate container | Free (self-hosted) |
 | pytest | Tests | Free |
+| pytest-asyncio | Async test support | Free |
 
 ### Frontend (Node 20 / React 18)
 | Package | Purpose | Cost |
@@ -43,6 +44,7 @@ User → Clerk Auth → React SPA → /api/* → FastAPI → PostgreSQL
 | Service | Purpose | Est. Cost |
 |---------|---------|-----------|
 | Clerk | Auth + user management | Free dev; $25/mo prod (10k MAU) |
+| Stripe | Billing + subscriptions | 1.4% + €0.25/tx |
 | PostgreSQL 16 | Database | Self-hosted (free) or $15/mo managed |
 | Redis 7 | Paperless cache | Self-hosted (free) |
 | VPS (Hetzner/DO) | Docker host | €5–20/mo |
@@ -78,6 +80,8 @@ app/                          # Python backend
   reconcile.py                # Amount+date matching
   routes.py                   # All API endpoints
   pt_invoice.yml              # invoice2data template
+  auth.py                     # Clerk JWT middleware (require_auth, optional_auth)
+  billing.py                  # Stripe billing (plans, checkout, webhooks)
   tests/
 frontend/                     # React SPA
   src/
@@ -95,9 +99,9 @@ frontend/                     # React SPA
       dashboard/              # FinancialOverview, ReconciliationHealth
       global/                 # GlobalUploadModal, QuickAddButton
       alerts/                 # TopbarAlertDropdown, AlertCenter
-    hooks/                    # TanStack Query hooks (use-documents, etc.)
+    hooks/                    # TanStack Query hooks (use-documents, use-billing, etc.)
     lib/
-      api.ts                  # FastAPI client (/api/*)
+      api.ts                  # FastAPI client (/api/*) + Stripe billing API
       navigation.ts           # Sidebar nav config (5 groups, 20 items)
       *-data.ts               # Mock data + TypeScript types
     pages/                    # 20 page components
@@ -112,28 +116,32 @@ docker-compose.yml
 ## Run
 
 ```bash
-# Backend
-make dev               # or: cd app && uvicorn app.main:app --reload --port 8080
+make dev                     # docker compose up --build (full stack)
+make test                    # pytest + vite build
+make deploy HOST=user@ip     # test → rsync → docker compose up -d
+make clean                   # docker compose down -v + purge caches
 
-# Frontend (dev)
-cd frontend && npm run dev   # Vite dev server on :5173, proxies /api → :8080
-
-# Full stack
-make deploy HOST=user@ip     # Docker build + push
-
-# Tests
-make test              # pytest
+# Frontend dev (hot reload)
+cd frontend && npm run dev   # Vite on :3000, proxies /api → :8080
 ```
 
 ## Environment Variables
 
 ```bash
-# .env (backend)
-DATABASE_URL=postgresql://user:pass@localhost:5432/tim
-PAPERLESS_URL=http://paperless:8000/api/
+# .env (backend — see .env.example)
+DATABASE_URL=postgresql://cc:cc@db:5432/cc
+PAPERLESS_URL=http://paperless:8000
 PAPERLESS_TOKEN=...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_PEM_PUBLIC_KEY=...       # RSA PEM from Clerk dashboard
+AUTH_DISABLED=1                # set to 1 for dev (skips JWT validation)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_PRO=price_...     # Stripe price ID for Pro plan
+STRIPE_PRICE_TEAM=price_...    # Stripe price ID for Team plan
+APP_URL=http://localhost:3000  # Stripe redirect URL
 
-# frontend/.env (frontend)
+# frontend/.env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 

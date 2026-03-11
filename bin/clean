@@ -1,4 +1,6 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")/.."
-docker-compose down -v
+docker compose down -v
+rm -rf frontend/dist frontend/node_modules/.vite
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
