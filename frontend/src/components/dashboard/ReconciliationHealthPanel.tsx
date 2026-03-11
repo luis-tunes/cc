@@ -1,38 +1,38 @@
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertCircle, Clock, FileQuestion, AlertTriangle } from "lucide-react";
-
-const reconciliationData = {
-  total: 142,
-  matched: 118,
-  unmatched: 24,
-  pendingDocuments: 7,
-  pendingClassification: 13,
-  anomalies: 3,
-};
-
-const pct = Math.round((reconciliationData.matched / reconciliationData.total) * 100);
-
-const recentAnomalies = [
-  { description: "Depósito não identificado — €1.000", date: "05 Mar" },
-  { description: "Duplicação possível — Fatura #812", date: "04 Mar" },
-  { description: "Valor divergente — Fornecedor XYZ", date: "03 Mar" },
-];
+import { useMemo } from "react";
+import { useDashboardSummary } from "@/hooks/use-dashboard";
+import { AlertCircle, Clock, FileQuestion, AlertTriangle } from "lucide-react";
 
 export function ReconciliationHealthPanel({ className }: { className?: string }) {
+  const { data: summary, isLoading } = useDashboardSummary();
+
+  const stats = useMemo(() => {
+    if (!summary) return { total: 0, matched: 0, unmatched: 0, pendingDocs: 0, pendingClass: 0 };
+    const matched = summary.reconciliations;
+    const unmatched = summary.unmatched_documents;
+    return {
+      total: matched + unmatched,
+      matched,
+      unmatched,
+      pendingDocs: summary.pending_review,
+      pendingClass: summary.classified,
+    };
+  }, [summary]);
+
+  const pct = stats.total > 0 ? Math.round((stats.matched / stats.total) * 100) : 0;
   return (
     <div className={cn("rounded-lg border bg-card", className)}>
       <div className="flex items-center justify-between border-b px-4 py-3">
         <h3 className="text-sm font-semibold text-foreground">
           Saúde da Reconciliação
         </h3>
-        <span className="text-xs text-muted-foreground">Março 2024</span>
       </div>
 
       <div className="p-4">
         {/* Progress bar */}
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {reconciliationData.matched}/{reconciliationData.total} reconciliados
+            {isLoading ? "…" : `${stats.matched}/${stats.total} reconciliados`}
           </span>
           <span
             className={cn(
@@ -58,48 +58,27 @@ export function ReconciliationHealthPanel({ className }: { className?: string })
           <StatItem
             icon={AlertCircle}
             label="Não reconciliados"
-            value={reconciliationData.unmatched}
+            value={stats.unmatched}
             variant="warning"
           />
           <StatItem
             icon={Clock}
             label="Docs. pendentes"
-            value={reconciliationData.pendingDocuments}
+            value={stats.pendingDocs}
             variant="default"
           />
           <StatItem
             icon={FileQuestion}
-            label="Por classificar"
-            value={reconciliationData.pendingClassification}
+            label="Classificados"
+            value={stats.pendingClass}
             variant="warning"
           />
           <StatItem
             icon={AlertTriangle}
             label="Anomalias"
-            value={reconciliationData.anomalies}
+            value={0}
             variant="danger"
           />
-        </div>
-
-        {/* Recent anomalies */}
-        <div className="mt-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Anomalias Recentes
-          </p>
-          <div className="mt-2 space-y-1.5">
-            {recentAnomalies.map((a, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-2 rounded-md bg-tim-danger/5 px-2.5 py-1.5"
-              >
-                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-tim-danger" />
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-xs text-foreground">{a.description}</p>
-                  <p className="text-[10px] text-muted-foreground">{a.date}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>

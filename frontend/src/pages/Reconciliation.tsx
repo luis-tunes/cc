@@ -4,13 +4,52 @@ import { ReconciliationCommandBar } from "@/components/reconciliation/Reconcilia
 import { MatchCard } from "@/components/reconciliation/MatchCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { GitMerge, CheckCircle2, PartyPopper } from "lucide-react";
-import { mockPairs, getReconciliationSummary, type ReconciliationPair } from "@/lib/reconciliation-data";
+import { type ReconciliationPair } from "@/lib/reconciliation-data";
+import { useReconciliations, useRunReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
 import { toast } from "sonner";
 
+/** Map backend Reconciliation to frontend ReconciliationPair */
+function toPair(r: Reconciliation): ReconciliationPair {
+  return {
+    id: String(r.id),
+    status: "auto-matched",
+    confidence: Math.round((r.match_confidence ?? 0.95) * 100),
+    reasoning: "Correspondência automática por montante e data.",
+    amountDelta: r.total && r.amount ? Math.abs(Number(r.total) - Math.abs(Number(r.amount))) : 0,
+    dateDelta: 0,
+    document: r.supplier_nif ? {
+      id: String(r.document_id),
+      fileName: `documento-${r.document_id}.pdf`,
+      supplier: r.supplier_nif,
+      amount: Number(r.total ?? 0),
+      vat: 0,
+      date: r.doc_date ?? "",
+      type: "Fatura",
+      extractionConfidence: 85,
+    } : undefined,
+    movement: r.description ? {
+      id: String(r.bank_transaction_id),
+      description: r.description,
+      amount: Number(r.amount ?? 0),
+      date: r.tx_date ?? "",
+    } : undefined,
+  };
+}
+
 export default function Reconciliation() {
-  const [pairs, setPairs] = useState<ReconciliationPair[]>(mockPairs);
+  const { data: rawReconciliations = [], isLoading } = useReconciliations();
+  const runRecon = useRunReconciliation();
+
+  const apiPairs = useMemo(() => rawReconciliations.map(toPair), [rawReconciliations]);
+  const [localOverrides, setLocalOverrides] = useState<Record<string, ReconciliationPair["status"]>>({});
+
+  const pairs = useMemo(() =>
+    apiPairs.map((p) => localOverrides[p.id] ? { ...p, status: localOverrides[p.id] } : p),
+    [apiPairs, localOverrides]
+  );
+
   const [activeFilter, setActiveFilter] = useState("all");
-  const [running, setRunning] = useState(false);
+  const running = runRecon.isPending;
 
   const summary = useMemo(() => {
     const s = { total: pairs.length, approved: 0, autoMatched: 0, suggested: 0, exceptions: 0, unmatched: 0 };
@@ -34,15 +73,11 @@ export default function Reconciliation() {
   }, [pairs, activeFilter]);
 
   const handleRun = useCallback(() => {
-    setRunning(true);
-    setTimeout(() => {
-      setRunning(false);
-      toast.success("Reconciliação concluída — 2 novos pares identificados");
-    }, 2500);
-  }, []);
+    runRecon.mutate();
+  }, [runRecon]);
 
   const handleApprove = useCallback((id: string) => {
-    setPairs((prev) => prev.map((p) => (p.id === id ? { ...p, status: "approved" as const } : p)));
+    setLocalOverrides((prev) => ({ ...prev, [id]: "approved" }));
     toast.success("Par aprovado");
   }, []);
 
@@ -51,7 +86,7 @@ export default function Reconciliation() {
   }, []);
 
   const handleFlag = useCallback((id: string) => {
-    setPairs((prev) => prev.map((p) => (p.id === id ? { ...p, status: "exception" as const } : p)));
+    setLocalOverrides((prev) => ({ ...prev, [id]: "exception" }));
     toast.warning("Marcado como exceção");
   }, []);
 
@@ -73,7 +108,7 @@ export default function Reconciliation() {
     return result;
   }, [filtered, activeFilter]);
 
-  const isEmpty = pairs.length === 0;
+  const isEmpty = pairs.length === 0 && !isLoading;
 
   return (
     <PageContainer

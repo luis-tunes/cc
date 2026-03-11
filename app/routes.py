@@ -5,9 +5,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 import httpx
-from fastapi import APIRouter, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from app.auth import AuthInfo, optional_auth
 from app.db import get_conn
 from app.parse import ingest_document
 from app.reconcile import reconcile_all
@@ -16,6 +17,13 @@ PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 
 router = APIRouter()
+
+
+def _tenant_clause(auth: AuthInfo | None, clauses: list, params: list) -> None:
+    """Append tenant_id filter if auth provides one."""
+    if auth and auth.tenant_id:
+        clauses.append("tenant_id = %s")
+        params.append(auth.tenant_id)
 
 # --- Models ---
 
@@ -63,16 +71,17 @@ async def paperless_webhook(payload: WebhookPayload):
     return {"document_id": doc_id}
 
 @router.post("/documents/upload")
-async def upload_document(file: UploadFile):
+async def upload_document(file: UploadFile, auth: AuthInfo | None = Depends(optional_auth)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=422, detail="only PDF files accepted")
     content = await file.read()
 
+    tid = auth.tenant_id if auth else None
     # Save a record immediately so frontend sees it
     with get_conn() as conn:
         row = conn.execute(
-            "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status) VALUES ('','',0,0,'outro',%s,'a processar') RETURNING id",
-            (file.filename,),
+            "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'a processar',%s) RETURNING id",
+            (file.filename, tid),
         ).fetchone()
         conn.commit()
         local_id = row["id"]
@@ -104,9 +113,11 @@ async def list_documents(
     search: str | None = None,
     limit: int = Query(default=100, le=1000),
     offset: int = 0,
+    auth: AuthInfo | None = Depends(optional_auth),
 ):
-    clauses = []
-    params = []
+    clauses: list[str] = []
+    params: list = []
+    _tenant_clause(auth, clauses, params)
     if supplier_nif:
         clauses.append("supplier_nif = %s")
         params.append(supplier_nif)
@@ -133,30 +144,39 @@ async def list_documents(
     return rows
 
 @router.get("/documents/{doc_id}", response_model=DocumentOut)
-async def get_document(doc_id: int):
+async def get_document(doc_id: int, auth: AuthInfo | None = Depends(optional_auth)):
+    clauses = ["id = %s"]
+    params: list = [doc_id]
+    _tenant_clause(auth, clauses, params)
+    where = "WHERE " + " AND ".join(clauses)
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents WHERE id = %s",
-            (doc_id,),
+            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents {where}",
+            params,
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
     return row
 
 @router.patch("/documents/{doc_id}", response_model=DocumentOut)
-async def update_document(doc_id: int, patch: DocumentPatch):
+async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo | None = Depends(optional_auth)):
     updates = patch.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=422, detail="no fields to update")
     set_parts = []
-    params = []
+    params: list = []
     for k, v in updates.items():
         set_parts.append(f"{k} = %s")
         params.append(v)
+    wheres = ["id = %s"]
     params.append(doc_id)
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"UPDATE documents SET {', '.join(set_parts)} WHERE id = %s RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at",
+            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at",
             params,
         ).fetchone()
         conn.commit()
@@ -167,12 +187,13 @@ async def update_document(doc_id: int, patch: DocumentPatch):
 # --- Bank Transactions ---
 
 @router.post("/bank-transactions/upload")
-async def upload_bank_csv(file: UploadFile):
+async def upload_bank_csv(file: UploadFile, auth: AuthInfo | None = Depends(optional_auth)):
     content = await file.read()
     text = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text), delimiter=";")
     if not reader.fieldnames or not {"date", "description", "amount"}.issubset(set(reader.fieldnames)):
         raise HTTPException(status_code=422, detail="CSV must have columns: date, description, amount")
+    tid = auth.tenant_id if auth else None
     count = 0
     with get_conn() as conn:
         for row in reader:
@@ -180,8 +201,8 @@ async def upload_bank_csv(file: UploadFile):
             description = row["description"].strip()
             amount = Decimal(row["amount"].strip().replace(",", "."))
             conn.execute(
-                "INSERT INTO bank_transactions (date, description, amount) VALUES (%s, %s, %s)",
-                (tx_date, description, amount),
+                "INSERT INTO bank_transactions (date, description, amount, tenant_id) VALUES (%s, %s, %s, %s)",
+                (tx_date, description, amount, tid),
             )
             count += 1
         conn.commit()
@@ -193,9 +214,11 @@ async def list_bank_transactions(
     date_to: date | None = None,
     limit: int = Query(default=100, le=1000),
     offset: int = 0,
+    auth: AuthInfo | None = Depends(optional_auth),
 ):
-    clauses = []
-    params = []
+    clauses: list[str] = []
+    params: list = []
+    _tenant_clause(auth, clauses, params)
     if date_from:
         clauses.append("date >= %s")
         params.append(date_from)
@@ -219,15 +242,27 @@ async def run_reconciliation():
     return {"matched": len(matches), "matches": matches}
 
 @router.get("/reconciliations")
-async def list_reconciliations(limit: int = Query(default=100, le=1000), offset: int = 0):
+async def list_reconciliations(
+    limit: int = Query(default=100, le=1000),
+    offset: int = 0,
+    auth: AuthInfo | None = Depends(optional_auth),
+):
+    clauses: list[str] = []
+    params: list = []
+    if auth and auth.tenant_id:
+        clauses.append("r.tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence,
+            f"""SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence,
                       d.supplier_nif, d.total, d.date as doc_date,
                       b.description, b.amount, b.date as tx_date
                FROM reconciliations r
                JOIN documents d ON d.id = r.document_id
                JOIN bank_transactions b ON b.id = r.bank_transaction_id
+               {where}
                ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
             (limit, offset),
         ).fetchall()
@@ -236,16 +271,22 @@ async def list_reconciliations(limit: int = Query(default=100, le=1000), offset:
 # --- Dashboard ---
 
 @router.get("/dashboard/summary")
-async def dashboard_summary():
+async def dashboard_summary(auth: AuthInfo | None = Depends(optional_auth)):
+    tf = ""
+    tp: list = []
+    if auth and auth.tenant_id:
+        tf = " WHERE tenant_id = %s"
+        tp = [auth.tenant_id]
     with get_conn() as conn:
-        docs = conn.execute("SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents").fetchone()
-        txs = conn.execute("SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM bank_transactions").fetchone()
-        recs = conn.execute("SELECT COUNT(*) as count FROM reconciliations").fetchone()
+        docs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents{tf}", tp).fetchone()
+        txs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM bank_transactions{tf}", tp).fetchone()
+        recs = conn.execute(f"SELECT COUNT(*) as count FROM reconciliations{tf}", tp).fetchone()
         unmatched = conn.execute(
-            "SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations)"
+            f"SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations){' AND tenant_id = %s' if tp else ''}",
+            tp,
         ).fetchone()
-        pending = conn.execute("SELECT COUNT(*) as count FROM documents WHERE status = 'pendente'").fetchone()
-        classified = conn.execute("SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto')").fetchone()
+        pending = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status = 'pendente'{' AND tenant_id = %s' if tp else ''}", tp).fetchone()
+        classified = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
     return {
         "documents": {"count": docs["count"], "total": str(docs["total"])},
         "bank_transactions": {"count": txs["count"], "total": str(txs["total"])},
@@ -256,14 +297,20 @@ async def dashboard_summary():
     }
 
 @router.get("/dashboard/monthly")
-async def monthly_summary():
+async def monthly_summary(auth: AuthInfo | None = Depends(optional_auth)):
+    tf = ""
+    tp: list = []
+    if auth and auth.tenant_id:
+        tf = " WHERE tenant_id = %s"
+        tp = [auth.tenant_id]
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT to_char(date, 'YYYY-MM') as month,
+            f"""SELECT to_char(date, 'YYYY-MM') as month,
                       COUNT(*) as doc_count,
                       COALESCE(SUM(total),0) as total,
                       COALESCE(SUM(vat),0) as vat
-               FROM documents GROUP BY month ORDER BY month DESC LIMIT 12"""
+               FROM documents{tf} GROUP BY month ORDER BY month DESC LIMIT 12""",
+            tp,
         ).fetchall()
     return [{"month": r["month"], "doc_count": r["doc_count"],
              "total": str(r["total"]), "vat": str(r["vat"])} for r in rows]

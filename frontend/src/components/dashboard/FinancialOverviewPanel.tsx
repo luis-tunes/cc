@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useMonthlyData } from "@/hooks/use-dashboard";
 import {
   AreaChart,
   Area,
@@ -11,22 +12,6 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-
-const monthlyData = [
-  { mes: "Out", receita: 18200, gastos: 14100, resultado: 4100 },
-  { mes: "Nov", receita: 21500, gastos: 15800, resultado: 5700 },
-  { mes: "Dez", receita: 19800, gastos: 16200, resultado: 3600 },
-  { mes: "Jan", receita: 22400, gastos: 15400, resultado: 7000 },
-  { mes: "Fev", receita: 20100, gastos: 14900, resultado: 5200 },
-  { mes: "Mar", receita: 24580, gastos: 16340, resultado: 8240 },
-];
-
-const weeklyData = [
-  { mes: "Sem 1", receita: 5200, gastos: 3800, resultado: 1400 },
-  { mes: "Sem 2", receita: 6100, gastos: 4200, resultado: 1900 },
-  { mes: "Sem 3", receita: 5800, gastos: 4100, resultado: 1700 },
-  { mes: "Sem 4", receita: 7480, gastos: 4240, resultado: 3240 },
-];
 
 type TimeWindow = "semana" | "mes" | "trimestre";
 
@@ -47,8 +32,29 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function FinancialOverviewPanel({ className }: { className?: string }) {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("mes");
+  const { data: rawMonthly } = useMonthlyData();
 
-  const data = timeWindow === "semana" ? weeklyData : monthlyData;
+  const chartData = useMemo(() => {
+    if (!rawMonthly || rawMonthly.length === 0) return [];
+    const shortMonth: Record<string, string> = {
+      "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+      "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+      "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
+    };
+    return rawMonthly.slice().reverse().map((m) => {
+      const mm = m.month.split("-")[1] ?? "";
+      const receita = parseFloat(m.total) || 0;
+      const gastos = parseFloat(m.vat) || 0;
+      return {
+        mes: shortMonth[mm] ?? mm,
+        receita,
+        gastos,
+        resultado: receita - gastos,
+      };
+    });
+  }, [rawMonthly]);
+
+  const data = chartData;
 
   return (
     <div className={cn("rounded-lg border bg-card", className)}>
@@ -170,30 +176,29 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
       <div className="flex items-center gap-6 border-t px-4 py-3">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Posição de Caixa
+            Total Receita
           </p>
-          <p className="text-sm font-semibold text-foreground">€47.230</p>
+          <p className="text-sm font-semibold text-foreground">
+            €{data.reduce((s, d) => s + d.receita, 0).toLocaleString("pt-PT", { minimumFractionDigits: 0 })}
+          </p>
         </div>
         <div className="h-6 w-px bg-border" />
         <div>
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Margem Líquida
+            Total IVA
           </p>
-          <p className="text-sm font-semibold text-tim-success">33,5%</p>
+          <p className="text-sm font-semibold text-foreground">
+            €{data.reduce((s, d) => s + d.gastos, 0).toLocaleString("pt-PT", { minimumFractionDigits: 0 })}
+          </p>
         </div>
         <div className="h-6 w-px bg-border" />
         <div>
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            A Receber
+            Resultado
           </p>
-          <p className="text-sm font-semibold text-foreground">€12.800</p>
-        </div>
-        <div className="h-6 w-px bg-border" />
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            A Pagar
+          <p className="text-sm font-semibold text-tim-success">
+            €{data.reduce((s, d) => s + d.resultado, 0).toLocaleString("pt-PT", { minimumFractionDigits: 0 })}
           </p>
-          <p className="text-sm font-semibold text-foreground">€6.450</p>
         </div>
       </div>
     </div>

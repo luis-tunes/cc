@@ -8,10 +8,31 @@ import { MovementDetailDrawer } from "@/components/movements/MovementDetailDrawe
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Upload, Landmark } from "lucide-react";
-import { mockMovements, classificationSummary, type BankMovement } from "@/lib/movements-data";
+import { classificationSummary, type BankMovement } from "@/lib/movements-data";
+import { useBankTransactions, useUploadBankCSV } from "@/hooks/use-bank-transactions";
 import { toast } from "sonner";
 
+/** Map backend BankTransaction → frontend BankMovement shape */
+function toMovement(tx: { id: number; date: string; description: string; amount: number }): BankMovement {
+  return {
+    id: String(tx.id),
+    date: tx.date,
+    description: tx.description,
+    amount: tx.amount,
+    type: tx.amount < 0 ? "debito" : "credito",
+    classificationStatus: "pendente",
+    reconciliationStatus: "pendente",
+    confidence: 50,
+    origin: "csv",
+  };
+}
+
 export default function BankMovements() {
+  const { data: rawTransactions = [], isLoading } = useBankTransactions();
+  const uploadCSV = useUploadBankCSV();
+
+  const movements = useMemo(() => rawTransactions.map(toMovement), [rawTransactions]);
+
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -30,7 +51,7 @@ export default function BankMovements() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filtered = useMemo(() => {
-    return mockMovements.filter((mv) => {
+    return movements.filter((mv) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
         const hay = [mv.description, mv.reference, mv.detectedEntity].filter(Boolean).join(" ").toLowerCase();
@@ -48,32 +69,33 @@ export default function BankMovements() {
       if (filters.confidence === "low" && mv.confidence >= 50) return false;
       return true;
     });
-  }, [filters]);
+  }, [movements, filters]);
 
   const handleImport = useCallback((file: File) => {
     setImporting(true);
     setImportResult(null);
-    setImportProgress(0);
-    let p = 0;
-    const interval = setInterval(() => {
-      p += Math.random() * 20;
-      if (p >= 100) {
-        p = 100;
-        clearInterval(interval);
+    setImportProgress(10);
+
+    uploadCSV.mutate(file, {
+      onSuccess: (data) => {
+        setImportProgress(100);
         setImporting(false);
-        setImportResult({ success: 10, failed: 0 });
-        toast.success("10 movimentos importados com sucesso");
-      }
-      setImportProgress(Math.min(p, 100));
-    }, 400);
-  }, []);
+        setImportResult({ success: data.imported, failed: 0 });
+      },
+      onError: () => {
+        setImportProgress(100);
+        setImporting(false);
+        setImportResult({ success: 0, failed: 1 });
+      },
+    });
+  }, [uploadCSV]);
 
   const openMovement = useCallback((mv: BankMovement) => {
     setDetailMv(mv);
     setDrawerOpen(true);
   }, []);
 
-  const isEmpty = mockMovements.length === 0;
+  const isEmpty = movements.length === 0 && !isLoading;
 
   return (
     <PageContainer
