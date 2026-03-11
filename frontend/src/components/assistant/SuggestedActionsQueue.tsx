@@ -17,7 +17,7 @@ export function SuggestedActionsQueue({ className }: { className?: string }) {
 
   const handleAction = (id: string, newStatus: SuggestedAction["status"]) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i)));
-    const labels = { aprovado: "Ação aprovada", aplicado: "Aplicada", ignorado: "Ignorada" };
+    const labels: Record<string, string> = { aprovado: "Ação aprovada", aplicado: "Aplicada", ignorado: "Ignorada" };
     toast.success(labels[newStatus] || "Atualizado");
   };
 

@@ -86,7 +86,7 @@ export function IvaOverviewPanel({ className }: { className?: string }) {
                 <YAxis tick={{ fontSize: 10, fill: "hsl(220 10% 55%)" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `€${v / 1000}k`} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(220 18% 9%)", border: "1px solid hsl(220 12% 16%)", borderRadius: 8, fontSize: 11 }}
-                  formatter={(value: number, name: string) => [fmt(value), name === "collected" ? "Liquidado" : "Dedutível"]}
+                  formatter={((value: any, name: any) => [fmt(value as number), name === "collected" ? "Liquidado" : "Dedutível"]) as any}
                 />
                 <Area type="monotone" dataKey="collected" stroke="hsl(40 80% 55%)" fill="url(#colCollected)" strokeWidth={1.5} />
                 <Area type="monotone" dataKey="deductible" stroke="hsl(210 60% 50%)" fill="url(#colDeductible)" strokeWidth={1.5} />

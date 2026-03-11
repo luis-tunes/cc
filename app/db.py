@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 _pool = None
 
 def get_pool():

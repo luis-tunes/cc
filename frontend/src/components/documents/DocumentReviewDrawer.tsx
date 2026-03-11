@@ -52,8 +52,8 @@ const SNC_ACCOUNTS = [
 
 export interface DocumentActions {
   onApprove: (id: string) => void;
-  onReject: (id: string, reason: string) => void;
-  onReclassify: (id: string, newAccount: string, newDocType: DocumentType) => void;
+  onReject: (id: string, reason?: string) => void;
+  onReclassify: (id: string, newAccount: string, newDocType?: DocumentType | string) => void;
   onConfirmField: (docId: string, fieldIndex: number) => void;
   onArchive: (id: string) => void;
   onAcceptAiSuggestion: (id: string) => void;

@@ -4,9 +4,9 @@ import { toast } from "sonner";
 
 export interface DocumentActions {
   onApprove: (id: string) => void;
-  onReject: (id: string) => void;
-  onReclassify: (id: string, newType: string) => void;
-  onConfirmField: (id: string, field: string) => void;
+  onReject: (id: string, reason?: string) => void;
+  onReclassify: (id: string, newType: string, newDocType?: string) => void;
+  onConfirmField: (docId: string, fieldIndex: number) => void;
   onArchive: (id: string) => void;
   onAcceptAiSuggestion: (id: string) => void;
   onAddNote: (id: string, note: string) => void;
@@ -30,15 +30,15 @@ export function useDocumentActions(refetch: () => void) {
       mutation.mutate({ id, patch: { status: "classificado" } });
       toast.success("Documento aprovado");
     },
-    onReject: (id) => {
+    onReject: (id, _reason?) => {
       mutation.mutate({ id, patch: { status: "rejeitado" } });
       toast.success("Documento rejeitado");
     },
-    onReclassify: (id, newType) => {
+    onReclassify: (id, newType, _newDocType?) => {
       mutation.mutate({ id, patch: { type: newType, status: "revisto" } });
       toast.success("Documento reclassificado");
     },
-    onConfirmField: (id, _field) => {
+    onConfirmField: (id, _fieldIndex) => {
       mutation.mutate({ id, patch: { status: "revisto" } });
       toast.success("Campo confirmado");
     },

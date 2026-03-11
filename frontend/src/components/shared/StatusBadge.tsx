@@ -9,7 +9,8 @@ export type StatusType =
   | "revisto"
   | "arquivado"
   | "atrasado"
-  | "anomalia";
+  | "anomalia"
+  | "rejeitado";
 
 const statusConfig: Record<StatusType, { label: string; className: string }> = {
   pendente: {
@@ -47,6 +48,10 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
   anomalia: {
     label: "Anomalia",
     className: "border border-tim-danger/50 text-tim-danger bg-transparent",
+  },
+  rejeitado: {
+    label: "Rejeitado",
+    className: "bg-tim-danger/15 text-tim-danger border border-tim-danger/30",
   },
 };
 
