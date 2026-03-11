@@ -2,12 +2,13 @@
 set -e
 
 HOST="${1:?usage: bin/deploy <user@host>}"
-DIR="/opt/cc"
 
 bin/test
 
+# Server needs docker-compose.yml, .env, and bin/ (for post-consume)
 ssh "$HOST" "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh"
-ssh "$HOST" "mkdir -p $DIR"
-rsync -az --delete --exclude '.git' --exclude '__pycache__' --exclude '.env' --exclude 'node_modules' --exclude 'frontend/dist' --exclude 'web' . "$HOST:$DIR/"
-ssh "$HOST" "cd $DIR && docker compose up -d --build"
+ssh "$HOST" "mkdir -p /opt/cc/bin"
+scp docker-compose.yml "$HOST:/opt/cc/"
+scp bin/post-consume "$HOST:/opt/cc/bin/"
+ssh "$HOST" "cd /opt/cc && docker compose pull app && docker compose up -d"
 echo "deployed: http://$HOST:8080"

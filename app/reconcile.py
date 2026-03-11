@@ -30,9 +30,9 @@ def reconcile_all(tenant_id: str | None = None) -> list[dict]:
                 if amount_diff < AMOUNT_TOLERANCE and date_diff <= DATE_TOLERANCE:
                     confidence = Decimal("1") - amount_diff
                     conn.execute(
-                        """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence)
-                           VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
-                        (doc["id"], tx["id"], confidence),
+                        """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence, tenant_id)
+                           VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+                        (doc["id"], tx["id"], confidence, tenant_id),
                     )
                     used_tx.add(tx["id"])
                     matches.append({"document_id": doc["id"], "bank_transaction_id": tx["id"], "confidence": float(confidence)})

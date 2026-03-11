@@ -104,10 +104,11 @@ else
   log ".env ja existe, a manter"
 fi
 
-# build e arrancar
+# pull e arrancar
 log "a arrancar containers..."
 cd "$DIR"
-sudo -u "$APP_USER" docker compose up -d --build 2>&1 | tail -5
+sudo -u "$APP_USER" docker compose pull app 2>&1 | tail -3
+sudo -u "$APP_USER" docker compose up -d 2>&1 | tail -5
 
 # esperar pelo paperless
 log "a esperar pelo paperless (pode demorar ~60s)..."

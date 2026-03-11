@@ -45,6 +45,7 @@ services:
         condition: service_started
 
   app:
+    image: ghcr.io/xzero-ai/cc:latest
     build:
       context: .
       args:

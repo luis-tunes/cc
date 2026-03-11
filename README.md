@@ -42,8 +42,9 @@ make deploy HOST=root@IP
 GitHub → Settings → Secrets:
 - `DEPLOY_HOST`: `root@IP`
 - `DEPLOY_KEY`: chave privada SSH
+- `VITE_CLERK_PUBLISHABLE_KEY`: `pk_test_...` ou `pk_live_...`
 
-Push em `main` → testes → deploy automático.
+Push em `main` → testes → build imagem → push GHCR → deploy (pull + up).
 
 ## Licença
 
