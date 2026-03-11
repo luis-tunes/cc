@@ -2,6 +2,10 @@
 Stripe billing — checkout sessions, webhooks, plan status.
 Clerk handles auth; Stripe handles money. They connect via metadata.
 
+Revenue split: 50/50 via Stripe Connect destination charges.
+Partner (sales) gets 50% directly to their connected account.
+Platform (builder) keeps 50% as the application fee.
+
 Plans:
   pro    — 150€/mo, unlimited docs, 5 seats
   custom — enterprise, SLA + warranty, custom pricing (contact us)
@@ -22,6 +26,11 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API = "https://api.stripe.com/v1"
 APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@tim.pt")
+
+# Stripe Connect — 50/50 revenue split
+# Partner's connected account ID (acct_...) from Stripe Connect onboarding
+PARTNER_STRIPE_ACCOUNT = os.environ.get("PARTNER_STRIPE_ACCOUNT", "")
+REVENUE_SPLIT_PERCENT = int(os.environ.get("REVENUE_SPLIT_PERCENT", "50"))
 
 PLANS = [
     {"id": "pro", "name": "Profissional", "price": 15000, "docs_per_month": -1, "seats": 5,
@@ -84,7 +93,7 @@ async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
     if not price_id:
         raise HTTPException(status_code=503, detail="Stripe price not configured for this plan")
 
-    session = _stripe("POST", "/checkout/sessions", {
+    checkout_data: dict = {
         "mode": "subscription",
         "line_items[0][price]": price_id,
         "line_items[0][quantity]": "1",
@@ -93,7 +102,15 @@ async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
         "client_reference_id": auth.tenant_id or auth.user_id,
         "metadata[tenant_id]": auth.tenant_id or "",
         "metadata[user_id]": auth.user_id,
-    })
+    }
+
+    # Stripe Connect: 50/50 split — partner gets subscription revenue,
+    # platform keeps application_fee_percent as its share.
+    if PARTNER_STRIPE_ACCOUNT:
+        checkout_data["subscription_data[application_fee_percent]"] = str(REVENUE_SPLIT_PERCENT)
+        checkout_data["subscription_data[transfer_data][destination]"] = PARTNER_STRIPE_ACCOUNT
+
+    session = _stripe("POST", "/checkout/sessions", checkout_data)
     return {"checkout_url": session["url"]}
 
 

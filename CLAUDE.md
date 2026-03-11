@@ -140,6 +140,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_PRO=price_...     # Stripe price ID for 150€/mo plan
 APP_URL=http://localhost:3000  # Stripe redirect URL
 CONTACT_EMAIL=info@tim.pt     # Enterprise plan contact
+PARTNER_STRIPE_ACCOUNT=acct_... # Partner connected account (50/50 split)
+REVENUE_SPLIT_PERCENT=50       # Platform keeps 50%, partner gets 50%
 
 # frontend/.env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...

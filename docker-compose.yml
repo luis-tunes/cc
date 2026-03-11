@@ -58,6 +58,8 @@ services:
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       APP_URL: ${APP_URL:-http://localhost:3000}
       CONTACT_EMAIL: ${CONTACT_EMAIL:-info@tim.pt}
+      PARTNER_STRIPE_ACCOUNT: ${PARTNER_STRIPE_ACCOUNT:-}
+      REVENUE_SPLIT_PERCENT: ${REVENUE_SPLIT_PERCENT:-50}
       WEB_DIR: /opt/tim/web
     ports:
       - "8080:8080"
