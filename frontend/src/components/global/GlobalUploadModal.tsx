@@ -1,0 +1,343 @@
+import { useState, useCallback, useRef } from "react";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Upload,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  ScanSearch,
+} from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+
+interface UploadFile {
+  id: string;
+  file: File;
+  status: "queued" | "uploading" | "processing" | "success" | "error";
+  progress: number;
+  errorMessage?: string;
+  result?: any;
+}
+
+interface GlobalUploadModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  preset?: string;
+  onDocumentProcessed?: (doc: any) => void;
+}
+
+const ACCEPTED = ".pdf,.jpg,.jpeg,.png,.tiff,.tif";
+
+export function GlobalUploadModal({
+  open,
+  onOpenChange,
+  preset,
+  onDocumentProcessed,
+}: GlobalUploadModalProps) {
+  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const processFile = useCallback(
+    async (uf: UploadFile) => {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === uf.id ? { ...f, status: "uploading", progress: 30 } : f
+        )
+      );
+
+      try {
+        const formData = new FormData();
+        formData.append("file", uf.file);
+
+        setFiles((prev) =>
+          prev.map((f) => (f.id === uf.id ? { ...f, progress: 60 } : f))
+        );
+
+        // Upload to our FastAPI backend → Paperless OCR pipeline
+        const response = await fetch("/api/documents/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uf.id
+              ? { ...f, status: "processing", progress: 100 }
+              : f
+          )
+        );
+
+        if (!response.ok) {
+          const errBody = await response
+            .json()
+            .catch(() => ({ detail: "Erro desconhecido" }));
+          throw new Error(errBody.detail || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uf.id ? { ...f, status: "success", result } : f
+          )
+        );
+
+        onDocumentProcessed?.(result);
+      } catch (err: any) {
+        console.error("Upload error:", err);
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uf.id
+              ? {
+                  ...f,
+                  status: "error",
+                  errorMessage: err.message || "Erro ao processar ficheiro",
+                }
+              : f
+          )
+        );
+      }
+    },
+    [onDocumentProcessed]
+  );
+
+  const addFiles = useCallback(
+    (fileList: FileList | File[]) => {
+      const newFiles: UploadFile[] = Array.from(fileList).map((f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file: f,
+        status: "queued" as const,
+        progress: 0,
+      }));
+      setFiles((prev) => [...prev, ...newFiles]);
+      newFiles.forEach((uf) => processFile(uf));
+    },
+    [processFile]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+    },
+    [addFiles]
+  );
+
+  const handleClose = () => {
+    onOpenChange(false);
+    setTimeout(() => setFiles([]), 300);
+  };
+
+  const removeFile = (id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const queued = files.filter((f) => f.status === "queued").length;
+  const uploading = files.filter((f) => f.status === "uploading").length;
+  const processing = files.filter((f) => f.status === "processing").length;
+  const succeeded = files.filter((f) => f.status === "success").length;
+  const failed = files.filter((f) => f.status === "error").length;
+  const allDone =
+    files.length > 0 && queued === 0 && uploading === 0 && processing === 0;
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-lg border-border bg-card p-0 sm:max-w-xl">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
+            <Upload className="h-4 w-4 text-primary" />
+            {preset === "fatura"
+              ? "Carregar Fatura"
+              : preset === "recibo"
+                ? "Carregar Recibo"
+                : "Carregar Ficheiros"}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="px-6 py-5">
+          {/* Dropzone */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 transition-all",
+              isDragOver
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40 hover:bg-secondary/30"
+            )}
+          >
+            <div
+              className={cn(
+                "mb-3 flex h-12 w-12 items-center justify-center rounded-full transition-colors",
+                isDragOver ? "bg-primary/10" : "bg-secondary"
+              )}
+            >
+              <Upload
+                className={cn(
+                  "h-5 w-5",
+                  isDragOver ? "text-primary" : "text-muted-foreground"
+                )}
+              />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              {isDragOver
+                ? "Largar ficheiros aqui"
+                : "Arrastar ficheiros ou clicar para selecionar"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              PDF, JPG, PNG, TIFF · Múltiplos ficheiros suportados
+            </p>
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ACCEPTED}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {/* File queue */}
+          {files.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                <span>
+                  {files.length} ficheiro{files.length > 1 ? "s" : ""}
+                </span>
+                {uploading > 0 && (
+                  <span className="text-tim-info">A carregar: {uploading}</span>
+                )}
+                {processing > 0 && (
+                  <span className="text-primary">
+                    OCR + classificação: {processing}
+                  </span>
+                )}
+                {succeeded > 0 && (
+                  <span className="text-tim-success">
+                    Concluído: {succeeded}
+                  </span>
+                )}
+                {failed > 0 && (
+                  <span className="text-tim-danger">Erro: {failed}</span>
+                )}
+              </div>
+
+              <div className="max-h-52 space-y-1.5 overflow-y-auto">
+                {files.map((uf) => (
+                  <FileRow
+                    key={uf.id}
+                    file={uf}
+                    onRemove={() => removeFile(uf.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-border px-6 py-3">
+          <div className="text-[10px] text-muted-foreground">
+            {allDone &&
+              failed === 0 &&
+              "Todos os ficheiros processados com sucesso"}
+            {allDone &&
+              failed > 0 &&
+              `${failed} ficheiro${failed > 1 ? "s" : ""} com erro`}
+            {!allDone && files.length > 0 && "A processar…"}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleClose}
+            >
+              {allDone ? "Fechar" : "Cancelar"}
+            </Button>
+            {allDone && succeeded > 0 && (
+              <Button size="sm" className="h-8 text-xs" onClick={handleClose}>
+                Ir para Documentos
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FileRow({
+  file,
+  onRemove,
+}: {
+  file: UploadFile;
+  onRemove: () => void;
+}) {
+  const ext = file.file.name.split(".").pop()?.toUpperCase() || "";
+  const sizeKb = (file.file.size / 1024).toFixed(0);
+
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary text-[10px] font-bold text-muted-foreground">
+        {ext}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium text-foreground">
+          {file.file.name}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">{sizeKb} KB</span>
+          {file.status === "uploading" && (
+            <Progress value={file.progress} className="h-1 flex-1" />
+          )}
+          {file.status === "processing" && (
+            <span className="flex items-center gap-1 text-[10px] text-primary">
+              <ScanSearch className="h-3 w-3 animate-pulse" />
+              OCR + classificação…
+            </span>
+          )}
+          {file.status === "success" && (
+            <span className="flex items-center gap-1 text-[10px] text-tim-success">
+              <CheckCircle2 className="h-3 w-3" />
+              Processado
+            </span>
+          )}
+          {file.status === "error" && (
+            <span className="flex items-center gap-1 text-[10px] text-tim-danger">
+              <AlertCircle className="h-3 w-3" />
+              {file.errorMessage}
+            </span>
+          )}
+        </div>
+      </div>
+      {file.status === "uploading" || file.status === "processing" ? (
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+      ) : (
+        <button
+          onClick={onRemove}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}

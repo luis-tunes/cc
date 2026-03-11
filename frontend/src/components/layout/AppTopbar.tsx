@@ -1,0 +1,102 @@
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Bot, Search, Building2, CalendarDays } from "lucide-react";
+import { useCommandMenu } from "@/components/shared/CommandMenu";
+import { QuickAddButton } from "@/components/global/QuickAddButton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TopbarAlertDropdown } from "@/components/alerts/TopbarAlertDropdown";
+import { useUser, useClerk } from "@clerk/react";
+import { useNavigate } from "react-router-dom";
+
+interface AppTopbarProps {
+  title?: string;
+}
+
+export function AppTopbar({ title }: AppTopbarProps) {
+  const { open: openCommand } = useCommandMenu();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const navigate = useNavigate();
+
+  const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
+      {/* Left */}
+      <div className="flex items-center gap-3">
+        <SidebarTrigger className="text-muted-foreground" />
+        {title && (
+          <h1 className="text-sm font-semibold text-foreground">{title}</h1>
+        )}
+      </div>
+
+      {/* Center */}
+      <div className="hidden items-center gap-3 md:flex">
+        <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
+          <Building2 className="h-3.5 w-3.5" />
+          <span className="font-medium text-foreground">
+            {user?.organizationMemberships?.[0]?.organization?.name || "TIM"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5" />
+          <span>{new Date().getFullYear()}</span>
+        </div>
+      </div>
+
+      {/* Right */}
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
+          onClick={openCommand}
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+        <TopbarAlertDropdown />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-primary hover:bg-primary/10"
+        >
+          <Bot className="h-4 w-4" />
+        </Button>
+
+        {/* Separator */}
+        <div className="mx-1 h-5 w-px bg-border" />
+
+        {/* Global CTA */}
+        <QuickAddButton />
+
+        <button
+          onClick={() => navigate("/perfil")}
+          className="shrink-0 rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40"
+          title="O meu perfil"
+        >
+          <Avatar className="h-7 w-7">
+            <AvatarImage src={user?.imageUrl} />
+            <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={() => signOut()}
+          title="Terminar sessão"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </Button>
+      </div>
+    </header>
+  );
+}

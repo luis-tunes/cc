@@ -1,7 +1,8 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.db import close_pool, init_db
 from app.routes import router
 
@@ -11,14 +12,29 @@ async def lifespan(app: FastAPI):
     yield
     close_pool()
 
-app = FastAPI(title="cc", lifespan=lifespan)
+app = FastAPI(title="TIM — Time is Money", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+# All API routes under /api
+app.include_router(router, prefix="/api")
+
+# Also keep routes without prefix for backwards compatibility
 app.include_router(router)
 
-_web_dir = os.environ.get("WEB_DIR", "/opt/cc/web")
+_web_dir = os.environ.get("WEB_DIR", "/opt/tim/web")
 if os.path.isdir(_web_dir):
-    app.mount("/", StaticFiles(directory=_web_dir, html=True), name="web")
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=os.path.join(_web_dir, "assets")), name="assets")
+
+    # SPA fallback — serve index.html for all non-API, non-asset routes
+    @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
+    async def spa_fallback(request: Request, path: str):
+        # If the file exists on disk, serve it (favicon, etc.)
+        file_path = os.path.join(_web_dir, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Otherwise serve the SPA
+        return FileResponse(os.path.join(_web_dir, "index.html"))

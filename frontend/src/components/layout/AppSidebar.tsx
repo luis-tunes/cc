@@ -1,0 +1,112 @@
+import { useLocation } from "react-router-dom";
+import { NavLink } from "@/components/NavLink";
+import { navigation } from "@/lib/navigation";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+  const location = useLocation();
+  const { user } = useUser();
+
+  const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <Sidebar collapsible="icon" className="border-r-0">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-bold tracking-tight text-primary">
+            TIM
+          </span>
+          {!collapsed && (
+            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+              Time is Money
+            </span>
+          )}
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent className="px-2 py-2">
+        {navigation.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const active = location.pathname === item.path;
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton asChild>
+                        <NavLink
+                          to={item.path}
+                          end
+                          className={cn(
+                            "relative hover:bg-sidebar-accent",
+                            active &&
+                              "bg-sidebar-accent text-primary font-medium"
+                          )}
+                          activeClassName="bg-sidebar-accent text-primary font-medium"
+                        >
+                          {active && (
+                            <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                          )}
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border p-3">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-7 w-7">
+            <AvatarImage src={user?.imageUrl} />
+            <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          {!collapsed && (
+            <div className="flex-1 overflow-hidden">
+              <p className="truncate text-xs font-medium text-foreground">
+                {user?.fullName || "Utilizador"}
+              </p>
+              <p className="truncate text-[10px] text-muted-foreground">
+                {user?.primaryEmailAddress?.emailAddress}
+              </p>
+            </div>
+          )}
+        </div>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  );
+}
