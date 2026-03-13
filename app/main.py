@@ -5,11 +5,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.db import close_pool, init_db
 from app.routes import router
-from app.billing import router as billing_router
+from app.billing import router as billing_router, init_billing_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_billing_db()
     yield
     close_pool()
 

@@ -79,6 +79,141 @@ def init_db():
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$;
             """)
+
+        # Key-value settings per tenant (entity profile, preferences, etc.)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tenant_settings (
+                tenant_id   TEXT NOT NULL,
+                key         TEXT NOT NULL,
+                data        JSONB NOT NULL DEFAULT '{}',
+                updated_at  TIMESTAMPTZ DEFAULT now(),
+                PRIMARY KEY (tenant_id, key)
+            );
+        """)
+
+        # ── Inventory / Operations ────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS unit_families (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                base_unit   TEXT NOT NULL,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS unit_conversions (
+                id              SERIAL PRIMARY KEY,
+                unit_family_id  INTEGER NOT NULL REFERENCES unit_families(id) ON DELETE CASCADE,
+                from_unit       TEXT NOT NULL,
+                to_unit         TEXT NOT NULL,
+                factor          NUMERIC(12,6) NOT NULL,
+                UNIQUE(unit_family_id, from_unit, to_unit)
+            );
+
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id                SERIAL PRIMARY KEY,
+                tenant_id         TEXT NOT NULL,
+                name              TEXT NOT NULL,
+                nif               VARCHAR(9) NOT NULL DEFAULT '',
+                category          TEXT NOT NULL DEFAULT '',
+                avg_delivery_days INTEGER NOT NULL DEFAULT 3,
+                reliability       NUMERIC(5,2) NOT NULL DEFAULT 80.0,
+                created_at        TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS ingredients (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                category        TEXT NOT NULL DEFAULT '',
+                unit            TEXT NOT NULL DEFAULT 'kg',
+                min_threshold   NUMERIC(12,4) NOT NULL DEFAULT 0,
+                supplier_id     INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+                last_cost       NUMERIC(12,4) NOT NULL DEFAULT 0,
+                avg_cost        NUMERIC(12,4) NOT NULL DEFAULT 0,
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS stock_events (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                type            VARCHAR(16) NOT NULL,
+                ingredient_id   INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+                qty             NUMERIC(12,4) NOT NULL,
+                unit            TEXT NOT NULL,
+                date            DATE NOT NULL DEFAULT CURRENT_DATE,
+                source          VARCHAR(16) NOT NULL DEFAULT 'manual',
+                reference       TEXT NOT NULL DEFAULT '',
+                cost            NUMERIC(12,4),
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS products (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                code            TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                category        TEXT NOT NULL DEFAULT '',
+                recipe_version  TEXT NOT NULL DEFAULT 'v1',
+                estimated_cost  NUMERIC(12,4) NOT NULL DEFAULT 0,
+                pvp             NUMERIC(12,4) NOT NULL DEFAULT 0,
+                margin          NUMERIC(5,2) NOT NULL DEFAULT 0,
+                active          BOOLEAN NOT NULL DEFAULT true,
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS recipe_ingredients (
+                id              SERIAL PRIMARY KEY,
+                product_id      INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                ingredient_id   INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+                qty             NUMERIC(12,4) NOT NULL,
+                unit            TEXT NOT NULL,
+                wastage_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+                UNIQUE(product_id, ingredient_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS price_history (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                ingredient_id   INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+                supplier_id     INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+                price           NUMERIC(12,4) NOT NULL,
+                date            DATE NOT NULL DEFAULT CURRENT_DATE,
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS supplier_ingredients (
+                supplier_id     INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+                ingredient_id   INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+                PRIMARY KEY (supplier_id, ingredient_id)
+            );
+        """)
+
+        # ── Indexes for query performance ─────────────────────────────
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_suppliers_tenant ON suppliers(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_ingredients_tenant ON ingredients(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_events_tenant ON stock_events(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_events_ingredient ON stock_events(ingredient_id);
+            CREATE INDEX IF NOT EXISTS idx_stock_events_date ON stock_events(tenant_id, date);
+            CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_products_code_tenant ON products(tenant_id, code);
+            CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_product ON recipe_ingredients(product_id);
+            CREATE INDEX IF NOT EXISTS idx_price_history_ingredient ON price_history(ingredient_id);
+            CREATE INDEX IF NOT EXISTS idx_price_history_supplier ON price_history(supplier_id);
+            CREATE INDEX IF NOT EXISTS idx_price_history_tenant ON price_history(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_bank_transactions_tenant ON bank_transactions(tenant_id);
+        """)
+
+        # ── Unique constraints (safe to run repeatedly) ───────────────
+        conn.execute("""
+            DO $$ BEGIN
+                ALTER TABLE products ADD CONSTRAINT uq_products_tenant_code UNIQUE (tenant_id, code);
+            EXCEPTION WHEN duplicate_table THEN NULL;
+            END $$;
+        """)
         conn.commit()
 
 

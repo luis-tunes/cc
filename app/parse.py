@@ -102,7 +102,7 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
             os.unlink(path)
     return result  # may be None/False — ingest_document handles fallback
 
-def ingest_document(paperless_id: int) -> int:
+def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 
@@ -150,15 +150,15 @@ def ingest_document(paperless_id: int) -> int:
 
     with get_conn() as conn:
         row = conn.execute(
-            """INSERT INTO documents (supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """INSERT INTO documents (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (paperless_id) DO UPDATE
                  SET total=EXCLUDED.total, vat=EXCLUDED.vat, date=EXCLUDED.date,
                      type=EXCLUDED.type, supplier_nif=EXCLUDED.supplier_nif,
                      client_nif=EXCLUDED.client_nif, raw_text=EXCLUDED.raw_text,
                      status=EXCLUDED.status
                RETURNING id""",
-            (supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
+            (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
         ).fetchone()
         conn.commit()
     return row["id"]

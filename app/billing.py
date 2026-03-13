@@ -6,6 +6,8 @@ Revenue split: 50/50 via Stripe Connect destination charges.
 Partner (sales) gets 50% directly to their connected account.
 Platform (builder) keeps 50% as the application fee.
 
+Trial: 14 days free, persisted in DB (tenant_plans table).
+
 Plans:
   pro    — 150€ + IVA/mês, documentos ilimitados, 5 utilizadores
   custom — empresa, SLA + garantia, preço personalizado (contacte-nos)
@@ -14,12 +16,15 @@ Plans:
 import os
 import hmac
 import hashlib
+import json
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth import AuthInfo, optional_auth, require_auth
+from app.db import get_conn
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -28,9 +33,10 @@ APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@tim.pt")
 
 # Stripe Connect — 50/50 revenue split
-# Partner's connected account ID (acct_...) from Stripe Connect onboarding
 PARTNER_STRIPE_ACCOUNT = os.environ.get("PARTNER_STRIPE_ACCOUNT", "")
 REVENUE_SPLIT_PERCENT = int(os.environ.get("REVENUE_SPLIT_PERCENT", "50"))
+
+TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "14"))
 
 PLANS = [
     {"id": "pro", "name": "Profissional", "price": 15000, "docs_per_month": -1, "seats": 5,
@@ -44,8 +50,82 @@ PLANS = [
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# In-memory plan cache (production would use DB)
-_tenant_plans: dict[str, dict] = {}
+
+def init_billing_db():
+    """Create the tenant_plans table if it doesn't exist."""
+    with get_conn() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tenant_plans (
+                tenant_id       TEXT PRIMARY KEY,
+                plan            TEXT NOT NULL DEFAULT 'free',
+                status          TEXT NOT NULL DEFAULT 'trialing',
+                trial_start     TIMESTAMPTZ,
+                trial_end       TIMESTAMPTZ,
+                stripe_customer TEXT,
+                updated_at      TIMESTAMPTZ DEFAULT now()
+            );
+        """)
+        conn.commit()
+
+
+def _get_or_create_tenant_plan(tenant_id: str) -> dict:
+    """Get tenant plan from DB, or create a trial entry."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT tenant_id, plan, status, trial_start, trial_end, stripe_customer FROM tenant_plans WHERE tenant_id = %s",
+            (tenant_id,),
+        ).fetchone()
+        if row:
+            return dict(row)
+        # Create new trial
+        now = datetime.now(timezone.utc)
+        trial_end = now + timedelta(days=TRIAL_DAYS)
+        conn.execute(
+            "INSERT INTO tenant_plans (tenant_id, plan, status, trial_start, trial_end) VALUES (%s, 'free', 'trialing', %s, %s)",
+            (tenant_id, now, trial_end),
+        )
+        conn.commit()
+        return {
+            "tenant_id": tenant_id,
+            "plan": "free",
+            "status": "trialing",
+            "trial_start": now,
+            "trial_end": trial_end,
+            "stripe_customer": None,
+        }
+
+
+def _compute_trial_status(info: dict) -> dict:
+    """Add computed fields like trial_days_left and check expiration."""
+    result = {
+        "plan": info["plan"],
+        "status": info["status"],
+        "stripe_customer": info.get("stripe_customer", ""),
+    }
+
+    if info["plan"] in ("pro", "custom"):
+        result["status"] = "active"
+        return result
+
+    trial_end = info.get("trial_end")
+    if trial_end:
+        now = datetime.now(timezone.utc)
+        if hasattr(trial_end, 'tzinfo') and trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        days_left = max(0, (trial_end - now).days)
+        result["trial_days_left"] = days_left
+        result["trial_end"] = trial_end.isoformat() if trial_end else None
+        if days_left <= 0 and info["plan"] != "pro":
+            result["status"] = "trial_expired"
+            # Update DB if needed
+            if info["status"] != "trial_expired":
+                with get_conn() as conn:
+                    conn.execute(
+                        "UPDATE tenant_plans SET status = 'trial_expired', updated_at = now() WHERE tenant_id = %s",
+                        (info["tenant_id"],),
+                    )
+                    conn.commit()
+    return result
 
 
 def _stripe(method: str, path: str, data: dict | None = None) -> dict:
@@ -77,10 +157,10 @@ async def list_plans():
 
 @router.get("/status")
 async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
-    """Return current billing status for tenant."""
+    """Return current billing status for tenant, including trial info."""
     tid = auth.tenant_id if auth else "dev-tenant"
-    info = _tenant_plans.get(tid, {"plan": "free", "status": "active"})
-    return info
+    info = _get_or_create_tenant_plan(tid)
+    return _compute_trial_status(info)
 
 
 @router.post("/checkout")
@@ -100,14 +180,13 @@ async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
         "line_items[0][price]": price_id,
         "line_items[0][quantity]": "1",
         "success_url": f"{APP_URL}/definicoes?billing=success",
-        "cancel_url": f"{APP_URL}/definicoes?billing=cancel",
+        "cancel_url": f"{APP_URL}/planos?billing=cancel",
         "client_reference_id": auth.tenant_id or auth.user_id,
         "metadata[tenant_id]": auth.tenant_id or "",
         "metadata[user_id]": auth.user_id,
     }
 
-    # Stripe Connect: 50/50 split — partner gets subscription revenue,
-    # platform keeps application_fee_percent as its share.
+    # Stripe Connect: 50/50 split
     if PARTNER_STRIPE_ACCOUNT:
         checkout_data["subscription_data[application_fee_percent]"] = str(REVENUE_SPLIT_PERCENT)
         checkout_data["subscription_data[transfer_data][destination]"] = PARTNER_STRIPE_ACCOUNT
@@ -122,15 +201,12 @@ async def stripe_webhook(request: Request):
     body = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
-    # Verify signature if secret is configured
     if STRIPE_WEBHOOK_SECRET and sig:
-        # Simple signature check (production should use stripe library)
         try:
             _verify_stripe_signature(body, sig)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid signature")
 
-    import json
     event = json.loads(body)
     event_type = event.get("type", "")
     data = event.get("data", {}).get("object", {})
@@ -138,16 +214,24 @@ async def stripe_webhook(request: Request):
     if event_type == "checkout.session.completed":
         tid = data.get("metadata", {}).get("tenant_id", "")
         if tid:
-            _tenant_plans[tid] = {"plan": "pro", "status": "active",
-                                   "stripe_customer": data.get("customer", "")}
+            with get_conn() as conn:
+                conn.execute(
+                    """INSERT INTO tenant_plans (tenant_id, plan, status, stripe_customer, updated_at)
+                       VALUES (%s, 'pro', 'active', %s, now())
+                       ON CONFLICT (tenant_id) DO UPDATE SET plan = 'pro', status = 'active', stripe_customer = %s, updated_at = now()""",
+                    (tid, data.get("customer", ""), data.get("customer", "")),
+                )
+                conn.commit()
 
     elif event_type == "customer.subscription.deleted":
-        # Downgrade to free
         customer = data.get("customer", "")
-        for tid, info in _tenant_plans.items():
-            if info.get("stripe_customer") == customer:
-                _tenant_plans[tid] = {"plan": "free", "status": "active"}
-                break
+        if customer:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE tenant_plans SET plan = 'free', status = 'cancelled', updated_at = now() WHERE stripe_customer = %s",
+                    (customer,),
+                )
+                conn.commit()
 
     return {"received": True}
 
