@@ -242,6 +242,8 @@ export interface BillingStatus {
   plan: string;
   status: string;
   stripe_customer?: string;
+  trial_days_left?: number;
+  trial_end?: string;
 }
 
 export async function fetchBillingPlans(): Promise<BillingPlan[]> {
@@ -256,4 +258,244 @@ export async function createCheckoutSession(planId: string): Promise<{ checkout_
   return request<{ checkout_url: string }>(`/billing/checkout?plan_id=${planId}`, {
     method: "POST",
   });
+}
+
+// ── Entity Profile ───────────────────────────────────────────────────
+
+export async function fetchEntity(): Promise<Record<string, string>> {
+  return request<Record<string, string>>("/entity");
+}
+
+export async function saveEntity(data: Record<string, string>): Promise<Record<string, string>> {
+  return request<Record<string, string>>("/entity", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Inventory Types ──────────────────────────────────────────────────
+
+export interface UnitFamily {
+  id: number;
+  name: string;
+  base_unit: string;
+  conversions: { from_unit: string; to_unit: string; factor: number }[];
+}
+
+export interface Supplier {
+  id: number;
+  name: string;
+  nif: string;
+  category: string;
+  avg_delivery_days: number;
+  reliability: number;
+  ingredient_ids: number[];
+  price_history: PricePoint[];
+}
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  category: string;
+  unit: string;
+  min_threshold: number;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  last_cost: number;
+  avg_cost: number;
+  stock: number;
+  status: "rutura" | "baixo" | "normal" | "excesso";
+}
+
+export interface StockEvent {
+  id: number;
+  type: "entrada" | "saída" | "desperdício" | "ajuste";
+  ingredient_id: number;
+  ingredient_name: string;
+  qty: number;
+  unit: string;
+  date: string;
+  source: string;
+  reference: string;
+  cost: number | null;
+}
+
+export interface RecipeIngredient {
+  ingredient_id: number;
+  ingredient_name?: string;
+  qty: number;
+  unit: string;
+  wastage_percent: number;
+  avg_cost?: number;
+}
+
+export interface Product {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  recipe_version: string;
+  estimated_cost: number;
+  pvp: number;
+  margin: number;
+  active: boolean;
+  ingredients: RecipeIngredient[];
+}
+
+export interface InventoryStats {
+  total_ingredients: number;
+  rutura_count: number;
+  baixo_count: number;
+  stock_value: number;
+  recent_entradas: number;
+  recent_saidas: number;
+}
+
+export interface ShoppingListItem {
+  ingredient_id: number;
+  name: string;
+  current_stock: number;
+  threshold: number;
+  suggested_qty: number;
+  unit: string;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  last_price: number;
+  avg_price: number;
+  urgency: "urgente" | "alta" | "normal";
+}
+
+export interface PricePoint {
+  id?: number;
+  ingredient_id: number;
+  supplier_id: number;
+  price: number;
+  date: string;
+}
+
+export interface ProductCost {
+  total_cost: number;
+  margin: number;
+  breakdown: {
+    ingredient_id: number;
+    name: string;
+    qty: number;
+    wastage_percent: number;
+    avg_cost: number;
+    line_cost: number;
+  }[];
+}
+
+export interface StockImpact {
+  qty: number;
+  sufficient: boolean;
+  impact: {
+    ingredient_id: number;
+    name: string;
+    current_stock: number;
+    needed: number;
+    after: number;
+    unit: string;
+    sufficient: boolean;
+  }[];
+}
+
+// ── Inventory API ────────────────────────────────────────────────────
+
+export async function fetchUnitFamilies(): Promise<UnitFamily[]> {
+  return request<UnitFamily[]>("/unit-families");
+}
+
+export async function createUnitFamily(body: { name: string; base_unit: string; conversions?: { from_unit: string; to_unit: string; factor: number }[] }): Promise<UnitFamily> {
+  return request<UnitFamily>("/unit-families", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function fetchSuppliers(): Promise<Supplier[]> {
+  return request<Supplier[]>("/suppliers");
+}
+
+export async function createSupplier(body: Partial<Supplier>): Promise<Supplier> {
+  return request<Supplier>("/suppliers", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateSupplier(id: number, body: Partial<Supplier>): Promise<Supplier> {
+  return request<Supplier>(`/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function deleteSupplier(id: number): Promise<void> {
+  return request(`/suppliers/${id}`, { method: "DELETE" });
+}
+
+export async function fetchIngredients(params?: { category?: string; status_filter?: string }): Promise<Ingredient[]> {
+  const qs = new URLSearchParams();
+  if (params?.category) qs.set("category", params.category);
+  if (params?.status_filter) qs.set("status_filter", params.status_filter);
+  const query = qs.toString();
+  return request<Ingredient[]>(`/ingredients${query ? `?${query}` : ""}`);
+}
+
+export async function createIngredient(body: Partial<Ingredient>): Promise<Ingredient> {
+  return request<Ingredient>("/ingredients", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateIngredient(id: number, body: Partial<Ingredient>): Promise<Ingredient> {
+  return request<Ingredient>(`/ingredients/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function deleteIngredient(id: number): Promise<void> {
+  return request(`/ingredients/${id}`, { method: "DELETE" });
+}
+
+export async function fetchStockEvents(params?: { ingredient_id?: number; event_type?: string; limit?: number; offset?: number }): Promise<StockEvent[]> {
+  const qs = new URLSearchParams();
+  if (params?.ingredient_id) qs.set("ingredient_id", String(params.ingredient_id));
+  if (params?.event_type) qs.set("event_type", params.event_type);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  const query = qs.toString();
+  return request<StockEvent[]>(`/stock-events${query ? `?${query}` : ""}`);
+}
+
+export async function createStockEvent(body: { type: string; ingredient_id: number; qty: number; unit?: string; date?: string; source?: string; reference?: string; cost?: number }): Promise<StockEvent> {
+  return request<StockEvent>("/stock-events", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function fetchProducts(): Promise<Product[]> {
+  return request<Product[]>("/products");
+}
+
+export async function createProduct(body: Partial<Product> & { ingredients?: RecipeIngredient[] }): Promise<Product> {
+  return request<Product>("/products", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateProduct(id: number, body: Partial<Product> & { ingredients?: RecipeIngredient[] }): Promise<Product> {
+  return request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  return request(`/products/${id}`, { method: "DELETE" });
+}
+
+export async function fetchProductCost(id: number): Promise<ProductCost> {
+  return request<ProductCost>(`/products/${id}/cost`);
+}
+
+export async function produceProduct(id: number, qty: number): Promise<{ produced: number; product: string; events: StockEvent[] }> {
+  return request(`/products/${id}/produce`, { method: "POST", body: JSON.stringify({ qty }) });
+}
+
+export async function fetchStockImpact(id: number, qty: number): Promise<StockImpact> {
+  return request<StockImpact>(`/products/${id}/stock-impact?qty=${qty}`);
+}
+
+export async function fetchInventoryStats(): Promise<InventoryStats> {
+  return request<InventoryStats>("/inventory/stats");
+}
+
+export async function fetchShoppingList(): Promise<ShoppingListItem[]> {
+  return request<ShoppingListItem[]>("/inventory/shopping-list");
+}
+
+export async function addPricePoint(body: { ingredient_id: number; supplier_id: number; price: number; date?: string }): Promise<PricePoint> {
+  return request<PricePoint>("/price-history", { method: "POST", body: JSON.stringify(body) });
 }
