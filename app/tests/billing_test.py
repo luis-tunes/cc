@@ -1,8 +1,6 @@
 """Tests for billing module."""
-import json
-from unittest.mock import patch, MagicMock
-from app.billing import PLANS, _tenant_plans, _verify_stripe_signature
 import pytest
+from app.billing import PLANS, _verify_stripe_signature
 
 
 def test_plans_have_required_fields():
@@ -32,12 +30,6 @@ def test_custom_plan_is_contact():
 def test_only_two_plans():
     assert len(PLANS) == 2
     assert [p["id"] for p in PLANS] == ["pro", "custom"]
-
-
-def test_tenant_plan_cache():
-    _tenant_plans["test-org"] = {"plan": "pro", "status": "active"}
-    assert _tenant_plans["test-org"]["plan"] == "pro"
-    del _tenant_plans["test-org"]
 
 
 def test_verify_stripe_signature_missing_parts():
