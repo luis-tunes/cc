@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,33 +15,70 @@ import {
   setupSteps,
   type EntityData,
 } from "@/lib/entity-data";
+import { useEntity, useSaveEntity } from "@/hooks/use-entity";
 import {
   Building2, Hash, MapPin, ChevronRight, ChevronLeft, Check,
   AlertTriangle, Info, Sparkles, BookOpen, Receipt, Users,
-  Mail, Shield, Save, BarChart3,
+  Mail, Shield, Save, BarChart3, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EntityProfile() {
+  const { data: savedData, isLoading } = useEntity();
+  const { mutate: save, isPending: isSaving } = useSaveEntity();
   const [data, setData] = useState<EntityData>(defaultEntityData);
   const [activeStep, setActiveStep] = useState(1);
-  const [isEditing, setIsEditing] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  const update = (field: keyof EntityData, value: string) =>
+  // Load saved data from backend
+  useEffect(() => {
+    if (savedData && Object.keys(savedData).length > 0) {
+      setData((prev) => ({ ...prev, ...savedData }));
+    }
+  }, [savedData]);
+
+  const update = (field: keyof EntityData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));
+    setDirty(true);
+  };
+
+  const handleSave = () => {
+    save(data as unknown as Record<string, string>, {
+      onSuccess: () => {
+        toast.success("Perfil guardado");
+        setDirty(false);
+      },
+      onError: () => toast.error("Erro ao guardar perfil"),
+    });
+  };
 
   const totalSteps = setupSteps.length;
   const progressPct = Math.round((activeStep / totalSteps) * 100);
 
   const recommendedCategory = entityCategories.find((c) => c.value === data.entityCategory);
 
+  if (isLoading) {
+    return (
+      <PageContainer title="Perfil da Entidade" subtitle="A carregar...">
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer
       title="Perfil da Entidade"
       subtitle="Configuração da empresa — contexto fiscal, contabilístico e operacional"
       actions={
-        <Button size="sm" className="text-xs" onClick={() => { toast.success("Perfil guardado"); setIsEditing(false); }}>
-          <Save className="mr-1.5 h-3.5 w-3.5" />
+        <Button
+          size="sm"
+          className="text-xs"
+          onClick={handleSave}
+          disabled={isSaving || !dirty}
+        >
+          {isSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
           Guardar Perfil
         </Button>
       }
@@ -272,8 +309,8 @@ export default function EntityProfile() {
                 <ChevronRight className="ml-1 h-3.5 w-3.5" />
               </Button>
             ) : (
-              <Button size="sm" className="text-xs" onClick={() => toast.success("Configuração completa!")}>
-                <Check className="mr-1 h-3.5 w-3.5" />
+              <Button size="sm" className="text-xs" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
                 Concluir
               </Button>
             )}

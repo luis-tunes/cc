@@ -1,4 +1,5 @@
-import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { ComingSoon } from "@/components/shared/ComingSoon";
+import { BarChart3 } from "lucide-react";
 export default function Reports() {
-  return <PlaceholderPage title="Relatórios" subtitle="Exportação e geração de relatórios" />;
+  return <ComingSoon title="Relatórios" subtitle="Exportação e geração de relatórios" icon={BarChart3} />;
 }

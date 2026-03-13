@@ -1,4 +1,5 @@
-import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { ComingSoon } from "@/components/shared/ComingSoon";
+import { Activity } from "lucide-react";
 export default function ActivityFeed() {
-  return <PlaceholderPage title="Atividade" subtitle="Feed de atividade da organização" />;
+  return <ComingSoon title="Atividade" subtitle="Feed de atividade da organização" icon={Activity} />;
 }

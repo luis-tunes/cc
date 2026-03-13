@@ -3,12 +3,11 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ImportPanel } from "@/components/movements/ImportPanel";
 import { MovementFiltersBar, type MovementFilters } from "@/components/movements/MovementFiltersBar";
 import { MovementLedger } from "@/components/movements/MovementLedger";
-import { AiClassificationRail } from "@/components/movements/AiClassificationRail";
 import { MovementDetailDrawer } from "@/components/movements/MovementDetailDrawer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Upload, Landmark } from "lucide-react";
-import { classificationSummary, type BankMovement } from "@/lib/movements-data";
+import { type BankMovement } from "@/lib/movements-data";
 import { useBankTransactions, useUploadBankCSV } from "@/hooks/use-bank-transactions";
 import { toast } from "sonner";
 
@@ -133,7 +132,7 @@ export default function BankMovements() {
             resultCount={filtered.length}
           />
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+          <div className="grid gap-4">
             {/* Ledger */}
             <div>
               {filtered.length > 0 ? (
@@ -148,9 +147,6 @@ export default function BankMovements() {
                 />
               )}
             </div>
-
-            {/* AI Rail */}
-            <AiClassificationRail summary={classificationSummary} />
           </div>
         </div>
       )}

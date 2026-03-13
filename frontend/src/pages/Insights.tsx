@@ -1,4 +1,5 @@
-import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { ComingSoon } from "@/components/shared/ComingSoon";
+import { Lightbulb } from "lucide-react";
 export default function Insights() {
-  return <PlaceholderPage title="Insights" subtitle="Análises e deteção de anomalias" />;
+  return <ComingSoon title="Insights" subtitle="Análises e deteção de anomalias" icon={Lightbulb} />;
 }

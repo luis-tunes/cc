@@ -16,8 +16,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { useUser } from "@clerk/react";
+import { useUser, OrganizationSwitcher } from "@clerk/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Lock } from "lucide-react";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -57,6 +58,7 @@ export function AppSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => {
                   const active = location.pathname === item.path;
+                  const isComingSoon = item.status === "coming-soon";
                   return (
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton asChild>
@@ -66,15 +68,23 @@ export function AppSidebar() {
                           className={cn(
                             "relative hover:bg-sidebar-accent",
                             active &&
-                              "bg-sidebar-accent text-primary font-medium"
+                              "bg-sidebar-accent text-primary font-medium",
+                            isComingSoon && "opacity-50"
                           )}
                           activeClassName="bg-sidebar-accent text-primary font-medium"
                         >
-                          {active && (
+                          {active && !isComingSoon && (
                             <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
                           )}
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.title}</span>}
+                          {!collapsed && (
+                            <span className="flex items-center gap-1.5">
+                              {item.title}
+                              {isComingSoon && (
+                                <Lock className="h-2.5 w-2.5 text-muted-foreground" />
+                              )}
+                            </span>
+                          )}
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -87,6 +97,22 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-3">
+        {!collapsed && (
+          <div className="mb-2">
+            <OrganizationSwitcher
+              hidePersonal={false}
+              afterCreateOrganizationUrl="/painel"
+              afterSelectOrganizationUrl="/painel"
+              appearance={{
+                elements: {
+                  rootBox: "w-full",
+                  organizationSwitcherTrigger:
+                    "w-full justify-between rounded-md border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-1.5 text-xs text-foreground hover:bg-sidebar-accent",
+                },
+              }}
+            />
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Avatar className="h-7 w-7">
             <AvatarImage src={user?.imageUrl} />

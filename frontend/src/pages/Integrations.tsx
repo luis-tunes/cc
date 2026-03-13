@@ -1,4 +1,5 @@
-import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { ComingSoon } from "@/components/shared/ComingSoon";
+import { Plug } from "lucide-react";
 export default function IntegrationsPage() {
-  return <PlaceholderPage title="Integrações" subtitle="Ligações a bancos, AT e outros serviços" />;
+  return <ComingSoon title="Integrações" subtitle="Ligações a bancos, AT e outros serviços" icon={Plug} />;
 }

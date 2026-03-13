@@ -1,0 +1,147 @@
+import { useState, useMemo } from "react";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { KpiCard } from "@/components/shared/KpiCard";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ProductTable } from "@/components/products/ProductTable";
+import { AddProductDialog } from "@/components/products/AddProductDialog";
+import { ProduceDialog } from "@/components/products/ProduceDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  UtensilsCrossed, Plus, TrendingUp, ToggleRight, Loader2,
+} from "lucide-react";
+import { useProducts, useDeleteProduct } from "@/hooks/use-inventory";
+import type { Product } from "@/lib/api";
+
+const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export default function Products() {
+  const { data: products = [], isLoading } = useProducts();
+  const deleteProd = useDeleteProduct();
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [produceProduct, setProduceProduct] = useState<Product | null>(null);
+
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !p.name.toLowerCase().includes(q) &&
+          !p.code.toLowerCase().includes(q) &&
+          !(p.category && p.category.toLowerCase().includes(q))
+        ) return false;
+      }
+      if (statusFilter === "active" && !p.active) return false;
+      if (statusFilter === "inactive" && p.active) return false;
+      return true;
+    });
+  }, [products, search, statusFilter]);
+
+  const activeCount = useMemo(() => products.filter((p) => p.active).length, [products]);
+
+  const avgMargin = useMemo(() => {
+    const active = products.filter((p) => p.active && p.pvp > 0);
+    if (active.length === 0) return 0;
+    return Math.round(
+      (active.reduce((sum, p) => sum + p.margin, 0) / active.length) * 100
+    );
+  }, [products]);
+
+  const avgCost = useMemo(() => {
+    const active = products.filter((p) => p.active);
+    if (active.length === 0) return 0;
+    return active.reduce((sum, p) => sum + p.estimated_cost, 0) / active.length;
+  }, [products]);
+
+  const handleEdit = (product: Product) => {
+    setEditProduct(product);
+    setDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) setEditProduct(null);
+  };
+
+  if (isLoading) {
+    return (
+      <PageContainer title="Marmitas" subtitle="Produtos, receitas e custos">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer
+      title="Marmitas"
+      subtitle="Produtos, receitas e custos"
+      actions={
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          Novo Produto
+        </Button>
+      }
+    >
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
+        <KpiCard label="Total Produtos" value={String(products.length)} icon={UtensilsCrossed} />
+        <KpiCard label="Ativos" value={String(activeCount)} icon={ToggleRight} accent />
+        <KpiCard label="Margem Média" value={`${avgMargin}%`} icon={TrendingUp} variant={avgMargin < 30 ? "warning" : "default"} />
+        <KpiCard label="Custo Médio" value={eur(avgCost)} compact />
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 mb-4">
+        <Input
+          placeholder="Pesquisar produto…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-8 w-64"
+        />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-8 w-32">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="inactive">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table or Empty */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={UtensilsCrossed}
+          title={products.length === 0 ? "Sem produtos" : "Nenhum resultado"}
+          description={
+            products.length === 0
+              ? "Adicione o seu primeiro produto para definir receitas e calcular custos."
+              : "Tente alterar os filtros."
+          }
+          actionLabel={products.length === 0 ? "Novo Produto" : undefined}
+          onAction={products.length === 0 ? () => setDialogOpen(true) : undefined}
+        />
+      ) : (
+        <ProductTable
+          products={filtered}
+          onEdit={handleEdit}
+          onDelete={(id) => deleteProd.mutate(id)}
+          onProduce={setProduceProduct}
+        />
+      )}
+
+      {/* Dialogs */}
+      <AddProductDialog open={dialogOpen} onOpenChange={handleDialogChange} editProduct={editProduct} />
+      <ProduceDialog open={!!produceProduct} onOpenChange={(open) => { if (!open) setProduceProduct(null); }} product={produceProduct} />
+    </PageContainer>
+  );
+}

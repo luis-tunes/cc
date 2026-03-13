@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { TrialGate } from "@/components/billing/TrialGate";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 
@@ -11,7 +12,6 @@ import SignUpPage from "@/pages/SignUp";
 
 // Lazy-loaded app pages
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
 const InboxPage = lazy(() => import("@/pages/Inbox"));
 const Documents = lazy(() => import("@/pages/Documents"));
 const BankMovements = lazy(() => import("@/pages/BankMovements"));
@@ -26,10 +26,16 @@ const AiAssistant = lazy(() => import("@/pages/AiAssistant"));
 const Insights = lazy(() => import("@/pages/Insights"));
 const Forecasts = lazy(() => import("@/pages/Forecasts"));
 const CostOptimization = lazy(() => import("@/pages/CostOptimization"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const Suppliers = lazy(() => import("@/pages/Suppliers"));
+const Products = lazy(() => import("@/pages/Products"));
+const ShoppingList = lazy(() => import("@/pages/ShoppingList"));
 const EntityProfile = lazy(() => import("@/pages/EntityProfile"));
 const IntegrationsPage = lazy(() => import("@/pages/Integrations"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
+const PricingPage = lazy(() => import("@/pages/Pricing"));
+const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -50,11 +56,23 @@ export default function App() {
           <Route path="/auth/sign-in/*" element={<SignInPage />} />
           <Route path="/auth/sign-up/*" element={<SignUpPage />} />
 
-          {/* Protected — inside layout */}
+          {/* Pricing — protected but outside app layout (full-screen) */}
+          <Route
+            path="/planos"
+            element={
+              <ProtectedRoute>
+                <PricingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected — inside layout, with trial gate */}
           <Route
             element={
               <ProtectedRoute>
-                <AppLayout />
+                <TrialGate>
+                  <AppLayout />
+                </TrialGate>
               </ProtectedRoute>
             }
           >
@@ -64,6 +82,10 @@ export default function App() {
             <Route path="/documentos" element={<Documents />} />
             <Route path="/movimentos" element={<BankMovements />} />
             <Route path="/reconciliacao" element={<Reconciliation />} />
+            <Route path="/inventario" element={<Inventory />} />
+            <Route path="/fornecedores" element={<Suppliers />} />
+            <Route path="/marmitas" element={<Products />} />
+            <Route path="/lista-compras" element={<ShoppingList />} />
             <Route path="/classificacoes" element={<Classifications />} />
             <Route path="/auto-classificacao" element={<AutoClassification />} />
             <Route path="/centro-fiscal" element={<TaxCenter />} />

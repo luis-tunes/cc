@@ -20,26 +20,27 @@ export interface EntityData {
   city: string;
 }
 
+/** Empty defaults — user fills in their own entity data. */
 export const defaultEntityData: EntityData = {
-  legalName: "Empresa Demo, Lda.",
-  nif: "514 123 456",
-  cae: "62010",
-  caeDescription: "Atividades de programação informática",
-  entityCategory: "pme",
-  accountingRegime: "snc-me",
-  vatRegime: "regime-normal-trimestral",
-  reportingFrequency: "trimestral",
-  employees: "5-10",
-  turnoverRange: "150k-350k",
-  balanceSheetRange: "100k-350k",
-  accountantName: "Dr. Manuel Silva",
-  accountantEmail: "contabilidade@silva.pt",
-  accountantNif: "234 567 890",
+  legalName: "",
+  nif: "",
+  cae: "",
+  caeDescription: "",
+  entityCategory: "",
+  accountingRegime: "",
+  vatRegime: "",
+  reportingFrequency: "",
+  employees: "",
+  turnoverRange: "",
+  balanceSheetRange: "",
+  accountantName: "",
+  accountantEmail: "",
+  accountantNif: "",
   fiscalRepName: "",
   fiscalRepNif: "",
-  address: "Rua da Tecnologia, 42, 3º Dto",
-  postalCode: "1200-456",
-  city: "Lisboa",
+  address: "",
+  postalCode: "",
+  city: "",
 };
 
 export const entityCategories = [
