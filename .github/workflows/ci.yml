@@ -59,19 +59,22 @@ jobs:
     needs: build-image
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - name: deploy
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
           if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_KEY" ]; then
             echo "DEPLOY_HOST / DEPLOY_KEY not configured — skipping"
             exit 0
           fi
           mkdir -p ~/.ssh
-          # printf preserves the key exactly (echo strips trailing newline on some shells)
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
@@ -80,6 +83,7 @@ jobs:
           scp -o StrictHostKeyChecking=no docker-compose.yml "$DEPLOY_HOST:/opt/cc/docker-compose.yml"
           scp -o StrictHostKeyChecking=no bin/post-consume "$DEPLOY_HOST:/opt/cc/bin/post-consume"
 
-          # Pull new image and restart
+          # Log in to ghcr.io on the server, pull new image, restart
           ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" \
-            "cd /opt/cc && docker compose pull app && docker compose up -d --remove-orphans"
+            "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin \
+            && cd /opt/cc && docker compose pull app && docker compose up -d --remove-orphans"
