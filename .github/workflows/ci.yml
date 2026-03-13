@@ -60,6 +60,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: deploy
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -70,8 +71,15 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          # printf preserves the key exactly (echo strips trailing newline on some shells)
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Push docker-compose.yml so the server always has the latest version
+          scp -o StrictHostKeyChecking=no docker-compose.yml "$DEPLOY_HOST:/opt/cc/docker-compose.yml"
+          scp -o StrictHostKeyChecking=no bin/post-consume "$DEPLOY_HOST:/opt/cc/bin/post-consume"
+
+          # Pull new image and restart
           ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" \
-            "cd /opt/cc && docker compose pull app && docker compose up -d"
+            "cd /opt/cc && docker compose pull app && docker compose up -d --remove-orphans"
