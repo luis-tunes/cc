@@ -61,9 +61,21 @@ doc arrives → Paperless (OCR) → post-consume script → curl webhook
 ## Schema
 
 ```sql
-documents:         supplier_nif, client_nif, total, vat, date, type, status
-bank_transactions: date, description, amount
-reconciliations:   document_id, bank_transaction_id, match_confidence
+documents:            supplier_nif, client_nif, total, vat, date, type, status
+bank_transactions:    date, description, amount
+reconciliations:      document_id, bank_transaction_id, match_confidence
+tenant_settings:      tenant_id, key, data (JSONB)
+
+-- Inventory / Operations
+unit_families:        name, base_unit
+unit_conversions:     unit_family_id FK, from_unit, to_unit, factor
+suppliers:            name, nif, category, avg_delivery_days, reliability
+ingredients:          name, category, unit, min_threshold, supplier_id FK, last_cost, avg_cost
+stock_events:         type (entrada/saída/desperdício/ajuste), ingredient_id FK, qty, unit, date, source, reference, cost
+products:             code, name, category, recipe_version, estimated_cost, pvp, margin, active
+recipe_ingredients:   product_id FK, ingredient_id FK, qty, unit, wastage_percent
+price_history:        ingredient_id FK, supplier_id FK, price, date
+supplier_ingredients: supplier_id FK, ingredient_id FK (junction)
 ```
 
 ## Reconciliation
@@ -107,7 +119,6 @@ frontend/                     # React SPA
     pages/                    # 20 page components
   tailwind.config.ts          # TIM dark theme
   vite.config.ts              # Proxy /api → :8080
-web/                          # Old vanilla frontend (deprecated)
 bin/                          # Scripts
 Dockerfile                    # Multi-stage: Node build → Python runtime
 docker-compose.yml
@@ -184,5 +195,5 @@ AT integration. SAFT. ML. Complex billing. ORM.
 - Don't add dependencies without asking.
 - Paperless at `http://paperless:8000/api/`. Webhook via PAPERLESS_POST_CONSUME_SCRIPT.
 - invoice2data templates in `app/` (yml files next to parse.py).
-- Frontend changes: React/TypeScript in `frontend/src/`. Never edit `web/`.
+- Frontend changes: React/TypeScript in `frontend/src/`.
 - API routes go under `/api` prefix in routes.py.

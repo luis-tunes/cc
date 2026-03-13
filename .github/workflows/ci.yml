@@ -74,4 +74,4 @@ jobs:
           echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh "$DEPLOY_HOST" "cd /opt/cc && docker compose pull app && docker compose up -d"
+          ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" "cd /opt/cc && docker compose pull app && docker compose up -d"

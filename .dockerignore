@@ -9,5 +9,4 @@ app/tests/
 .github/
 .venv/
 frontend/node_modules/
-web/
 *.tsbuildinfo

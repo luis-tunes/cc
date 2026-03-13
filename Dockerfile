@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
 
-# Copy the built frontend instead of old vanilla web/
 COPY --from=frontend-build /build/dist web/
 
 EXPOSE 8080
