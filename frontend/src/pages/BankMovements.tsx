@@ -158,7 +158,7 @@ export default function BankMovements() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       <MovementDetailDrawer
         movement={detailMv}

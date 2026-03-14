@@ -229,7 +229,7 @@ export default function InboxPage() {
             />
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Review drawer */}
       <DocumentReviewDrawer
