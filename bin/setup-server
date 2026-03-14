@@ -1,94 +1,60 @@
 #!/usr/bin/env bash
 #
-# CC - Setup completo num servidor novo
-#
-# Uso:
-#   ssh root@IP 'bash -s TOKEN' < bin/setup-server
-#
-# TOKEN = GitHub Personal Access Token (classic) com permissao "repo"
-#   Cria em: github.com/settings/tokens/new
-#
-# Ou sem token (repo publico):
+# Bootstrap a fresh server. Run once:
 #   ssh root@IP 'bash -s' < bin/setup-server
 #
 set -euo pipefail
 
-GH_TOKEN="${1:-}"
 DIR="/opt/cc"
 APP_USER="cc"
-REPO_OWNER="xzero-ai"
-REPO_NAME="cc"
-
-if [ -n "$GH_TOKEN" ]; then
-  REPO_URL="https://${GH_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
-else
-  REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
-fi
 
 log() { echo "-- $1"; }
 
-log "a atualizar sistema..."
+# System
 export DEBIAN_FRONTEND=noninteractive
+log "a atualizar sistema..."
 apt-get update -qq && apt-get upgrade -y -qq
 
-# swap (necessario em servidores com 2GB para OCR do paperless)
+# Swap (2GB — needed for Paperless OCR)
 if [ ! -f /swapfile ]; then
   log "a criar 2GB swap..."
-  fallocate -l 2G /swapfile
-  chmod 600 /swapfile
-  mkswap /swapfile >/dev/null
-  swapon /swapfile
+  fallocate -l 2G /swapfile && chmod 600 /swapfile
+  mkswap /swapfile >/dev/null && swapon /swapfile
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
-else
-  log "swap ja existe"
 fi
 
-# docker
+# Docker
 if ! command -v docker &>/dev/null; then
   log "a instalar docker..."
   curl -fsSL https://get.docker.com | sh
-else
-  log "docker ja instalado"
 fi
 
-# firewall
+# Firewall
 log "firewall..."
 apt-get install -y -qq ufw
-ufw allow 22/tcp   >/dev/null 2>&1 || true
-ufw allow 80/tcp   >/dev/null 2>&1 || true
-ufw allow 443/tcp  >/dev/null 2>&1 || true
+ufw allow 22/tcp  >/dev/null 2>&1 || true
+ufw allow 80/tcp  >/dev/null 2>&1 || true
+ufw allow 443/tcp >/dev/null 2>&1 || true
 ufw --force enable >/dev/null 2>&1 || true
 
-# user
+# App user
 if ! id "$APP_USER" &>/dev/null; then
   log "a criar user $APP_USER..."
   adduser --disabled-password --gecos "" "$APP_USER"
 fi
 usermod -aG docker "$APP_USER" 2>/dev/null || true
 
-# clone / update
-if [ -d "$DIR/.git" ]; then
-  log "a atualizar repo..."
-  cd "$DIR" && git pull --ff-only
-else
-  log "a clonar repo..."
-  git clone "$REPO_URL" "$DIR"
-  # limpar token do remote url (seguranca)
-  if [ -n "$GH_TOKEN" ]; then
-    cd "$DIR"
-    git remote set-url origin "https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
-  fi
-fi
+# Directory structure (deploy pushes files here later)
+mkdir -p "$DIR/bin"
 chown -R "$APP_USER:$APP_USER" "$DIR"
 
-# .env
-cd "$DIR"
-if [ ! -f .env ]; then
-  log "a gerar .env com passwords aleatorias..."
+# Generate .env with random passwords
+if [ ! -f "$DIR/.env" ]; then
+  log "a gerar .env..."
   PG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
   PL_SECRET=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
   PL_ADMIN_PASS=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-  cat > .env << EOF
+  cat > "$DIR/.env" << EOF
 POSTGRES_DB=cc
 POSTGRES_USER=cc
 POSTGRES_PASSWORD=${PG_PASS}
@@ -96,73 +62,46 @@ PAPERLESS_SECRET_KEY=${PL_SECRET}
 PAPERLESS_ADMIN_USER=admin
 PAPERLESS_ADMIN_PASSWORD=${PL_ADMIN_PASS}
 PAPERLESS_TOKEN=
+AUTH_DISABLED=0
+DOMAIN=:80
 EOF
-  chown "$APP_USER:$APP_USER" .env
-  chmod 600 .env
-else
-  log ".env ja existe, a manter"
+  chown "$APP_USER:$APP_USER" "$DIR/.env"
+  chmod 600 "$DIR/.env"
 fi
 
-# pull e arrancar
-log "a arrancar containers..."
-cd "$DIR"
-sudo -u "$APP_USER" docker compose pull app 2>&1 | tail -3
-sudo -u "$APP_USER" docker compose up -d 2>&1 | tail -5
-
-# esperar pelo paperless
-log "a esperar pelo paperless (pode demorar ~60s)..."
-for i in $(seq 1 60); do
-  if sudo -u "$APP_USER" docker compose exec -T paperless curl -sf http://localhost:8000/api/ >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-
-# token do paperless
-log "a criar token paperless..."
-TOKEN=$(sudo -u "$APP_USER" docker compose exec -T paperless python3 manage.py shell -c "
-from rest_framework.authtoken.models import Token
-from django.contrib.auth.models import User
-u = User.objects.get(username='admin')
-t, _ = Token.objects.get_or_create(user=u)
-print(t.key)
-" 2>/dev/null | tr -d '[:space:]')
-
-if [ -n "$TOKEN" ]; then
-  sed -i "s|^PAPERLESS_TOKEN=.*|PAPERLESS_TOKEN=${TOKEN}|" .env
-  sudo -u "$APP_USER" docker compose restart app >/dev/null 2>&1
-  log "token configurado"
-else
-  log "nao conseguiu gerar token - paperless pode ainda estar a arrancar"
-  log "corre depois: cd $DIR && docker compose exec paperless python3 manage.py shell -c \"from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; t,_=Token.objects.get_or_create(user=User.objects.get(username='admin')); print(t.key)\""
+# SSH key for CI deploy
+if [ ! -f "/home/$APP_USER/.ssh/deploy" ]; then
+  log "a gerar chave SSH para CI..."
+  sudo -u "$APP_USER" mkdir -p "/home/$APP_USER/.ssh"
+  sudo -u "$APP_USER" ssh-keygen -t ed25519 -f "/home/$APP_USER/.ssh/deploy" -N "" -q
+  cat "/home/$APP_USER/.ssh/deploy.pub" >> "/home/$APP_USER/.ssh/authorized_keys"
+  chmod 600 "/home/$APP_USER/.ssh/authorized_keys"
+  chown "$APP_USER:$APP_USER" "/home/$APP_USER/.ssh/authorized_keys"
 fi
 
-# chave ssh para deploy automatico (github actions)
-if [ ! -f /home/$APP_USER/.ssh/deploy ]; then
-  sudo -u "$APP_USER" mkdir -p /home/$APP_USER/.ssh
-  sudo -u "$APP_USER" ssh-keygen -t ed25519 -f /home/$APP_USER/.ssh/deploy -N "" -q
-  cat /home/$APP_USER/.ssh/deploy.pub >> /home/$APP_USER/.ssh/authorized_keys
-  chmod 600 /home/$APP_USER/.ssh/authorized_keys
-  chown "$APP_USER:$APP_USER" /home/$APP_USER/.ssh/authorized_keys
-fi
-
-# resultado
 IP=$(curl -sf https://api.ipify.org || hostname -I | awk '{print $1}')
-PL_PASS=$(grep PAPERLESS_ADMIN_PASSWORD .env | cut -d= -f2)
+PL_PASS=$(grep PAPERLESS_ADMIN_PASSWORD "$DIR/.env" | cut -d= -f2)
 
 echo ""
 echo "--------------------------------------"
-echo "  CC esta live"
+echo "  Servidor pronto"
 echo "--------------------------------------"
 echo ""
-echo "  App:       http://${IP}"
-echo "  Paperless: http://${IP}:8000"
-echo "  Login:     admin / ${PL_PASS}"
+echo "  Proximo passo — da maquina local:"
+echo "    make deploy HOST=$APP_USER@$IP"
 echo ""
-echo "  Para deploy automatico (opcional):"
-echo "  github.com/${REPO_OWNER}/${REPO_NAME} > Settings > Secrets > Actions"
-echo "  DEPLOY_HOST = ${APP_USER}@${IP}"
+echo "  Depois de arrancar, gerar token paperless:"
+echo "    ssh $APP_USER@$IP"
+echo "    cd $DIR && docker compose exec paperless python3 manage.py shell -c \\"
+echo "      \"from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; t,_=Token.objects.get_or_create(user=User.objects.get(username='admin')); print(t.key)\""
+echo "    # colar o token em $DIR/.env como PAPERLESS_TOKEN=..."
+echo "    docker compose restart app"
+echo ""
+echo "  Paperless admin: admin / $PL_PASS"
+echo ""
+echo "  Para CI automatico (GitHub Secrets):"
+echo "  DEPLOY_HOST = $APP_USER@$IP"
 echo "  DEPLOY_KEY  ="
-cat /home/$APP_USER/.ssh/deploy 2>/dev/null || true
+cat "/home/$APP_USER/.ssh/deploy" 2>/dev/null || true
 echo ""
 echo "--------------------------------------"

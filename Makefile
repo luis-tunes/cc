@@ -1,4 +1,4 @@
-.PHONY: dev test clean deploy mcp
+.PHONY: dev test deploy clean
 
 dev:
 	bin/dev
@@ -6,11 +6,8 @@ dev:
 test:
 	bin/test
 
-clean:
-	bin/clean
-
 deploy:
 	bin/deploy $(HOST)
 
-mcp:
-	cd mcp && npm install && npm run build
+clean:
+	bin/clean
