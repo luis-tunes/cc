@@ -13,7 +13,12 @@ interface TrialGateProps {
  * plans, renders children normally.
  */
 export function TrialGate({ children }: TrialGateProps) {
-  const { data: billing, isLoading } = useBillingStatus();
+  const { data: billing, isLoading, isError } = useBillingStatus();
+
+  // If billing check fails (e.g. no auth token, non-HTTPS), let them through
+  if (isError) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (

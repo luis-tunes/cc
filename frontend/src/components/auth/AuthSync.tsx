@@ -10,7 +10,14 @@ export function AuthSync() {
   const { getToken } = useAuth();
 
   useEffect(() => {
-    setTokenProvider(() => getToken());
+    setTokenProvider(async () => {
+      try {
+        return await getToken();
+      } catch {
+        // crypto.subtle unavailable over HTTP — proceed without token
+        return null;
+      }
+    });
   }, [getToken]);
 
   return null;

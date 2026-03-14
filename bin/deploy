@@ -10,5 +10,5 @@ ssh "$HOST" "command -v docker >/dev/null || curl -fsSL https://get.docker.com |
 ssh "$HOST" "mkdir -p /opt/cc/bin"
 scp docker-compose.yml Caddyfile "$HOST:/opt/cc/"
 scp bin/post-consume "$HOST:/opt/cc/bin/"
-ssh "$HOST" "cd /opt/cc && docker compose pull app && docker compose up -d"
+ssh "$HOST" "cd /opt/cc && docker compose pull app && docker compose up -d --force-recreate --remove-orphans"
 echo "deployed: http://$HOST"
