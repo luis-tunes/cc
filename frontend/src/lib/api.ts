@@ -499,3 +499,107 @@ export async function fetchShoppingList(): Promise<ShoppingListItem[]> {
 export async function addPricePoint(body: { ingredient_id: number; supplier_id: number; price: number; date?: string }): Promise<PricePoint> {
   return request<PricePoint>("/price-history", { method: "POST", body: JSON.stringify(body) });
 }
+
+// ── Tax Center ──────────────────────────────────────────────────────────────
+
+export interface IvaPeriod {
+  period: string;
+  year: string;
+  quarter: number;
+  doc_count: number;
+  total_invoiced: number;
+  total_vat: number;
+  vat_collected: number;
+  vat_deductible: number;
+  vat_due: number;
+}
+
+export interface IrcEstimate {
+  year: number;
+  receitas: number;
+  gastos: number;
+  resultado: number;
+  irc_estimate: number;
+  irc_rate_note: string;
+  doc_count: number;
+}
+
+export interface AuditFlag {
+  type: string;
+  severity: "error" | "warning" | "info";
+  label: string;
+  count: number;
+  description: string;
+}
+
+export interface AuditFlagsResult {
+  flags: AuditFlag[];
+  total_issues: number;
+}
+
+export async function fetchIvaPeriods(): Promise<IvaPeriod[]> {
+  return request<IvaPeriod[]>("/tax/iva-periods");
+}
+
+export async function fetchIrcEstimate(): Promise<IrcEstimate> {
+  return request<IrcEstimate>("/tax/irc-estimate");
+}
+
+export async function fetchAuditFlags(): Promise<AuditFlagsResult> {
+  return request<AuditFlagsResult>("/tax/audit-flags");
+}
+
+// ── Obligations ─────────────────────────────────────────────────────────────
+
+export interface Obligation {
+  id: string;
+  type: string;
+  period: string;
+  deadline: string;
+  deadline_month: number | null;
+  deadline_day: number;
+  description: string;
+  days_left: number;
+  status: "overdue" | "urgent" | "upcoming" | "future";
+}
+
+export async function fetchObligations(year?: number): Promise<Obligation[]> {
+  const qs = year ? `?year=${year}` : "";
+  return request<Obligation[]>(`/obligations${qs}`);
+}
+
+// ── Reports ─────────────────────────────────────────────────────────────────
+
+export interface PlMonth {
+  month: string;
+  month_label: string;
+  receitas: number;
+  iva_cobrado: number;
+  gastos: number;
+  iva_dedutivel: number;
+  resultado: number;
+  doc_count: number;
+}
+
+export interface PlReport {
+  year: number;
+  months: PlMonth[];
+  totals: { receitas: number; gastos: number; resultado: number; iva_cobrado: number; iva_dedutivel: number };
+}
+
+export interface TopSupplier {
+  supplier_nif: string;
+  doc_count: number;
+  total_spend: number;
+  total_vat: number;
+  last_date: string | null;
+}
+
+export async function fetchPlReport(year?: number): Promise<PlReport> {
+  const qs = year ? `?year=${year}` : "";
+  return request<PlReport>(`/reports/pl${qs}`);
+}
+
+export async function fetchTopSuppliers(limit = 10): Promise<TopSupplier[]> {
+  return request<TopSupplier[]>(`/reports/top-suppliers?limit=${limit}`);
+}

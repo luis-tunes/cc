@@ -58,6 +58,17 @@ export const navigation: NavGroup[] = [
     ],
   },
   {
+    label: "Fiscal & Análise",
+    items: [
+      { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active" },
+      { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active" },
+      { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "active" },
+      { title: "Classificações", path: "/classificacoes", icon: Tags, status: "active" },
+      { title: "Insights", path: "/insights", icon: Lightbulb, status: "active" },
+      { title: "Previsões", path: "/previsoes", icon: TrendingUp, status: "active" },
+    ],
+  },
+  {
     label: "Gestão",
     items: [
       { title: "Perfil da Entidade", path: "/entidade", icon: Building2, status: "active" },
@@ -67,12 +78,9 @@ export const navigation: NavGroup[] = [
   {
     label: "Brevemente",
     items: [
-      { title: "Classificações", path: "/classificacoes", icon: Tags, status: "coming-soon" },
-      { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "coming-soon" },
-      { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "coming-soon" },
-      { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "coming-soon" },
       { title: "Assistente IA", path: "/assistente", icon: Bot, status: "coming-soon" },
       { title: "Integrações", path: "/integracoes", icon: Plug, status: "coming-soon" },
     ],
   },
 ];
+

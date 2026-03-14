@@ -1172,6 +1172,286 @@ async def shopping_list(auth: AuthInfo = Depends(require_auth)):
 
 # --- Price History ---
 
+# --- Tax Center ---
+
+@router.get("/tax/iva-periods")
+async def tax_iva_periods(auth: AuthInfo = Depends(require_auth)):
+    """IVA aggregated by quarter: total invoiced, total VAT, docs count."""
+    tid = auth.tenant_id or auth.user_id
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                TO_CHAR(date_trunc('quarter', date), 'YYYY') AS year,
+                EXTRACT(QUARTER FROM date)::int               AS quarter,
+                COUNT(*)                                       AS doc_count,
+                SUM(total)                                     AS total_invoiced,
+                SUM(vat)                                       AS total_vat,
+                SUM(CASE WHEN type = 'fatura' THEN vat ELSE 0 END) AS vat_collected,
+                SUM(CASE WHEN type IN ('fatura-fornecedor','recibo') THEN vat ELSE 0 END) AS vat_deductible
+            FROM documents
+            WHERE tenant_id = %s
+              AND date IS NOT NULL
+              AND status != 'arquivado'
+            GROUP BY 1, 2
+            ORDER BY 1 DESC, 2 DESC
+            LIMIT 8
+            """,
+            (tid,),
+        ).fetchall()
+    return [
+        {
+            "period": f"Q{r['quarter']} {r['year']}",
+            "year": r["year"],
+            "quarter": r["quarter"],
+            "doc_count": r["doc_count"],
+            "total_invoiced": float(r["total_invoiced"] or 0),
+            "total_vat": float(r["total_vat"] or 0),
+            "vat_collected": float(r["vat_collected"] or 0),
+            "vat_deductible": float(r["vat_deductible"] or 0),
+            "vat_due": float((r["vat_collected"] or 0) - (r["vat_deductible"] or 0)),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/tax/irc-estimate")
+async def tax_irc_estimate(auth: AuthInfo = Depends(require_auth)):
+    """IRC (corporate tax) estimate for the current year based on processed docs."""
+    tid = auth.tenant_id or auth.user_id
+    year = datetime.date.today().year
+    with get_conn() as conn:
+        totals = conn.execute(
+            """
+            SELECT
+                SUM(CASE WHEN type = 'fatura' THEN total ELSE 0 END)                AS receitas,
+                SUM(CASE WHEN type IN ('fatura-fornecedor','recibo') THEN total ELSE 0 END) AS gastos,
+                COUNT(*) AS doc_count
+            FROM documents
+            WHERE tenant_id = %s
+              AND EXTRACT(YEAR FROM date) = %s
+              AND status != 'arquivado'
+            """,
+            (tid, year),
+        ).fetchone()
+    receitas = float(totals["receitas"] or 0)
+    gastos = float(totals["gastos"] or 0)
+    resultado = receitas - gastos
+    # PT IRC: 17% up to €25k, 21% above (simplified estimate)
+    if resultado <= 0:
+        irc_estimate = 0.0
+    elif resultado <= 25000:
+        irc_estimate = resultado * 0.17
+    else:
+        irc_estimate = 25000 * 0.17 + (resultado - 25000) * 0.21
+    return {
+        "year": year,
+        "receitas": receitas,
+        "gastos": gastos,
+        "resultado": resultado,
+        "irc_estimate": round(irc_estimate, 2),
+        "irc_rate_note": "17% até €25k, 21% acima (estimativa simplificada)",
+        "doc_count": totals["doc_count"],
+    }
+
+
+@router.get("/tax/audit-flags")
+async def tax_audit_flags(auth: AuthInfo = Depends(require_auth)):
+    """Detect anomalies: docs with 0 VAT, round amounts, missing NIF."""
+    tid = auth.tenant_id or auth.user_id
+    with get_conn() as conn:
+        # Docs with zero VAT but non-zero total (suspicious)
+        zero_vat = conn.execute(
+            """SELECT COUNT(*) as count FROM documents
+               WHERE tenant_id = %s AND vat = 0 AND total > 100 AND type = 'fatura'""",
+            (tid,),
+        ).fetchone()
+        # Docs with suspiciously round amounts (multiple of 1000)
+        round_amounts = conn.execute(
+            """SELECT COUNT(*) as count FROM documents
+               WHERE tenant_id = %s AND total > 0 AND MOD(total::numeric, 1000) = 0""",
+            (tid,),
+        ).fetchone()
+        # Docs missing supplier NIF
+        missing_nif = conn.execute(
+            """SELECT COUNT(*) as count FROM documents
+               WHERE tenant_id = %s AND (supplier_nif = '' OR supplier_nif = '000000000')""",
+            (tid,),
+        ).fetchone()
+        # Duplicate amounts on same date
+        duplicates = conn.execute(
+            """SELECT COUNT(*) as count FROM (
+                 SELECT date, total, COUNT(*) as n FROM documents
+                 WHERE tenant_id = %s AND status != 'arquivado'
+                 GROUP BY date, total HAVING COUNT(*) > 1
+               ) sub""",
+            (tid,),
+        ).fetchone()
+    flags = []
+    if zero_vat["count"] > 0:
+        flags.append({"type": "iva_zero", "severity": "warning",
+                      "label": "IVA a zero em faturas", "count": zero_vat["count"],
+                      "description": "Faturas com total > €100 mas IVA = 0"})
+    if round_amounts["count"] > 0:
+        flags.append({"type": "round_amount", "severity": "info",
+                      "label": "Montantes redondos", "count": round_amounts["count"],
+                      "description": "Documentos com valores múltiplos de €1.000"})
+    if missing_nif["count"] > 0:
+        flags.append({"type": "missing_nif", "severity": "error",
+                      "label": "NIF em falta", "count": missing_nif["count"],
+                      "description": "Documentos sem NIF do fornecedor identificado"})
+    if duplicates["count"] > 0:
+        flags.append({"type": "duplicate", "severity": "warning",
+                      "label": "Possíveis duplicados", "count": duplicates["count"],
+                      "description": "Pares de documentos com mesmo montante e data"})
+    return {"flags": flags, "total_issues": len(flags)}
+
+
+# --- Obligations ---
+
+PT_OBLIGATIONS = [
+    {"id": "iva_q1", "type": "IVA", "period": "T1", "deadline_month": 5, "deadline_day": 20, "description": "Declaração IVA 1º Trimestre"},
+    {"id": "iva_q2", "type": "IVA", "period": "T2", "deadline_month": 8, "deadline_day": 20, "description": "Declaração IVA 2º Trimestre"},
+    {"id": "iva_q3", "type": "IVA", "period": "T3", "deadline_month": 11, "deadline_day": 20, "description": "Declaração IVA 3º Trimestre"},
+    {"id": "iva_q4", "type": "IVA", "period": "T4", "deadline_month": 2, "deadline_day": 20, "description": "Declaração IVA 4º Trimestre"},
+    {"id": "irc_annual", "type": "IRC", "period": "Anual", "deadline_month": 7, "deadline_day": 31, "description": "Declaração Modelo 22 (IRC)"},
+    {"id": "irs_cat_b", "type": "IRS", "period": "Anual", "deadline_month": 6, "deadline_day": 30, "description": "IRS Categoria B (se aplicável)"},
+    {"id": "ss_q1", "type": "SS", "period": "T1", "deadline_month": 4, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
+    {"id": "ss_q2", "type": "SS", "period": "T2", "deadline_month": 7, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
+    {"id": "ss_q3", "type": "SS", "period": "T3", "deadline_month": 10, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
+    {"id": "ss_q4", "type": "SS", "period": "T4", "deadline_month": 1, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
+    {"id": "dmr_monthly", "type": "DMR", "period": "Mensal", "deadline_month": None, "deadline_day": 10, "description": "DMR – Declaração Mensal de Remunerações"},
+    {"id": "saf_t", "type": "SAF-T", "period": "Mensal", "deadline_month": None, "deadline_day": 25, "description": "SAF-T – Ficheiro de auditoria tributária"},
+]
+
+
+@router.get("/obligations")
+async def list_obligations(year: int | None = None, _auth: AuthInfo = Depends(require_auth)):
+    """Return PT fiscal obligations with status relative to current date."""
+    today = datetime.date.today()
+    target_year = year or today.year
+    result = []
+    for ob in PT_OBLIGATIONS:
+        if ob["deadline_month"] is None:
+            # Monthly — generate for next 3 months
+            for offset in range(3):
+                m = (today.month + offset - 1) % 12 + 1
+                y = target_year + ((today.month + offset - 1) // 12)
+                deadline = datetime.date(y, m, min(ob["deadline_day"], 28))
+                days_left = (deadline - today).days
+                result.append({
+                    **ob,
+                    "id": f"{ob['id']}_{y}_{m:02d}",
+                    "deadline": deadline.isoformat(),
+                    "days_left": days_left,
+                    "status": "overdue" if days_left < 0 else "urgent" if days_left <= 7 else "upcoming" if days_left <= 30 else "future",
+                })
+        else:
+            dl_year = target_year if ob["deadline_month"] >= 3 else target_year + 1
+            try:
+                deadline = datetime.date(dl_year, ob["deadline_month"], ob["deadline_day"])
+            except ValueError:
+                deadline = datetime.date(dl_year, ob["deadline_month"], 28)
+            days_left = (deadline - today).days
+            result.append({
+                **ob,
+                "deadline": deadline.isoformat(),
+                "days_left": days_left,
+                "status": "overdue" if days_left < 0 else "urgent" if days_left <= 7 else "upcoming" if days_left <= 30 else "future",
+            })
+    result.sort(key=lambda x: x["deadline"])
+    return result
+
+
+# --- Reports ---
+
+@router.get("/reports/pl")
+async def report_pl(year: int | None = None, auth: AuthInfo = Depends(require_auth)):
+    """Monthly P&L: revenues vs expenses, net result."""
+    tid = auth.tenant_id or auth.user_id
+    target_year = year or datetime.date.today().year
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                TO_CHAR(date_trunc('month', date), 'YYYY-MM') AS month,
+                SUM(CASE WHEN type = 'fatura' THEN total ELSE 0 END)        AS receitas,
+                SUM(CASE WHEN type = 'fatura' THEN vat ELSE 0 END)          AS iva_cobrado,
+                SUM(CASE WHEN type IN ('fatura-fornecedor','recibo') THEN total ELSE 0 END) AS gastos,
+                SUM(CASE WHEN type IN ('fatura-fornecedor','recibo') THEN vat ELSE 0 END)  AS iva_dedutivel,
+                COUNT(*)                                                      AS doc_count
+            FROM documents
+            WHERE tenant_id = %s
+              AND EXTRACT(YEAR FROM date) = %s
+              AND date IS NOT NULL
+              AND status != 'arquivado'
+            GROUP BY 1
+            ORDER BY 1
+            """,
+            (tid, target_year),
+        ).fetchall()
+    months_pt = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    data = []
+    for r in rows:
+        mm = int(r["month"].split("-")[1]) - 1
+        receitas = float(r["receitas"] or 0)
+        gastos = float(r["gastos"] or 0)
+        data.append({
+            "month": r["month"],
+            "month_label": months_pt[mm],
+            "receitas": receitas,
+            "iva_cobrado": float(r["iva_cobrado"] or 0),
+            "gastos": gastos,
+            "iva_dedutivel": float(r["iva_dedutivel"] or 0),
+            "resultado": receitas - gastos,
+            "doc_count": r["doc_count"],
+        })
+    totals = {
+        "receitas": sum(r["receitas"] for r in data),
+        "gastos": sum(r["gastos"] for r in data),
+        "resultado": sum(r["resultado"] for r in data),
+        "iva_cobrado": sum(r["iva_cobrado"] for r in data),
+        "iva_dedutivel": sum(r["iva_dedutivel"] for r in data),
+    }
+    return {"year": target_year, "months": data, "totals": totals}
+
+
+@router.get("/reports/top-suppliers")
+async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require_auth)):
+    """Top suppliers by total spend."""
+    tid = auth.tenant_id or auth.user_id
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT supplier_nif,
+                   COUNT(*) as doc_count,
+                   SUM(total) as total_spend,
+                   SUM(vat) as total_vat,
+                   MAX(date) as last_date
+            FROM documents
+            WHERE tenant_id = %s
+              AND type IN ('fatura-fornecedor', 'recibo')
+              AND status != 'arquivado'
+            GROUP BY supplier_nif
+            ORDER BY total_spend DESC
+            LIMIT %s
+            """,
+            (tid, limit),
+        ).fetchall()
+    return [
+        {
+            "supplier_nif": r["supplier_nif"],
+            "doc_count": r["doc_count"],
+            "total_spend": float(r["total_spend"] or 0),
+            "total_vat": float(r["total_vat"] or 0),
+            "last_date": r["last_date"].isoformat() if r["last_date"] else None,
+        }
+        for r in rows
+    ]
+
+
+# --- Price History ---
+
 @router.post("/price-history")
 async def add_price_point(body: dict, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id or auth.user_id

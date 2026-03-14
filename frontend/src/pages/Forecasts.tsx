@@ -1,5 +1,110 @@
-import { ComingSoon } from "@/components/shared/ComingSoon";
-import { TrendingUp } from "lucide-react";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { usePlReport } from "@/hooks/use-tax";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import { cn } from "@/lib/utils";
+import { TrendingUp, TrendingDown, Info } from "lucide-react";
+
+const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function fmt(n: number) {
+  return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
 export default function Forecasts() {
-  return <ComingSoon title="Previsões" subtitle="Projeções de cash flow, cenários e análise de risco" icon={TrendingUp} />;
+  const { data: pl } = usePlReport();
+
+  // Simple linear projection: average of last 3 months + trend
+  const historical = pl?.months ?? [];
+  const last3 = historical.slice(-3);
+  const avgReceitas = last3.length > 0 ? last3.reduce((s, m) => s + m.receitas, 0) / last3.length : 0;
+  const avgGastos = last3.length > 0 ? last3.reduce((s, m) => s + m.gastos, 0) / last3.length : 0;
+  const trend = last3.length >= 2 ? (last3[last3.length - 1].resultado - last3[0].resultado) / last3.length : 0;
+
+  const today = new Date();
+  const projections = Array.from({ length: 6 }, (_, i) => {
+    const m = (today.getMonth() + i) % 12;
+    const projReceitas = Math.max(0, avgReceitas + trend * i * 0.3);
+    const projGastos = Math.max(0, avgGastos + trend * i * 0.1);
+    return {
+      month: MONTHS_PT[m],
+      receitas: Math.round(projReceitas),
+      gastos: Math.round(projGastos),
+      resultado: Math.round(projReceitas - projGastos),
+      isProjection: true,
+    };
+  });
+
+  const chartData = [
+    ...historical.map((m) => ({ month: m.month_label, receitas: m.receitas, gastos: m.gastos, resultado: m.resultado, isProjection: false })),
+    ...projections,
+  ];
+
+  const totalProjectedReceitas = projections.reduce((s, m) => s + m.receitas, 0);
+  const totalProjectedResultado = projections.reduce((s, m) => s + m.resultado, 0);
+
+  return (
+    <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
+      {/* Summary */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-tim-info/30 bg-tim-info/5 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Receitas projetadas (6m)</p>
+          <p className="mt-1 text-xl font-semibold text-tim-info">{fmt(totalProjectedReceitas)}</p>
+        </div>
+        <div className={cn("rounded-lg border p-4", totalProjectedResultado >= 0 ? "border-tim-success/30 bg-tim-success/5" : "border-tim-danger/30 bg-tim-danger/5")}>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Resultado projetado (6m)</p>
+          <div className="flex items-center gap-1.5">
+            {totalProjectedResultado >= 0 ? <TrendingUp className="h-4 w-4 text-tim-success" /> : <TrendingDown className="h-4 w-4 text-tim-danger" />}
+            <p className={cn("mt-1 text-xl font-semibold", totalProjectedResultado >= 0 ? "text-tim-success" : "text-tim-danger")}>{fmt(totalProjectedResultado)}</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-tim-warning/30 bg-tim-warning/5 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Média mensal (último trimestre)</p>
+          <p className="mt-1 text-xl font-semibold text-tim-warning">{fmt(avgReceitas - avgGastos)}</p>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-sm font-semibold">Histórico + Projeção 6 meses</h3>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(145,50%,42%)" }} /> Receitas</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(0,65%,50%)" }} /> Gastos</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded border-2 border-dashed" style={{ borderColor: "hsl(40,80%,55%)", background: "transparent" }} /> Projeção</span>
+          </div>
+        </div>
+        <div className="p-4">
+          {chartData.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Sem dados históricos para projetar</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={256}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(145,50%,42%)" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="hsl(145,50%,42%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,14%)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
+                <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(145,50%,42%)" strokeWidth={2} fill="url(#gradR)" />
+                <Area type="monotone" dataKey="gastos" name="Gastos" stroke="hsl(0,65%,50%)" strokeWidth={1.5} fill="none" />
+                <Area type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(40,80%,55%)" strokeWidth={2} fill="none" strokeDasharray="6 3" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/20 p-3">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground">Projeção baseada na média dos últimos {last3.length} meses com tendência linear simples. Não constitui previsão financeira certificada.</p>
+      </div>
+    </PageContainer>
+  );
 }

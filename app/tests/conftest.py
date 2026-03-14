@@ -840,6 +840,25 @@ class FakeConn:
         sql_lower = sql.strip().lower()
         if "to_char" in sql_lower:
             return FakeCursor([])
+        # Tax IRC: SUM(CASE WHEN type=...) AS receitas/gastos + COUNT(*) from documents
+        if "receitas" in sql_lower and "gastos" in sql_lower and "from documents" in sql_lower:
+            docs = list(_tables["documents"])
+            if params:
+                docs = [d for d in docs if d.get("tenant_id") == params[0]]
+            receitas = sum(d.get("total", Decimal("0")) for d in docs if d.get("type") == "fatura")
+            gastos = sum(d.get("total", Decimal("0")) for d in docs if d.get("type") in ("fatura-fornecedor", "recibo"))
+            return FakeCursor([{"receitas": receitas, "gastos": gastos, "doc_count": len(docs)}])
+        # Tax IVA periods / reports P&L: SUM with GROUP BY quarter/month
+        if "quarter" in sql_lower or "month_label" in sql_lower or ("extract" in sql_lower and "from documents" in sql_lower):
+            return FakeCursor([])
+        # Tax audit flags (zero vat, round amounts, missing nif, duplicates)
+        if "vat = 0" in sql_lower or "mod(" in sql_lower or "having count" in sql_lower:
+            return FakeCursor([{"count": 0}])
+        if "supplier_nif is null" in sql_lower or "(supplier_nif = ''" in sql_lower:
+            return FakeCursor([{"count": 0}])
+        # Top suppliers: SUM(total) GROUP BY supplier_nif
+        if "supplier_nif" in sql_lower and "sum" in sql_lower:
+            return FakeCursor([])
         # Dashboard: documents count + sum(total)
         if "count" in sql_lower and "sum" in sql_lower and "from documents" in sql_lower:
             docs = list(_tables["documents"])

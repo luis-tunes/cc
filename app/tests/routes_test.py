@@ -218,3 +218,92 @@ def test_put_and_get_entity():
     assert r.json()["legalName"] == "Empresa Teste"
     r = client.get("/api/entity")
     assert r.status_code == 200
+
+
+# ── Tax ───────────────────────────────────────────────────────────────
+
+def test_iva_periods():
+    r = client.get("/api/tax/iva-periods")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    if data:
+        period = data[0]
+        assert "quarter" in period
+        assert "cobrado" in period
+        assert "dedutivel" in period
+        assert "devido" in period
+
+
+def test_irc_estimate():
+    r = client.get("/api/tax/irc-estimate")
+    assert r.status_code == 200
+    data = r.json()
+    assert "year" in data
+    assert "taxable_income" in data or "resultado" in data
+    assert "irc_estimate" in data or "irc_due" in data
+
+
+def test_audit_flags():
+    r = client.get("/api/tax/audit-flags")
+    assert r.status_code == 200
+    data = r.json()
+    assert "flags" in data
+    assert "total_issues" in data or "total" in data
+    assert isinstance(data["flags"], list)
+
+
+# ── Obligations ───────────────────────────────────────────────────────
+
+def test_obligations():
+    r = client.get("/api/obligations")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    ob = data[0]
+    assert "description" in ob or "name" in ob
+    assert "due_date" in ob or "deadline" in ob
+    assert "status" in ob
+    assert ob["status"] in ("overdue", "urgent", "upcoming", "future")
+
+
+# ── Reports ───────────────────────────────────────────────────────────
+
+def test_pl_report():
+    r = client.get("/api/reports/pl")
+    assert r.status_code == 200
+    data = r.json()
+    assert "year" in data
+    assert "months" in data
+    assert isinstance(data["months"], list)
+    if data["months"]:
+        m = data["months"][0]
+        assert "month" in m
+        assert "receitas" in m
+        assert "gastos" in m
+        assert "resultado" in m
+
+
+def test_pl_report_custom_year():
+    r = client.get("/api/reports/pl?year=2023")
+    assert r.status_code == 200
+    assert r.json()["year"] == 2023
+
+
+def test_top_suppliers():
+    r = client.get("/api/reports/top-suppliers")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    if data:
+        s = data[0]
+        assert "supplier" in s
+        assert "total" in s
+        assert "doc_count" in s
+
+
+def test_top_suppliers_limit():
+    r = client.get("/api/reports/top-suppliers?limit=3")
+    assert r.status_code == 200
+    assert len(r.json()) <= 3
