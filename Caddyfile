@@ -1,0 +1,24 @@
+# TIM reverse proxy
+# ─────────────────────────────────────────────────────────
+# HTTP mode (no domain): set DOMAIN=:80 in .env
+# HTTPS mode (with domain): set DOMAIN=tim.pt in .env
+#
+# Caddy auto-provisions Let's Encrypt certs when DOMAIN is a real hostname.
+
+{$DOMAIN::80} {
+	# API + webhook → FastAPI backend
+	handle /api/* {
+		reverse_proxy app:8080
+	}
+	handle /webhook {
+		reverse_proxy app:8080
+	}
+	handle /health {
+		reverse_proxy app:8080
+	}
+
+	# Everything else → SPA (served by FastAPI)
+	handle {
+		reverse_proxy app:8080
+	}
+}

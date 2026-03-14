@@ -65,13 +65,31 @@ services:
       PARTNER_STRIPE_ACCOUNT: ${PARTNER_STRIPE_ACCOUNT:-}
       REVENUE_SPLIT_PERCENT: ${REVENUE_SPLIT_PERCENT:-50}
       WEB_DIR: /opt/tim/web
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     depends_on:
       db:
         condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
 
 volumes:
   pgdata:
   paperless_data:
   paperless_media:
+  caddy_data:
+  caddy_config:

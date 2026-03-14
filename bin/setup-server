@@ -57,7 +57,6 @@ apt-get install -y -qq ufw
 ufw allow 22/tcp   >/dev/null 2>&1 || true
 ufw allow 80/tcp   >/dev/null 2>&1 || true
 ufw allow 443/tcp  >/dev/null 2>&1 || true
-ufw allow 8080/tcp >/dev/null 2>&1 || true
 ufw --force enable >/dev/null 2>&1 || true
 
 # user
@@ -156,7 +155,7 @@ echo "--------------------------------------"
 echo "  CC esta live"
 echo "--------------------------------------"
 echo ""
-echo "  App:       http://${IP}:8080"
+echo "  App:       http://${IP}"
 echo "  Paperless: http://${IP}:8000"
 echo "  Login:     admin / ${PL_PASS}"
 echo ""
