@@ -92,3 +92,12 @@
   background: hsl(var(--card)) !important;
   border-color: hsl(var(--border)) !important;
 }
+
+/* Hide Clerk "Secured by" branding & "Development mode" badge */
+.cl-footer,
+.cl-footerAction,
+.cl-internal-b3fm6y,
+[data-clerk-component] a[href*="clerk.com"],
+.cl-internal-1dauvt6 {
+  display: none !important;
+}

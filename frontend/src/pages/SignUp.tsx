@@ -13,6 +13,10 @@ export default function SignUpPage() {
           path="/auth/sign-up"
           signInUrl="/auth/sign-in"
           appearance={{
+            layout: {
+              socialButtonsPlacement: "top",
+              showOptionalFields: false,
+            },
             elements: {
               rootBox: "mx-auto",
               card: "bg-card border-border shadow-lg",
@@ -22,6 +26,12 @@ export default function SignUpPage() {
               formFieldInput: "bg-muted border-border text-foreground",
               footerActionLink: "text-primary hover:text-primary/80",
               formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90",
+              footer: "hidden",
+              footerAction: "hidden",
+              badge: "hidden",
+              dividerLine: "bg-border",
+              dividerText: "text-muted-foreground",
+              internal: "hidden",
             },
           }}
         />
