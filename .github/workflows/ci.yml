@@ -63,7 +63,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          DIR="/opt/cc"
+          DIR="/home/cc/cc"
           ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" "mkdir -p $DIR/bin"
           scp -o StrictHostKeyChecking=no docker-compose.yml Caddyfile "$DEPLOY_HOST:$DIR/"
           scp -o StrictHostKeyChecking=no bin/post-consume "$DEPLOY_HOST:$DIR/bin/post-consume"

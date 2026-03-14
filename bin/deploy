@@ -2,7 +2,7 @@
 set -e
 
 HOST="${1:?usage: bin/deploy <user@host>}"
-DIR="/opt/cc"
+DIR="/home/cc/cc"
 
 ssh "$HOST" "mkdir -p $DIR/bin"
 scp docker-compose.yml Caddyfile "$HOST:$DIR/"

@@ -5,7 +5,7 @@
 #
 set -euo pipefail
 
-DIR="/opt/cc"
+DIR="/home/cc/cc"
 APP_USER="cc"
 
 log() { echo "-- $1"; }
