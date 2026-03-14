@@ -106,7 +106,16 @@ export default function BankMovements() {
         </Button>
       }
     >
-      {isEmpty ? (
+      {isEmpty && showImport && (
+        <ImportPanel
+          onImport={handleImport}
+          importing={importing}
+          importProgress={importProgress}
+          importResult={importResult}
+        />
+      )}
+
+      {isEmpty && !showImport ? (
         <EmptyState
           icon={Landmark}
           title="Sem movimentos bancários"
@@ -115,7 +124,7 @@ export default function BankMovements() {
           onAction={() => setShowImport(true)}
           className="py-20"
         />
-      ) : (
+      ) : !isEmpty ? (
         <div className="space-y-4">
           {showImport && (
             <ImportPanel

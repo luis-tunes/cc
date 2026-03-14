@@ -166,7 +166,15 @@ export default function InboxPage() {
         </Button>
       }
     >
-      {isEmpty ? (
+      {isEmpty && showIntake && (
+        <IntakeZone
+          uploadQueue={uploadQueue}
+          onUpload={handleUpload}
+          onDismiss={handleDismissUpload}
+        />
+      )}
+
+      {isEmpty && !showIntake ? (
         /* First-use empty state */
         <EmptyState
           icon={FileText}
@@ -176,7 +184,7 @@ export default function InboxPage() {
           onAction={() => setShowIntake(true)}
           className="py-20"
         />
-      ) : (
+      ) : !isEmpty ? (
         <div className="space-y-4">
           {/* Intake zone (collapsible) */}
           {showIntake && (
