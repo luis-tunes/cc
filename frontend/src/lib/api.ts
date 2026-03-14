@@ -73,8 +73,13 @@ async function requestFormData<T>(
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Upload failed ${res.status}: ${body}`);
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.detail) detail = parsed.detail;
+    } catch { /* not JSON */ }
+    throw new Error(`Upload failed ${res.status}: ${detail || res.statusText}`);
   }
 
   return res.json();

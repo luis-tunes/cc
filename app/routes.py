@@ -106,18 +106,24 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
 
     # Forward to Paperless for OCR
     headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
-    r = httpx.post(
-        f"{PAPERLESS_URL}/api/documents/post_document/",
-        headers=headers,
-        files={"document": (file.filename, content, mime)},
-        timeout=60,
-    )
+    try:
+        r = httpx.post(
+            f"{PAPERLESS_URL}/api/documents/post_document/",
+            headers=headers,
+            files={"document": (file.filename, content, mime)},
+            timeout=60,
+        )
+    except httpx.HTTPError as exc:
+        with get_conn() as conn:
+            conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
+            conn.commit()
+        raise HTTPException(status_code=502, detail=f"paperless unreachable: {exc}")
     if r.status_code not in (200, 202):
         # Mark as failed but keep the record
         with get_conn() as conn:
             conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
             conn.commit()
-        raise HTTPException(status_code=502, detail=f"paperless rejected: {r.text}")
+        raise HTTPException(status_code=502, detail=f"paperless rejected ({r.status_code}): {r.text}")
     return {"status": "accepted", "filename": file.filename, "id": local_id}
 
 # --- Documents ---

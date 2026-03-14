@@ -72,6 +72,10 @@ def init_db():
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$;
             """)
+        # Make date nullable (old DBs had NOT NULL without default)
+        conn.execute("""
+            ALTER TABLE documents ALTER COLUMN date DROP NOT NULL;
+        """)
         for tbl in ("bank_transactions", "reconciliations"):
             conn.execute(f"""
                 DO $$ BEGIN
