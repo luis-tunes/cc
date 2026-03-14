@@ -6,15 +6,23 @@
 
 const BASE = "/api";
 
-/** Get the Clerk session token for API calls */
+/**
+ * Token provider — set by AuthSync component so the API client
+ * can obtain a fresh Clerk session token from outside React.
+ */
+let _tokenProvider: (() => Promise<string | null>) | null = null;
+
+export function setTokenProvider(provider: () => Promise<string | null>) {
+  _tokenProvider = provider;
+}
+
 async function getAuthToken(): Promise<string | null> {
-  try {
-    const clerk = (window as any).__clerk;
-    if (clerk?.session) {
-      return await clerk.session.getToken();
+  if (_tokenProvider) {
+    try {
+      return await _tokenProvider();
+    } catch {
+      // token fetch failed — proceed without auth
     }
-  } catch {
-    // No clerk available (dev mode, etc.)
   }
   return null;
 }

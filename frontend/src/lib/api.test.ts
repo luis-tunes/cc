@@ -8,8 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-// Mock Clerk (no auth in tests)
-vi.stubGlobal("window", { ...globalThis.window, __clerk: undefined });
+// No auth token in tests (token provider not set → header omitted)
 
 // Must import after mocks are set
 import {
@@ -29,6 +28,8 @@ import {
   deleteIngredient,
   fetchBillingPlans,
   fetchBillingStatus,
+  setTokenProvider,
+  uploadDocument,
 } from "@/lib/api";
 
 function mockResponse(data: unknown, status = 200) {
@@ -243,5 +244,37 @@ describe("API client", () => {
     await fetchDocuments();
     const opts = mockFetch.mock.calls[0][1];
     expect(opts.headers["Content-Type"]).toBe("application/json");
+  });
+
+  // ── Auth token ─────────────────────────────────────────────────
+
+  it("sends Authorization header when token provider is set", async () => {
+    setTokenProvider(() => Promise.resolve("test-token-123"));
+    mockResponse([]);
+    await fetchDocuments();
+    const opts = mockFetch.mock.calls[0][1];
+    expect(opts.headers["Authorization"]).toBe("Bearer test-token-123");
+    // Clean up
+    setTokenProvider(() => Promise.resolve(null));
+  });
+
+  it("uploadDocument sends Authorization header with FormData", async () => {
+    setTokenProvider(() => Promise.resolve("upload-token-456"));
+    mockResponse({ status: "accepted", filename: "test.pdf", id: 1 });
+    const file = new File(["pdf-data"], "test.pdf", { type: "application/pdf" });
+    await uploadDocument(file);
+    const opts = mockFetch.mock.calls[0][1];
+    expect(opts.headers["Authorization"]).toBe("Bearer upload-token-456");
+    expect(opts.body).toBeInstanceOf(FormData);
+    // Clean up
+    setTokenProvider(() => Promise.resolve(null));
+  });
+
+  it("omits Authorization header when token provider returns null", async () => {
+    setTokenProvider(() => Promise.resolve(null));
+    mockResponse([]);
+    await fetchDocuments();
+    const opts = mockFetch.mock.calls[0][1];
+    expect(opts.headers["Authorization"]).toBeUndefined();
   });
 });
