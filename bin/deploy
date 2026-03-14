@@ -3,7 +3,19 @@ set -e
 
 HOST="${1:?usage: bin/deploy <user@host>}"
 DIR="/home/cc/cc"
+IMAGE="ghcr.io/xzero-ai/cc:latest"
 
+# ── Build + push fresh image ──────────────────────────────────────
+echo "building $IMAGE (no cache)…"
+VITE_KEY="$(grep VITE_CLERK_PUBLISHABLE_KEY .env 2>/dev/null | cut -d= -f2)"
+docker build --no-cache \
+  --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_KEY" \
+  -t "$IMAGE" .
+
+echo "pushing $IMAGE…"
+docker push "$IMAGE"
+
+# ── Deploy to remote ──────────────────────────────────────────────
 ssh "$HOST" "mkdir -p $DIR/bin"
 scp docker-compose.yml Caddyfile "$HOST:$DIR/"
 scp bin/post-consume "$HOST:$DIR/bin/post-consume"
