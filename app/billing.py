@@ -158,7 +158,7 @@ async def list_plans():
 @router.get("/status")
 async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
     """Return current billing status for tenant, including trial info."""
-    tid = auth.tenant_id if auth else "dev-tenant"
+    tid = (auth.tenant_id or auth.user_id) if auth else "anonymous"
     info = _get_or_create_tenant_plan(tid)
     return _compute_trial_status(info)
 
