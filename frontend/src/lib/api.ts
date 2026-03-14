@@ -14,22 +14,40 @@ let _tokenProvider: (() => Promise<string | null>) | null = null;
 
 export function setTokenProvider(provider: () => Promise<string | null>) {
   _tokenProvider = provider;
+  // Reset cache when provider changes
+  _cachedToken = undefined;
+  _tokenExpiry = 0;
 }
 
+// Cache the token to avoid calling getToken() (2s timeout on HTTP) on every request
+let _cachedToken: string | null | undefined;
+let _tokenExpiry = 0;
+const TOKEN_CACHE_MS = 50_000; // cache for 50s (Clerk tokens last ~60s)
+
 async function getAuthToken(): Promise<string | null> {
-  if (_tokenProvider) {
-    try {
-      // Timeout after 2s — Clerk's getToken() can hang on HTTP (no crypto.subtle)
-      const result = await Promise.race([
-        _tokenProvider(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-      ]);
-      return result;
-    } catch {
-      // token fetch failed — proceed without auth
-    }
+  if (!_tokenProvider) return null;
+
+  const now = Date.now();
+  if (_cachedToken !== undefined && now < _tokenExpiry) {
+    return _cachedToken;
   }
-  return null;
+
+  try {
+    // Timeout after 2s — Clerk's getToken() can hang on HTTP (no crypto.subtle)
+    const result = await Promise.race([
+      _tokenProvider(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    _cachedToken = result;
+    // If token is null (HTTP / no crypto.subtle), cache longer to avoid repeated 2s waits
+    _tokenExpiry = now + (result ? TOKEN_CACHE_MS : 10_000);
+    return result;
+  } catch {
+    // token fetch failed — cache null to avoid repeated failures
+    _cachedToken = null;
+    _tokenExpiry = now + 10_000;
+    return null;
+  }
 }
 
 async function request<T>(

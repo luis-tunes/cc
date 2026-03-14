@@ -18,6 +18,8 @@ export function useBillingStatus() {
   return useQuery<BillingStatus>({
     queryKey: ["billing", "status"],
     queryFn: fetchBillingStatus,
+    retry: false,
+    staleTime: 60_000,
   });
 }
 

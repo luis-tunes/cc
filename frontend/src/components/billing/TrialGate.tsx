@@ -1,7 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useBillingStatus } from "@/hooks/use-billing";
 import { Loader2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 interface TrialGateProps {
   children: ReactNode;
@@ -14,9 +14,17 @@ interface TrialGateProps {
  */
 export function TrialGate({ children }: TrialGateProps) {
   const { data: billing, isLoading, isError } = useBillingStatus();
+  const [timedOut, setTimedOut] = useState(false);
 
-  // If billing check fails (e.g. no auth token, non-HTTPS), let them through
-  if (isError) {
+  // Safety net: if billing check takes more than 4s, let user through
+  useEffect(() => {
+    if (!isLoading) return;
+    const id = setTimeout(() => setTimedOut(true), 4000);
+    return () => clearTimeout(id);
+  }, [isLoading]);
+
+  // If billing check fails or times out, let them through
+  if (isError || timedOut) {
     return <>{children}</>;
   }
 
