@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Ingredient } from "@/lib/api";
+import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
+import { cn } from "@/lib/utils";
 
 interface IngredientTableProps {
   ingredients: Ingredient[];
@@ -15,8 +17,10 @@ interface IngredientTableProps {
 const fmt = (v: number) => v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function IngredientTable({ ingredients, onAddStock, onRemoveStock, onDelete }: IngredientTableProps) {
+  const { focusedIndex, containerRef } = useKeyboardNav(ingredients.length);
+
   return (
-    <div className="rounded-lg border bg-card overflow-x-auto">
+    <div ref={containerRef} tabIndex={0} className="rounded-lg border bg-card overflow-x-auto outline-none">
       <Table>
         <TableHeader>
           <TableRow>
@@ -30,8 +34,8 @@ export function IngredientTable({ ingredients, onAddStock, onRemoveStock, onDele
           </TableRow>
         </TableHeader>
         <TableBody>
-          {ingredients.map((ing) => (
-            <TableRow key={ing.id}>
+          {ingredients.map((ing, idx) => (
+            <TableRow key={ing.id} className={cn(focusedIndex === idx && "ring-1 ring-inset ring-primary/40 bg-primary/5")}>
               <TableCell className="font-medium">{ing.name}</TableCell>
               <TableCell className="text-muted-foreground text-sm">{ing.category || "—"}</TableCell>
               <TableCell className="text-right font-mono text-sm">

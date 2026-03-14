@@ -18,6 +18,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { BankMovement } from "@/lib/movements-data";
+import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 
 interface MovementLedgerProps {
   movements: BankMovement[];
@@ -30,8 +31,14 @@ export function MovementLedger({
   onOpenMovement,
   className,
 }: MovementLedgerProps) {
+  const { focusedIndex, containerRef } = useKeyboardNav(movements.length);
+
   return (
-    <div className={cn("rounded-lg border bg-card overflow-x-auto", className)}>
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className={cn("rounded-lg border bg-card overflow-x-auto outline-none", className)}
+    >
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
@@ -48,9 +55,10 @@ export function MovementLedger({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {movements.map((mv) => {
+          {movements.map((mv, idx) => {
             const isDebit = mv.type === "debito";
             const hasFlags = mv.isAnomaly || mv.isDuplicate;
+            const isFocused = focusedIndex === idx;
 
             return (
               <TableRow
@@ -58,7 +66,8 @@ export function MovementLedger({
                 className={cn(
                   "border-border cursor-pointer transition-colors",
                   hasFlags && "bg-tim-danger/[0.03]",
-                  mv.classificationStatus === "pendente" && !hasFlags && "bg-tim-warning/[0.02]"
+                  mv.classificationStatus === "pendente" && !hasFlags && "bg-tim-warning/[0.02]",
+                  isFocused && "ring-1 ring-inset ring-primary/40 bg-primary/5"
                 )}
                 onClick={() => onOpenMovement(mv)}
               >

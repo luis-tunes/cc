@@ -25,14 +25,32 @@ export function useDocumentActions(refetch: () => void) {
     },
   });
 
+  function withUndo(
+    id: string,
+    patch: Record<string, any>,
+    undoPatch: Record<string, any>,
+    label: string
+  ) {
+    mutation.mutate({ id, patch });
+    toast.success(label, {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          mutation.mutate({ id, patch: undoPatch });
+          toast.info("Ação desfeita");
+        },
+      },
+      duration: 5000,
+    });
+  }
+
   const actions: DocumentActions = {
     onApprove: (id) => {
       mutation.mutate({ id, patch: { status: "classificado" } });
       toast.success("Documento aprovado");
     },
     onReject: (id, _reason?) => {
-      mutation.mutate({ id, patch: { status: "rejeitado" } });
-      toast.success("Documento rejeitado");
+      withUndo(id, { status: "rejeitado" }, { status: "pendente" }, "Documento rejeitado");
     },
     onReclassify: (id, newType, _newDocType?) => {
       mutation.mutate({ id, patch: { type: newType, status: "revisto" } });
@@ -43,15 +61,13 @@ export function useDocumentActions(refetch: () => void) {
       toast.success("Campo confirmado");
     },
     onArchive: (id) => {
-      mutation.mutate({ id, patch: { status: "arquivado" } });
-      toast.success("Documento arquivado");
+      withUndo(id, { status: "arquivado" }, { status: "pendente" }, "Documento arquivado");
     },
     onAcceptAiSuggestion: (id) => {
       mutation.mutate({ id, patch: { status: "classificado" } });
       toast.success("Sugestão IA aceite");
     },
     onAddNote: (_id, _note) => {
-      // Notes not yet stored in backend — just toast
       toast.success("Nota adicionada");
     },
   };
