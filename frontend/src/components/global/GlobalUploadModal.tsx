@@ -16,6 +16,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { uploadDocument } from "@/lib/api";
 
 interface UploadFile {
   id: string;
@@ -61,11 +62,8 @@ export function GlobalUploadModal({
           prev.map((f) => (f.id === uf.id ? { ...f, progress: 60 } : f))
         );
 
-        // Upload to our FastAPI backend → Paperless OCR pipeline
-        const response = await fetch("/api/documents/upload", {
-          method: "POST",
-          body: formData,
-        });
+        // Upload via API client (includes auth token)
+        const result = await uploadDocument(uf.file);
 
         setFiles((prev) =>
           prev.map((f) =>
@@ -74,15 +72,6 @@ export function GlobalUploadModal({
               : f
           )
         );
-
-        if (!response.ok) {
-          const errBody = await response
-            .json()
-            .catch(() => ({ detail: "Erro desconhecido" }));
-          throw new Error(errBody.detail || `HTTP ${response.status}`);
-        }
-
-        const result = await response.json();
 
         setFiles((prev) =>
           prev.map((f) =>

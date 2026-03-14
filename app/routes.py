@@ -71,11 +71,28 @@ async def paperless_webhook(payload: WebhookPayload):
         raise HTTPException(status_code=422, detail=str(e))
     return {"document_id": doc_id}
 
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".tiff": "image/tiff",
+    ".tif": "image/tiff",
+}
+
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_auth)):
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=422, detail="only PDF files accepted")
+    if not file.filename:
+        raise HTTPException(status_code=422, detail="filename is required")
+    ext = os.path.splitext(file.filename.lower())[1]
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unsupported file type '{ext}'; accepted: PDF, JPG, PNG, TIFF",
+        )
     content = await file.read()
+    mime = MIME_MAP.get(ext, "application/octet-stream")
 
     tid = auth.tenant_id if auth else None
     # Save a record immediately so frontend sees it
@@ -92,7 +109,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
     r = httpx.post(
         f"{PAPERLESS_URL}/api/documents/post_document/",
         headers=headers,
-        files={"document": (file.filename, content, "application/pdf")},
+        files={"document": (file.filename, content, mime)},
         timeout=60,
     )
     if r.status_code not in (200, 202):

@@ -28,10 +28,15 @@ function toDocumentRecord(doc: Document): DocumentRecord {
 
   const hasReconciliation = false; // TODO: backend should return this flag
 
+  const fileName = doc.filename || `documento-${doc.id}.pdf`;
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  const imageExts = new Set(["jpg", "jpeg", "png", "tiff", "tif"]);
+  const fileType = imageExts.has(ext) ? "image" : "pdf";
+
   return {
     id: String(doc.id),
-    fileName: doc.filename || `documento-${doc.id}.pdf`,
-    fileType: "pdf",
+    fileName,
+    fileType,
     documentType: typeMap[doc.type] || "outro",
     supplier: doc.supplier_nif || undefined,
     nif: doc.supplier_nif || undefined,
