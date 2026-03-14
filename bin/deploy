@@ -4,12 +4,14 @@ set -e
 HOST="${1:?usage: bin/deploy <user@host>}"
 DIR="/opt/cc"
 
-ssh "$HOST" "mkdir -p $DIR/bin"
-scp docker-compose.yml Caddyfile "$HOST:$DIR/"
-scp bin/post-consume "$HOST:$DIR/bin/"
+ssh "$HOST" "sudo mkdir -p $DIR/bin"
+scp docker-compose.yml Caddyfile "$HOST:/tmp/"
+scp bin/post-consume "$HOST:/tmp/post-consume"
 
-ssh "$HOST" "cd $DIR \
-  && docker compose pull app \
-  && docker compose up -d --force-recreate --remove-orphans"
+ssh "$HOST" "sudo cp /tmp/docker-compose.yml /tmp/Caddyfile $DIR/ \
+  && sudo cp /tmp/post-consume $DIR/bin/ \
+  && rm -f /tmp/docker-compose.yml /tmp/Caddyfile /tmp/post-consume \
+  && cd $DIR && sudo docker compose pull app \
+  && sudo docker compose up -d --force-recreate --remove-orphans"
 
 echo "deployed → $HOST"

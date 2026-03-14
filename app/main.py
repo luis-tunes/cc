@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -7,10 +8,18 @@ from app.db import close_pool, init_db
 from app.routes import router
 from app.billing import router as billing_router, init_billing_db
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("startup: PAPERLESS_URL=%s", os.environ.get("PAPERLESS_URL", "(not set)"))
+    logger.info("startup: PAPERLESS_TOKEN=%s", "set" if os.environ.get("PAPERLESS_TOKEN") else "EMPTY")
+    logger.info("startup: AUTH_DISABLED=%s", os.environ.get("AUTH_DISABLED", "0"))
+    logger.info("startup: DATABASE_URL=%s", "set" if os.environ.get("DATABASE_URL") else "EMPTY")
     init_db()
     init_billing_db()
+    logger.info("startup: DB initialized OK")
     yield
     close_pool()
 

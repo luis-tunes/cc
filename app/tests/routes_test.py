@@ -63,6 +63,79 @@ def test_upload_document_success(mock_post):
     assert "id" in data
 
 
+@patch("app.routes.httpx.post")
+def test_upload_jpg_success(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = "ok"
+    mock_post.return_value = mock_resp
+
+    # Minimal JFIF header
+    jpg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+    r = client.post(
+        "/api/documents/upload",
+        files={"file": ("photo.jpg", jpg_bytes, "image/jpeg")},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["filename"] == "photo.jpg"
+    assert "id" in data
+    # Verify Paperless was called with correct mime
+    call_kwargs = mock_post.call_args
+    assert "image/jpeg" in str(call_kwargs)
+
+
+@patch("app.routes.httpx.post")
+def test_upload_png_success(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = "ok"
+    mock_post.return_value = mock_resp
+
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    r = client.post(
+        "/api/documents/upload",
+        files={"file": ("scan.png", png_bytes, "image/png")},
+    )
+    assert r.status_code == 200
+    assert r.json()["filename"] == "scan.png"
+
+
+@patch("app.routes.httpx.post", side_effect=RuntimeError("connection pool exhausted"))
+def test_upload_paperless_unexpected_error(mock_post):
+    """Non-httpx exception from Paperless call should return 502, not 500."""
+    r = client.post(
+        "/api/documents/upload",
+        files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
+    )
+    assert r.status_code == 502
+    assert "unreachable" in r.json()["detail"]
+
+
+@patch("app.routes.httpx.post")
+def test_upload_paperless_rejects(mock_post):
+    """Paperless returns 401 (bad token) — should return 502."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 401
+    mock_resp.text = "Invalid token"
+    mock_post.return_value = mock_resp
+
+    r = client.post(
+        "/api/documents/upload",
+        files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
+    )
+    assert r.status_code == 502
+    assert "paperless rejected" in r.json()["detail"]
+
+
+def test_upload_preflight():
+    r = client.get("/api/debug/upload-check")
+    assert r.status_code == 200
+    data = r.json()
+    assert "db" in data
+    assert "paperless" in data
+
+
 def test_patch_document_no_fields():
     r = client.patch("/api/documents/1", json={})
     assert r.status_code == 422

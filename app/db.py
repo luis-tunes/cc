@@ -72,9 +72,14 @@ def init_db():
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$;
             """)
-        # Make date nullable (old DBs had NOT NULL without default)
+        # Make date nullable and set defaults (old DBs had NOT NULL without defaults)
         conn.execute("""
             ALTER TABLE documents ALTER COLUMN date DROP NOT NULL;
+            ALTER TABLE documents ALTER COLUMN supplier_nif SET DEFAULT '';
+            ALTER TABLE documents ALTER COLUMN client_nif SET DEFAULT '';
+            ALTER TABLE documents ALTER COLUMN total SET DEFAULT 0;
+            ALTER TABLE documents ALTER COLUMN vat SET DEFAULT 0;
+            ALTER TABLE documents ALTER COLUMN type SET DEFAULT 'outro';
         """)
         for tbl in ("bank_transactions", "reconciliations"):
             conn.execute(f"""

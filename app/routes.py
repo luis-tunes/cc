@@ -2,6 +2,7 @@ import csv
 import datetime
 import io
 import json
+import logging
 import os
 from decimal import Decimal
 from typing import Optional
@@ -13,6 +14,8 @@ from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn
 from app.parse import ingest_document
 from app.reconcile import reconcile_all
+
+logger = logging.getLogger(__name__)
 
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
@@ -91,40 +94,89 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
             status_code=422,
             detail=f"unsupported file type '{ext}'; accepted: PDF, JPG, PNG, TIFF",
         )
-    content = await file.read()
-    mime = MIME_MAP.get(ext, "application/octet-stream")
 
-    tid = auth.tenant_id if auth else None
-    # Save a record immediately so frontend sees it
-    with get_conn() as conn:
-        row = conn.execute(
-            "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'a processar',%s) RETURNING id",
-            (file.filename, tid),
-        ).fetchone()
-        conn.commit()
-        local_id = row["id"]
-
-    # Forward to Paperless for OCR
-    headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
     try:
-        r = httpx.post(
-            f"{PAPERLESS_URL}/api/documents/post_document/",
-            headers=headers,
-            files={"document": (file.filename, content, mime)},
-            timeout=60,
+        content = await file.read()
+        logger.info("upload: file=%s size=%d ext=%s", file.filename, len(content), ext)
+        mime = MIME_MAP.get(ext, "application/octet-stream")
+
+        tid = auth.tenant_id if auth else None
+        # Save a record immediately so frontend sees it
+        try:
+            with get_conn() as conn:
+                row = conn.execute(
+                    "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'a processar',%s) RETURNING id",
+                    (file.filename, tid),
+                ).fetchone()
+                conn.commit()
+                local_id = row["id"]
+        except Exception:
+            logger.exception("upload: DB insert failed for file=%s", file.filename)
+            raise HTTPException(status_code=500, detail="database error saving document record")
+
+        # Forward to Paperless for OCR
+        headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
+        try:
+            r = httpx.post(
+                f"{PAPERLESS_URL}/api/documents/post_document/",
+                headers=headers,
+                files={"document": (file.filename, content, mime)},
+                timeout=60,
+            )
+        except Exception as exc:
+            logger.exception("upload: paperless request failed for file=%s", file.filename)
+            with get_conn() as conn:
+                conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
+                conn.commit()
+            raise HTTPException(status_code=502, detail=f"paperless unreachable: {exc}")
+
+        if r.status_code not in (200, 202):
+            logger.error("upload: paperless rejected file=%s status=%d body=%s", file.filename, r.status_code, r.text[:500])
+            with get_conn() as conn:
+                conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
+                conn.commit()
+            raise HTTPException(status_code=502, detail=f"paperless rejected ({r.status_code}): {r.text}")
+
+        logger.info("upload: success file=%s id=%d paperless_status=%d", file.filename, local_id, r.status_code)
+        return {"status": "accepted", "filename": file.filename, "id": local_id}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("upload: unexpected error for file=%s", getattr(file, 'filename', '?'))
+        raise HTTPException(status_code=500, detail="internal error during upload")
+
+
+@router.get("/debug/upload-check")
+async def upload_preflight():
+    """Test DB and Paperless connectivity. Only works when AUTH_DISABLED=1."""
+    if not os.environ.get("AUTH_DISABLED", "0") == "1":
+        raise HTTPException(status_code=404)
+    results: dict = {}
+    # DB check
+    try:
+        with get_conn() as conn:
+            conn.execute("SELECT 1")
+        results["db"] = "ok"
+    except Exception as e:
+        results["db"] = f"error: {e}"
+    # Paperless check
+    try:
+        r = httpx.get(
+            f"{PAPERLESS_URL}/api/",
+            headers={"Authorization": f"Token {PAPERLESS_TOKEN}"},
+            timeout=10,
         )
-    except httpx.HTTPError as exc:
-        with get_conn() as conn:
-            conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
-            conn.commit()
-        raise HTTPException(status_code=502, detail=f"paperless unreachable: {exc}")
-    if r.status_code not in (200, 202):
-        # Mark as failed but keep the record
-        with get_conn() as conn:
-            conn.execute("UPDATE documents SET status = 'erro' WHERE id = %s", (local_id,))
-            conn.commit()
-        raise HTTPException(status_code=502, detail=f"paperless rejected ({r.status_code}): {r.text}")
-    return {"status": "accepted", "filename": file.filename, "id": local_id}
+        results["paperless"] = f"status={r.status_code}"
+        if r.status_code == 200:
+            results["paperless_auth"] = "ok"
+        else:
+            results["paperless_auth"] = f"failed ({r.status_code}): {r.text[:200]}"
+    except Exception as e:
+        results["paperless"] = f"unreachable: {e}"
+    results["paperless_url"] = PAPERLESS_URL
+    results["paperless_token_set"] = bool(PAPERLESS_TOKEN)
+    return results
 
 # --- Documents ---
 

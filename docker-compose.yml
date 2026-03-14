@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cc}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./bin/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cc}"]
       interval: 5s
@@ -21,7 +22,7 @@ services:
     environment:
       PAPERLESS_DBENGINE: postgresql
       PAPERLESS_DBHOST: db
-      PAPERLESS_DBNAME: ${POSTGRES_DB:-cc}
+      PAPERLESS_DBNAME: paperless
       PAPERLESS_DBUSER: ${POSTGRES_USER:-cc}
       PAPERLESS_DBPASS: ${POSTGRES_PASSWORD:-cc}
       PAPERLESS_REDIS: redis://redis:6379
