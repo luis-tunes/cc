@@ -4,12 +4,13 @@ import { FinancialOverviewPanel } from "@/components/dashboard/FinancialOverview
 import { ReconciliationHealthPanel } from "@/components/dashboard/ReconciliationHealthPanel";
 import { DashboardQuickUpload } from "@/components/dashboard/DashboardQuickUpload";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
-import { useDashboardSummary } from "@/hooks/use-dashboard";
+import { RecentDocumentsFeed } from "@/components/dashboard/RecentDocumentsFeed";
+import { useDashboardSummary, useMonthlyData } from "@/hooks/use-dashboard";
+import { useMemo } from "react";
 import {
   FileText,
   Landmark,
   GitMerge,
-  Loader2,
 } from "lucide-react";
 
 function formatEUR(val: string | number): string {
@@ -20,6 +21,7 @@ function formatEUR(val: string | number): string {
 
 export default function Dashboard() {
   const { data: summary, isLoading } = useDashboardSummary();
+  const { data: monthly } = useMonthlyData();
 
   const docCount = summary?.documents?.count ?? 0;
   const docTotal = summary?.documents?.total ?? "0";
@@ -29,6 +31,12 @@ export default function Dashboard() {
   const unmatched = summary?.unmatched_documents ?? 0;
 
   const hasData = docCount > 0 || txCount > 0;
+
+  // Sparklines from monthly data (last 6 months, doc count)
+  const sparkDocs = useMemo(() =>
+    monthly?.slice(-6).map((m) => m.doc_count) ?? [], [monthly]);
+  const sparkRevenue = useMemo(() =>
+    monthly?.slice(-6).map((m) => parseFloat(m.total) || 0) ?? [], [monthly]);
 
   return (
     <PageContainer
@@ -51,13 +59,15 @@ export default function Dashboard() {
           icon={FileText}
           accent
           compact
+          sparkline={sparkDocs}
         />
         <KpiCard
-          label="Movimentos"
-          value={isLoading ? "…" : String(txCount)}
-          trend={{ value: formatEUR(txTotal), direction: "neutral" }}
+          label="Volume"
+          value={isLoading ? "…" : formatEUR(docTotal)}
+          trend={{ value: `${docCount} docs`, direction: "neutral" }}
           icon={Landmark}
           compact
+          sparkline={sparkRevenue}
         />
         <KpiCard
           label="Reconciliados"
@@ -83,10 +93,15 @@ export default function Dashboard() {
 
       {/* === OPERATIONAL PANELS (only shown when there's data) === */}
       {hasData && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <FinancialOverviewPanel />
-          <ReconciliationHealthPanel />
-        </div>
+        <>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <FinancialOverviewPanel />
+            <ReconciliationHealthPanel />
+          </div>
+          <div className="mt-6">
+            <RecentDocumentsFeed />
+          </div>
+        </>
       )}
     </PageContainer>
   );

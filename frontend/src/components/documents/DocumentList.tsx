@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
+import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 
 interface DocumentListProps {
   documents: DocumentRecord[];
@@ -47,8 +48,14 @@ export function DocumentList({
   const allSelected =
     documents.length > 0 && documents.every((d) => selectedIds.has(d.id));
 
+  const { focusedIndex, containerRef } = useKeyboardNav(documents.length);
+
   return (
-    <div className={cn("rounded-lg border bg-card overflow-x-auto", className)}>
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className={cn("rounded-lg border bg-card overflow-x-auto outline-none", className)}
+    >
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
@@ -86,18 +93,21 @@ export function DocumentList({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {documents.map((doc) => {
+          {documents.map((doc, idx) => {
             const FileIcon = doc.fileType === "pdf" ? FileText : Image;
             const SourceIcon = sourceIcon[doc.source];
             const isLowConf = doc.extractionConfidence < 60;
+            const isFocused = focusedIndex === idx;
 
             return (
               <TableRow
                 key={doc.id}
+                data-focused={isFocused}
                 className={cn(
                   "border-border cursor-pointer transition-colors",
                   isLowConf && "bg-tim-warning/[0.03]",
-                  selectedIds.has(doc.id) && "bg-accent/50"
+                  selectedIds.has(doc.id) && "bg-accent/50",
+                  isFocused && "ring-1 ring-inset ring-primary/40 bg-primary/5"
                 )}
                 onClick={() => onOpenDocument(doc)}
               >
