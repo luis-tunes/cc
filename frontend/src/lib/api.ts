@@ -19,7 +19,12 @@ export function setTokenProvider(provider: () => Promise<string | null>) {
 async function getAuthToken(): Promise<string | null> {
   if (_tokenProvider) {
     try {
-      return await _tokenProvider();
+      // Timeout after 2s — Clerk's getToken() can hang on HTTP (no crypto.subtle)
+      const result = await Promise.race([
+        _tokenProvider(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      return result;
     } catch {
       // token fetch failed — proceed without auth
     }
