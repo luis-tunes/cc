@@ -46,24 +46,26 @@ export default function Forecasts() {
 
   return (
     <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
-      {/* Summary */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-tim-info/30 bg-tim-info/5 p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Receitas projetadas (6m)</p>
-          <p className="mt-1 text-xl font-semibold text-tim-info">{fmt(totalProjectedReceitas)}</p>
-        </div>
-        <div className={cn("rounded-lg border p-4", totalProjectedResultado >= 0 ? "border-tim-success/30 bg-tim-success/5" : "border-tim-danger/30 bg-tim-danger/5")}>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Resultado projetado (6m)</p>
-          <div className="flex items-center gap-1.5">
-            {totalProjectedResultado >= 0 ? <TrendingUp className="h-4 w-4 text-tim-success" /> : <TrendingDown className="h-4 w-4 text-tim-danger" />}
-            <p className={cn("mt-1 text-xl font-semibold", totalProjectedResultado >= 0 ? "text-tim-success" : "text-tim-danger")}>{fmt(totalProjectedResultado)}</p>
+      {/* Summary — only show when there's historical data */}
+      {historical.length > 0 && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-tim-info/30 bg-tim-info/5 p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Receitas projetadas (6m)</p>
+            <p className="mt-1 text-xl font-semibold text-tim-info">{fmt(totalProjectedReceitas)}</p>
+          </div>
+          <div className={cn("rounded-lg border p-4", totalProjectedResultado >= 0 ? "border-tim-success/30 bg-tim-success/5" : "border-tim-danger/30 bg-tim-danger/5")}>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Resultado projetado (6m)</p>
+            <div className="flex items-center gap-1.5">
+              {totalProjectedResultado >= 0 ? <TrendingUp className="h-4 w-4 text-tim-success" /> : <TrendingDown className="h-4 w-4 text-tim-danger" />}
+              <p className={cn("mt-1 text-xl font-semibold", totalProjectedResultado >= 0 ? "text-tim-success" : "text-tim-danger")}>{fmt(totalProjectedResultado)}</p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-tim-warning/30 bg-tim-warning/5 p-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Média mensal (último trimestre)</p>
+            <p className="mt-1 text-xl font-semibold text-tim-warning">{fmt(avgReceitas - avgGastos)}</p>
           </div>
         </div>
-        <div className="rounded-lg border border-tim-warning/30 bg-tim-warning/5 p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Média mensal (último trimestre)</p>
-          <p className="mt-1 text-xl font-semibold text-tim-warning">{fmt(avgReceitas - avgGastos)}</p>
-        </div>
-      </div>
+      )}
 
       {/* Chart */}
       <div className="rounded-lg border bg-card">
