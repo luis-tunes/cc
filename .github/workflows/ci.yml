@@ -64,13 +64,10 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           DIR="/opt/cc"
-          ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" "sudo mkdir -p $DIR/bin"
-          scp -o StrictHostKeyChecking=no docker-compose.yml Caddyfile "$DEPLOY_HOST:/tmp/"
-          scp -o StrictHostKeyChecking=no bin/post-consume "$DEPLOY_HOST:/tmp/post-consume"
+          ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" "mkdir -p $DIR/bin"
+          scp -o StrictHostKeyChecking=no docker-compose.yml Caddyfile "$DEPLOY_HOST:$DIR/"
+          scp -o StrictHostKeyChecking=no bin/post-consume "$DEPLOY_HOST:$DIR/bin/post-consume"
           ssh -o StrictHostKeyChecking=no "$DEPLOY_HOST" \
-            "sudo cp /tmp/docker-compose.yml /tmp/Caddyfile $DIR/ \
-            && sudo cp /tmp/post-consume $DIR/bin/ \
-            && rm -f /tmp/docker-compose.yml /tmp/Caddyfile /tmp/post-consume \
-            && echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin \
-            && cd $DIR && sudo docker compose pull app \
-            && sudo docker compose up -d --force-recreate --remove-orphans"
+            "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin \
+            && cd $DIR && docker compose pull app \
+            && docker compose up -d --force-recreate --remove-orphans"
