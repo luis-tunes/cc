@@ -20,6 +20,11 @@ ssh "$HOST" "mkdir -p $DIR/bin"
 scp docker-compose.yml Caddyfile "$HOST:$DIR/"
 scp bin/post-consume "$HOST:$DIR/bin/post-consume"
 
+# Copy .env if it exists locally (never overwrite a production .env that's already there)
+if [ -f .env ]; then
+  scp .env "$HOST:$DIR/.env"
+fi
+
 ssh "$HOST" "cd $DIR && docker compose pull app \
   && docker compose up -d --force-recreate --remove-orphans"
 

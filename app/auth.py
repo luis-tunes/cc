@@ -61,7 +61,7 @@ def _extract_auth(request: Request) -> Optional[AuthInfo]:
     token = auth_header[7:]
     try:
         payload = _decode_clerk_jwt(token)
-    except jwt.InvalidTokenError as e:
+    except (jwt.InvalidTokenError, ValueError) as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
     return AuthInfo(
