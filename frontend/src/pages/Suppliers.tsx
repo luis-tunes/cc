@@ -4,10 +4,13 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SupplierTable } from "@/components/suppliers/SupplierTable";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
+import { PriceHistoryPanel } from "@/components/suppliers/PriceHistoryPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Truck, Plus, Users, Clock, ShieldCheck, Loader2,
+  Truck, Plus, Users, Clock, ShieldCheck, Loader2, TrendingUp,
 } from "lucide-react";
 import { useSuppliers, useDeleteSupplier } from "@/hooks/use-inventory";
 import type { Supplier } from "@/lib/api";
@@ -17,19 +20,29 @@ export default function Suppliers() {
   const deleteSup = useDeleteSupplier();
 
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
 
   const filtered = useMemo(() => {
-    if (!search) return suppliers;
-    const q = search.toLowerCase();
-    return suppliers.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.nif && s.nif.includes(q)) ||
-        (s.category && s.category.toLowerCase().includes(q))
-    );
-  }, [suppliers, search]);
+    return suppliers.filter((s) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !s.name.toLowerCase().includes(q) &&
+          !(s.nif && s.nif.includes(q)) &&
+          !(s.category && s.category.toLowerCase().includes(q))
+        ) return false;
+      }
+      if (categoryFilter !== "all" && s.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [suppliers, search, categoryFilter]);
+
+  const categories = useMemo(() => {
+    const cats = new Set(suppliers.map((s) => s.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [suppliers]);
 
   const avgReliability = useMemo(() => {
     if (suppliers.length === 0) return 0;
@@ -90,36 +103,63 @@ export default function Suppliers() {
         <KpiCard label="Ingredientes Cobertos" value={String(totalIngredients)} icon={Truck} />
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 mb-4">
-        <Input
-          placeholder="Pesquisar fornecedor…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-64"
-        />
-      </div>
+      <Tabs defaultValue="fornecedores" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
+          <TabsTrigger value="precos" className="gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Historial de Preços
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Table or Empty */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={Truck}
-          title={suppliers.length === 0 ? "Sem fornecedores" : "Nenhum resultado"}
-          description={
-            suppliers.length === 0
-              ? "Adicione o seu primeiro fornecedor para começar a gerir preços e entregas."
-              : "Tente alterar a pesquisa."
-          }
-          actionLabel={suppliers.length === 0 ? "Novo Fornecedor" : undefined}
-          onAction={suppliers.length === 0 ? () => setDialogOpen(true) : undefined}
-        />
-      ) : (
-        <SupplierTable
-          suppliers={filtered}
-          onEdit={handleEdit}
-          onDelete={(id) => deleteSup.mutate(id)}
-        />
-      )}
+        <TabsContent value="fornecedores">
+          {/* Search + Category filter */}
+          <div className="flex items-center gap-2 mb-4">
+            <Input
+              placeholder="Pesquisar fornecedor…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 w-64"
+            />
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="h-8 w-40">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table or Empty */}
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={Truck}
+              title={suppliers.length === 0 ? "Sem fornecedores" : "Nenhum resultado"}
+              description={
+                suppliers.length === 0
+                  ? "Adicione o seu primeiro fornecedor para começar a gerir preços e entregas."
+                  : "Tente alterar a pesquisa."
+              }
+              actionLabel={suppliers.length === 0 ? "Novo Fornecedor" : undefined}
+              onAction={suppliers.length === 0 ? () => setDialogOpen(true) : undefined}
+            />
+          ) : (
+            <SupplierTable
+              suppliers={filtered}
+              onEdit={handleEdit}
+              onDelete={(id) => deleteSup.mutate(id)}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="precos">
+          <PriceHistoryPanel suppliers={suppliers} />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog */}
       <AddSupplierDialog
