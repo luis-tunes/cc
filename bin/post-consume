@@ -3,10 +3,16 @@ set -euo pipefail
 
 echo "post-consume: document_id=${DOCUMENT_ID}" >&2
 
-HTTP_CODE=$(curl -s -o /dev/stderr -w "%{http_code}" \
+BODY=$(mktemp)
+trap 'rm -f "$BODY"' EXIT
+
+HTTP_CODE=$(curl -s -o "$BODY" -w "%{http_code}" \
   -X POST "http://app:8080/webhook" \
   -H "Content-Type: application/json" \
-  -d "{\"document_id\": ${DOCUMENT_ID}}" 2>&1)
+  -d "{\"document_id\": ${DOCUMENT_ID}}")
+
+cat "$BODY" >&2
+echo "" >&2
 
 if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
   echo "post-consume: success (HTTP $HTTP_CODE)" >&2

@@ -114,7 +114,7 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
         try:
             total = _parse_amount_from_text(raw_text)
         except ValueError:
-            raise ValueError("could not extract amount from document")
+            total = Decimal("0")
         doc_date = _parse_date_from_text(raw_text)
         nifs = [n for n in _NIF_RE.findall(raw_text) if validate_nif(n)]
         supplier_nif = nifs[0] if len(nifs) >= 1 else "000000000"

@@ -65,6 +65,14 @@ export function useDocuments() {
       const raw = await fetchDocuments();
       return raw.map(toDocumentRecord);
     },
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (!docs) return false;
+      const hasPending = docs.some((d) =>
+        ["pendente", "a processar"].includes(d.classificationStatus)
+      );
+      return hasPending ? 5000 : false;
+    },
   });
 
   const refetch = () =>
