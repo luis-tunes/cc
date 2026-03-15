@@ -11,9 +11,10 @@ interface AddIngredientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   suppliers: Supplier[];
+  defaultCategory?: string;
 }
 
-export function AddIngredientDialog({ open, onOpenChange, suppliers }: AddIngredientDialogProps) {
+export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCategory }: AddIngredientDialogProps) {
   const create = useCreateIngredient();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -62,7 +63,28 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers }: AddIngred
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="ing-category">Categoria</Label>
-              <Input id="ing-category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="cereais" />
+              <Select value={category || defaultCategory || ""} onValueChange={setCategory}>
+                <SelectTrigger id="ing-category"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cereais">Cereais</SelectItem>
+                  <SelectItem value="legumes">Legumes</SelectItem>
+                  <SelectItem value="frutas">Frutas</SelectItem>
+                  <SelectItem value="carne">Carne</SelectItem>
+                  <SelectItem value="peixe">Peixe</SelectItem>
+                  <SelectItem value="lacticínios">Lacticínios</SelectItem>
+                  <SelectItem value="gorduras">Gorduras</SelectItem>
+                  <SelectItem value="temperos">Temperos</SelectItem>
+                  <SelectItem value="ovos">Ovos</SelectItem>
+                  <SelectItem value="leguminosas">Leguminosas</SelectItem>
+                  <SelectItem value="massas">Massas</SelectItem>
+                  <SelectItem value="embalagem">Embalagem</SelectItem>
+                  <SelectItem value="limpeza">Limpeza</SelectItem>
+                  <SelectItem value="descartáveis">Descartáveis</SelectItem>
+                  <SelectItem value="higiene">Higiene</SelectItem>
+                  <SelectItem value="consumível">Consumível</SelectItem>
+                  <SelectItem value="outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ing-unit">Unidade</Label>

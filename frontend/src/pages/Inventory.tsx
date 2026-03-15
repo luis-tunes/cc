@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Package, Plus, ArrowDownToLine, AlertTriangle,
-  XCircle, TrendingUp, Loader2,
+  XCircle, TrendingUp, Loader2, Wheat, Wrench,
 } from "lucide-react";
 import {
   useIngredients,
@@ -25,6 +25,15 @@ import type { Ingredient } from "@/lib/api";
 
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const MATERIA_PRIMA_CATEGORIES = ["cereais", "legumes", "frutas", "carne", "peixe", "lacticínios", "gorduras", "temperos", "ovos", "leguminosas", "massas", "outros"];
+const CONSUMIVEL_CATEGORIES = ["embalagem", "limpeza", "descartáveis", "higiene", "escritório", "consumível"];
+
+function classifyCategory(cat: string): "materia-prima" | "consumivel" {
+  const lower = cat.toLowerCase().trim();
+  if (CONSUMIVEL_CATEGORIES.some((c) => lower.includes(c))) return "consumivel";
+  return "materia-prima";
+}
+
 export default function Inventory() {
   const { data: ingredients = [], isLoading: loadingIng } = useIngredients();
   const { data: events = [], isLoading: loadingEv } = useStockEvents({ limit: 50 });
@@ -35,14 +44,24 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAddIngredient, setShowAddIngredient] = useState(false);
+  const [defaultCategory, setDefaultCategory] = useState("");
   const [stockEventDialog, setStockEventDialog] = useState<{
     open: boolean;
     ingredientId?: number;
     type?: string;
   }>({ open: false });
 
-  const filtered = useMemo(() => {
-    return ingredients.filter((ing) => {
+  const materiasPrimas = useMemo(
+    () => ingredients.filter((i) => classifyCategory(i.category) === "materia-prima"),
+    [ingredients]
+  );
+  const consumiveis = useMemo(
+    () => ingredients.filter((i) => classifyCategory(i.category) === "consumivel"),
+    [ingredients]
+  );
+
+  const filterList = (list: Ingredient[]) =>
+    list.filter((ing) => {
       if (search) {
         const q = search.toLowerCase();
         if (!ing.name.toLowerCase().includes(q) && !ing.category.toLowerCase().includes(q)) return false;
@@ -50,13 +69,29 @@ export default function Inventory() {
       if (statusFilter !== "all" && ing.status !== statusFilter) return false;
       return true;
     });
-  }, [ingredients, search, statusFilter]);
+
+  const filteredMP = useMemo(() => filterList(materiasPrimas), [materiasPrimas, search, statusFilter]);
+  const filteredCons = useMemo(() => filterList(consumiveis), [consumiveis, search, statusFilter]);
 
   const isLoading = loadingIng || loadingEv;
 
+  const mpStats = useMemo(() => ({
+    total: materiasPrimas.length,
+    rutura: materiasPrimas.filter((i) => i.status === "rutura").length,
+    baixo: materiasPrimas.filter((i) => i.status === "baixo").length,
+    value: materiasPrimas.reduce((s, i) => s + i.stock * i.avg_cost, 0),
+  }), [materiasPrimas]);
+
+  const consStats = useMemo(() => ({
+    total: consumiveis.length,
+    rutura: consumiveis.filter((i) => i.status === "rutura").length,
+    baixo: consumiveis.filter((i) => i.status === "baixo").length,
+    value: consumiveis.reduce((s, i) => s + i.stock * i.avg_cost, 0),
+  }), [consumiveis]);
+
   if (isLoading) {
     return (
-      <PageContainer title="Inventário" subtitle="Gestão de stock de ingredientes">
+      <PageContainer title="Inventário" subtitle="Gestão de stock">
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
@@ -64,10 +99,29 @@ export default function Inventory() {
     );
   }
 
+  const renderIngredientSection = (list: Ingredient[], emptyLabel: string) => (
+    list.length === 0 ? (
+      <EmptyState
+        icon={Package}
+        title={ingredients.length === 0 ? emptyLabel : "Nenhum resultado"}
+        description={ingredients.length === 0 ? "Adicione o seu primeiro ingrediente para começar a gerir o stock." : "Tente alterar os filtros."}
+        actionLabel={ingredients.length === 0 ? "Novo Ingrediente" : undefined}
+        onAction={ingredients.length === 0 ? () => setShowAddIngredient(true) : undefined}
+      />
+    ) : (
+      <IngredientTable
+        ingredients={list}
+        onAddStock={(ing) => setStockEventDialog({ open: true, ingredientId: ing.id, type: "entrada" })}
+        onRemoveStock={(ing) => setStockEventDialog({ open: true, ingredientId: ing.id, type: "saída" })}
+        onDelete={(id) => deleteIng.mutate(id)}
+      />
+    )
+  );
+
   return (
     <PageContainer
       title="Inventário"
-      subtitle="Gestão de stock de ingredientes"
+      subtitle="Matérias primas, consumíveis e movimentos de stock"
       actions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setStockEventDialog({ open: true })}>
@@ -84,7 +138,7 @@ export default function Inventory() {
       {/* KPI Cards */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-6">
-          <KpiCard label="Ingredientes" value={String(stats.total_ingredients)} icon={Package} />
+          <KpiCard label="Total Ingredientes" value={String(stats.total_ingredients)} icon={Package} />
           <KpiCard label="Valor em Stock" value={eur(stats.stock_value)} icon={TrendingUp} accent />
           <KpiCard label="Em Rutura" value={String(stats.rutura_count)} icon={XCircle} variant={stats.rutura_count > 0 ? "danger" : "default"} />
           <KpiCard label="Stock Baixo" value={String(stats.baixo_count)} icon={AlertTriangle} variant={stats.baixo_count > 0 ? "warning" : "default"} />
@@ -93,11 +147,20 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Tabs: Ingredientes | Movimentos */}
-      <Tabs defaultValue="ingredientes" className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
+      {/* Tabs: Matérias Primas | Consumíveis | Movimentos */}
+      <Tabs defaultValue="materias-primas" className="space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <TabsList>
-            <TabsTrigger value="ingredientes">Ingredientes</TabsTrigger>
+            <TabsTrigger value="materias-primas" className="gap-1.5">
+              <Wheat className="h-3.5 w-3.5" />
+              Matérias Primas
+              {mpStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono">{mpStats.total}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="consumiveis" className="gap-1.5">
+              <Wrench className="h-3.5 w-3.5" />
+              Consumíveis
+              {consStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono">{consStats.total}</span>}
+            </TabsTrigger>
             <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
@@ -122,23 +185,26 @@ export default function Inventory() {
           </div>
         </div>
 
-        <TabsContent value="ingredientes">
-          {filtered.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title={ingredients.length === 0 ? "Sem ingredientes" : "Nenhum resultado"}
-              description={ingredients.length === 0 ? "Adicione o seu primeiro ingrediente para começar a gerir o stock." : "Tente alterar os filtros."}
-              actionLabel={ingredients.length === 0 ? "Novo Ingrediente" : undefined}
-              onAction={ingredients.length === 0 ? () => setShowAddIngredient(true) : undefined}
-            />
-          ) : (
-            <IngredientTable
-              ingredients={filtered}
-              onAddStock={(ing) => setStockEventDialog({ open: true, ingredientId: ing.id, type: "entrada" })}
-              onRemoveStock={(ing) => setStockEventDialog({ open: true, ingredientId: ing.id, type: "saída" })}
-              onDelete={(id) => deleteIng.mutate(id)}
-            />
-          )}
+        <TabsContent value="materias-primas">
+          {/* MP-specific KPIs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            <KpiCard label="Matérias Primas" value={String(mpStats.total)} icon={Wheat} compact />
+            <KpiCard label="Valor MP" value={eur(mpStats.value)} compact />
+            <KpiCard label="Rutura" value={String(mpStats.rutura)} variant={mpStats.rutura > 0 ? "danger" : "default"} compact />
+            <KpiCard label="Stock Baixo" value={String(mpStats.baixo)} variant={mpStats.baixo > 0 ? "warning" : "default"} compact />
+          </div>
+          {renderIngredientSection(filteredMP, "Sem matérias primas")}
+        </TabsContent>
+
+        <TabsContent value="consumiveis">
+          {/* Consumables-specific KPIs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            <KpiCard label="Consumíveis" value={String(consStats.total)} icon={Wrench} compact />
+            <KpiCard label="Valor Cons." value={eur(consStats.value)} compact />
+            <KpiCard label="Rutura" value={String(consStats.rutura)} variant={consStats.rutura > 0 ? "danger" : "default"} compact />
+            <KpiCard label="Stock Baixo" value={String(consStats.baixo)} variant={consStats.baixo > 0 ? "warning" : "default"} compact />
+          </div>
+          {renderIngredientSection(filteredCons, "Sem consumíveis")}
         </TabsContent>
 
         <TabsContent value="movimentos">
@@ -155,7 +221,7 @@ export default function Inventory() {
       </Tabs>
 
       {/* Dialogs */}
-      <AddIngredientDialog open={showAddIngredient} onOpenChange={setShowAddIngredient} suppliers={suppliers} />
+      <AddIngredientDialog open={showAddIngredient} onOpenChange={setShowAddIngredient} suppliers={suppliers} defaultCategory={defaultCategory} />
       <AddStockEventDialog
         open={stockEventDialog.open}
         onOpenChange={(open) => setStockEventDialog((s) => ({ ...s, open }))}
