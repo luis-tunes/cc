@@ -135,15 +135,20 @@ def test_ingest_document_invalid_nifs_fallback():
     assert doc["client_nif"] == "000000000"
 
 
-def test_ingest_document_no_amount_raises():
-    """If no amount can be found, raise ValueError."""
+def test_ingest_document_no_amount_saves_pending():
+    """If no amount can be found, save with total=0 and status pendente."""
     text = "This document has no monetary values at all"
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
          patch("app.parse.fetch_document_text", return_value=text):
-        with pytest.raises(ValueError, match="could not extract amount"):
-            ingest_document(51)
+        doc_id = ingest_document(51)
+
+    import sys
+    tables = sys.modules["tests.conftest"].get_tables()
+    doc = next(d for d in tables["documents"] if d["id"] == doc_id)
+    assert doc["total"] == Decimal("0")
+    assert doc["status"] == "pendente"
 
 
 def test_ingest_document_with_invoice2data_result():
