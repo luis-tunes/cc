@@ -46,12 +46,16 @@ def test_upload_rejects_non_pdf():
     assert "PDF" in r.json()["detail"]
 
 
-@patch("app.routes.httpx.post")
-def test_upload_document_success(mock_post):
+@patch("app.routes.httpx.Client")
+def test_upload_document_success(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.text = "ok"
-    mock_post.return_value = mock_resp
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
 
     r = client.post(
         "/api/documents/upload",
@@ -63,12 +67,16 @@ def test_upload_document_success(mock_post):
     assert "id" in data
 
 
-@patch("app.routes.httpx.post")
-def test_upload_jpg_success(mock_post):
+@patch("app.routes.httpx.Client")
+def test_upload_jpg_success(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.text = "ok"
-    mock_post.return_value = mock_resp
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
 
     # Minimal JFIF header
     jpg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 100
@@ -81,16 +89,20 @@ def test_upload_jpg_success(mock_post):
     assert data["filename"] == "photo.jpg"
     assert "id" in data
     # Verify Paperless was called with correct mime
-    call_kwargs = mock_post.call_args
+    call_kwargs = mock_client.post.call_args
     assert "image/jpeg" in str(call_kwargs)
 
 
-@patch("app.routes.httpx.post")
-def test_upload_png_success(mock_post):
+@patch("app.routes.httpx.Client")
+def test_upload_png_success(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.text = "ok"
-    mock_post.return_value = mock_resp
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
 
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
     r = client.post(
@@ -101,9 +113,15 @@ def test_upload_png_success(mock_post):
     assert r.json()["filename"] == "scan.png"
 
 
-@patch("app.routes.httpx.post", side_effect=RuntimeError("connection pool exhausted"))
-def test_upload_paperless_unexpected_error(mock_post):
+@patch("app.routes.httpx.Client")
+def test_upload_paperless_unexpected_error(mock_client_cls):
     """Non-httpx exception from Paperless call should return 502, not 500."""
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.side_effect = RuntimeError("connection pool exhausted")
+    mock_client_cls.return_value = mock_client
+
     r = client.post(
         "/api/documents/upload",
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
@@ -112,13 +130,17 @@ def test_upload_paperless_unexpected_error(mock_post):
     assert "unreachable" in r.json()["detail"]
 
 
-@patch("app.routes.httpx.post")
-def test_upload_paperless_rejects(mock_post):
+@patch("app.routes.httpx.Client")
+def test_upload_paperless_rejects(mock_client_cls):
     """Paperless returns 401 (bad token) — should return 502."""
     mock_resp = MagicMock()
     mock_resp.status_code = 401
     mock_resp.text = "Invalid token"
-    mock_post.return_value = mock_resp
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
 
     r = client.post(
         "/api/documents/upload",
@@ -141,11 +163,15 @@ def test_patch_document_no_fields():
     assert r.status_code == 422
 
 
-@patch("app.routes.httpx.post")
-def test_create_and_patch_document(mock_post):
+@patch("app.routes.httpx.Client")
+def test_create_and_patch_document(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_post.return_value = mock_resp
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
 
     r = client.post(
         "/api/documents/upload",
