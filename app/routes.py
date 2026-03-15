@@ -43,7 +43,7 @@ class DocumentOut(BaseModel):
     raw_text: str | None = None
     status: str = "pendente"
     paperless_id: int | None = None
-    created_at: str | None = None
+    created_at: datetime.datetime | None = None
 
 class DocumentPatch(BaseModel):
     status: Optional[str] = None
