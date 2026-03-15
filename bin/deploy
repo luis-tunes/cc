@@ -18,7 +18,7 @@ docker push "$IMAGE"
 # ── Deploy to remote ──────────────────────────────────────────────
 ssh "$HOST" "mkdir -p $DIR/bin"
 scp docker-compose.yml Caddyfile "$HOST:$DIR/"
-scp bin/post-consume "$HOST:$DIR/bin/post-consume"
+scp bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
 
 # Copy .env if it exists locally (never overwrite a production .env that's already there)
 if [ -f .env ]; then

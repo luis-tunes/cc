@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cc}
       POSTGRES_USER: ${POSTGRES_USER:-cc}
@@ -16,9 +17,16 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   paperless:
     image: ghcr.io/paperless-ngx/paperless-ngx:2.14
+    restart: unless-stopped
     environment:
       PAPERLESS_DBENGINE: postgresql
       PAPERLESS_DBHOST: db
@@ -37,16 +45,21 @@ services:
       - paperless_data:/usr/src/paperless/data
       - paperless_media:/usr/src/paperless/media
       - ./bin:/opt/bin:ro
-    ports:
-      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   app:
     image: ghcr.io/xzero-ai/cc:latest
+    restart: unless-stopped
     build:
       context: .
       args:
@@ -70,6 +83,8 @@ services:
       - "8080"
     depends_on:
       db:
+        condition: service_healthy
+      paperless:
         condition: service_healthy
 
   caddy:

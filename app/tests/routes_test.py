@@ -115,7 +115,7 @@ def test_upload_png_success(mock_client_cls):
 
 @patch("app.routes.httpx.Client")
 def test_upload_paperless_unexpected_error(mock_client_cls):
-    """Non-httpx exception from Paperless call should return 502, not 500."""
+    """Paperless down → document saved with accepted_without_ocr status."""
     mock_client = MagicMock()
     mock_client.__enter__ = MagicMock(return_value=mock_client)
     mock_client.__exit__ = MagicMock(return_value=False)
@@ -126,13 +126,14 @@ def test_upload_paperless_unexpected_error(mock_client_cls):
         "/api/documents/upload",
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
     )
-    assert r.status_code == 502
-    assert "unreachable" in r.json()["detail"]
+    assert r.status_code == 200
+    assert r.json()["status"] == "accepted_without_ocr"
+    assert "id" in r.json()
 
 
 @patch("app.routes.httpx.Client")
 def test_upload_paperless_rejects(mock_client_cls):
-    """Paperless returns 401 (bad token) — should return 502."""
+    """Paperless returns 401 (bad token) — document still saved."""
     mock_resp = MagicMock()
     mock_resp.status_code = 401
     mock_resp.text = "Invalid token"
@@ -146,8 +147,8 @@ def test_upload_paperless_rejects(mock_client_cls):
         "/api/documents/upload",
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
     )
-    assert r.status_code == 502
-    assert "paperless rejected" in r.json()["detail"]
+    assert r.status_code == 200
+    assert r.json()["status"] == "accepted_without_ocr"
 
 
 def test_upload_preflight():

@@ -102,7 +102,21 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
 
         tid = auth.tenant_id if auth else None
 
-        # Forward to Paperless for OCR first — only create DB record on success
+        # Save DB record first so the upload is never lost
+        try:
+            with get_conn() as conn:
+                row = conn.execute(
+                    "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'pendente ocr',%s) RETURNING id",
+                    (file.filename, tid),
+                ).fetchone()
+                conn.commit()
+                local_id = row["id"]
+        except Exception:
+            logger.exception("upload: DB insert failed for file=%s", file.filename)
+            raise HTTPException(status_code=500, detail="database error saving document record")
+
+        # Forward to Paperless for OCR (best-effort)
+        paperless_ok = False
         headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
         transport = httpx.HTTPTransport(retries=3)
         try:
@@ -113,29 +127,21 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
                     files={"document": (file.filename, content, mime)},
                     timeout=60,
                 )
+            if r.status_code in (200, 202):
+                paperless_ok = True
+            else:
+                logger.error("upload: paperless rejected file=%s status=%d body=%s", file.filename, r.status_code, r.text[:500])
         except Exception as exc:
-            logger.exception("upload: paperless request failed for file=%s", file.filename)
-            raise HTTPException(status_code=502, detail=f"paperless unreachable: {exc}")
+            logger.warning("upload: paperless unreachable for file=%s: %s", file.filename, exc)
 
-        if r.status_code not in (200, 202):
-            logger.error("upload: paperless rejected file=%s status=%d body=%s", file.filename, r.status_code, r.text[:500])
-            raise HTTPException(status_code=502, detail=f"paperless rejected ({r.status_code}): {r.text}")
-
-        # Paperless accepted — now save the DB record
-        try:
+        if paperless_ok:
             with get_conn() as conn:
-                row = conn.execute(
-                    "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'a processar',%s) RETURNING id",
-                    (file.filename, tid),
-                ).fetchone()
+                conn.execute("UPDATE documents SET status = 'a processar' WHERE id = %s", (local_id,))
                 conn.commit()
-                local_id = row["id"]
-        except Exception:
-            logger.exception("upload: DB insert failed for file=%s", file.filename)
-            raise HTTPException(status_code=500, detail="database error saving document record")
 
-        logger.info("upload: success file=%s id=%d paperless_status=%d", file.filename, local_id, r.status_code)
-        return {"status": "accepted", "filename": file.filename, "id": local_id}
+        status_msg = "accepted" if paperless_ok else "accepted_without_ocr"
+        logger.info("upload: %s file=%s id=%d paperless=%s", status_msg, file.filename, local_id, paperless_ok)
+        return {"status": status_msg, "filename": file.filename, "id": local_id}
 
     except HTTPException:
         raise

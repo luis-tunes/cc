@@ -87,7 +87,7 @@ export default function InboxPage() {
       }, 200);
 
       try {
-        await uploadDocument(file);
+        const result = await uploadDocument(file);
         clearInterval(interval);
         setUploadQueue((prev) =>
           prev.map((f) =>
@@ -101,7 +101,11 @@ export default function InboxPage() {
               f.id === item.id ? { ...f, status: "extracted" } : f
             )
           );
-          toast.success(`${item.name} — enviado para processamento OCR`);
+          if (result?.status === "accepted_without_ocr") {
+            toast.warning(`${item.name} — guardado, mas OCR indisponível. Será processado quando o serviço estiver ativo.`);
+          } else {
+            toast.success(`${item.name} — enviado para processamento OCR`);
+          }
           refetch();
         }, 1000);
       } catch (err: any) {
