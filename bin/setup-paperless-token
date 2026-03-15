@@ -10,7 +10,7 @@ ssh "$HOST" "cd $DIR && docker compose exec paperless curl -sf http://localhost:
   || { echo "paperless not ready — try again in a minute"; exit 1; }
 
 echo "creating API token for user '$ADMIN'…"
-TOKEN=$(ssh "$HOST" "cd $DIR && docker compose exec paperless python3 manage.py create_api_auth_token $ADMIN" \
+TOKEN=$(ssh "$HOST" "cd $DIR && docker compose exec paperless python3 manage.py drf_create_token $ADMIN" \
   | grep -oP '[\da-f]{40}')
 
 if [ -z "$TOKEN" ]; then
