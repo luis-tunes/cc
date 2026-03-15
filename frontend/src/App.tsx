@@ -84,6 +84,7 @@ export default function App() {
             <Route path="/reconciliacao" element={<Reconciliation />} />
             <Route path="/inventario" element={<Inventory />} />
             <Route path="/fornecedores" element={<Suppliers />} />
+            <Route path="/produtos" element={<Products />} />
             <Route path="/marmitas" element={<Products />} />
             <Route path="/lista-compras" element={<ShoppingList />} />
             <Route path="/classificacoes" element={<Classifications />} />

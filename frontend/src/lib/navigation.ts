@@ -53,7 +53,7 @@ export const navigation: NavGroup[] = [
       { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active" },
       { title: "Inventário", path: "/inventario", icon: Package, status: "active" },
       { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active" },
-      { title: "Marmitas", path: "/marmitas", icon: UtensilsCrossed, status: "active" },
+      { title: "Produto Acabado", path: "/produtos", icon: UtensilsCrossed, status: "active" },
       { title: "Lista de Compras", path: "/lista-compras", icon: ShoppingCart, status: "active" },
     ],
   },

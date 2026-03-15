@@ -5,13 +5,15 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ProductTable } from "@/components/products/ProductTable";
 import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { ProduceDialog } from "@/components/products/ProduceDialog";
+import { StockEventList } from "@/components/inventory/StockEventList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  UtensilsCrossed, Plus, TrendingUp, ToggleRight, Loader2,
+  UtensilsCrossed, Plus, TrendingUp, ToggleRight, Loader2, History,
 } from "lucide-react";
-import { useProducts, useDeleteProduct } from "@/hooks/use-inventory";
+import { useProducts, useDeleteProduct, useStockEvents } from "@/hooks/use-inventory";
 import type { Product } from "@/lib/api";
 
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -19,6 +21,7 @@ const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFracti
 export default function Products() {
   const { data: products = [], isLoading } = useProducts();
   const deleteProd = useDeleteProduct();
+  const { data: productionEvents = [] } = useStockEvents({ event_type: "saída", limit: 100 });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -58,6 +61,12 @@ export default function Products() {
     return active.reduce((sum, p) => sum + p.estimated_cost, 0) / active.length;
   }, [products]);
 
+  // Filter production events (source contains "produ") for the production history tab
+  const prodHistory = useMemo(
+    () => productionEvents.filter((e) => e.source?.toLowerCase().includes("produ") || e.reference?.toLowerCase().includes("produ")),
+    [productionEvents]
+  );
+
   const handleEdit = (product: Product) => {
     setEditProduct(product);
     setDialogOpen(true);
@@ -70,7 +79,7 @@ export default function Products() {
 
   if (isLoading) {
     return (
-      <PageContainer title="Marmitas" subtitle="Produtos, receitas e custos">
+      <PageContainer title="Produto Acabado" subtitle="Produtos, receitas e custos">
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
@@ -80,7 +89,7 @@ export default function Products() {
 
   return (
     <PageContainer
-      title="Marmitas"
+      title="Produto Acabado"
       subtitle="Produtos, receitas e custos"
       actions={
         <Button size="sm" onClick={() => setDialogOpen(true)}>
@@ -97,47 +106,70 @@ export default function Products() {
         <KpiCard label="Custo Médio" value={eur(avgCost)} compact />
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4">
-        <Input
-          placeholder="Pesquisar produto…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-64"
-        />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-32">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="active">Ativos</SelectItem>
-            <SelectItem value="inactive">Inativos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Tabs defaultValue="produtos" className="space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <TabsList>
+            <TabsTrigger value="produtos">Produtos</TabsTrigger>
+            <TabsTrigger value="producoes" className="gap-1.5">
+              <History className="h-3.5 w-3.5" />
+              Histórico Produção
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Pesquisar produto…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 w-64"
+            />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-32">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="inactive">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-      {/* Table or Empty */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={UtensilsCrossed}
-          title={products.length === 0 ? "Sem produtos" : "Nenhum resultado"}
-          description={
-            products.length === 0
-              ? "Adicione o seu primeiro produto para definir receitas e calcular custos."
-              : "Tente alterar os filtros."
-          }
-          actionLabel={products.length === 0 ? "Novo Produto" : undefined}
-          onAction={products.length === 0 ? () => setDialogOpen(true) : undefined}
-        />
-      ) : (
-        <ProductTable
-          products={filtered}
-          onEdit={handleEdit}
-          onDelete={(id) => deleteProd.mutate(id)}
-          onProduce={setProduceProduct}
-        />
-      )}
+        <TabsContent value="produtos">
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={UtensilsCrossed}
+              title={products.length === 0 ? "Sem produtos" : "Nenhum resultado"}
+              description={
+                products.length === 0
+                  ? "Adicione o seu primeiro produto para definir receitas e calcular custos."
+                  : "Tente alterar os filtros."
+              }
+              actionLabel={products.length === 0 ? "Novo Produto" : undefined}
+              onAction={products.length === 0 ? () => setDialogOpen(true) : undefined}
+            />
+          ) : (
+            <ProductTable
+              products={filtered}
+              onEdit={handleEdit}
+              onDelete={(id) => deleteProd.mutate(id)}
+              onProduce={setProduceProduct}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="producoes">
+          {prodHistory.length === 0 ? (
+            <EmptyState
+              icon={History}
+              title="Sem produções"
+              description="O histórico de produções aparecerá aqui quando produzir produtos."
+            />
+          ) : (
+            <StockEventList events={prodHistory} />
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <AddProductDialog open={dialogOpen} onOpenChange={handleDialogChange} editProduct={editProduct} />
