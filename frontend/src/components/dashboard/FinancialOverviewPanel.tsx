@@ -41,7 +41,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
       "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
       "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
     };
-    return rawMonthly.slice().reverse().map((m) => {
+    return rawMonthly.filter((m) => m.month != null).slice().reverse().map((m) => {
       const mm = m.month.split("-")[1] ?? "";
       const receita = parseFloat(m.total) || 0;
       const gastos = parseFloat(m.vat) || 0;
