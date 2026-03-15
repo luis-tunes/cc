@@ -1,18 +1,23 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { UrgencyBadge } from "./UrgencyBadge";
+import { CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ShoppingListItem } from "@/lib/api";
 
 interface ShoppingListTableProps {
   items: ShoppingListItem[];
   groupBy: "none" | "supplier" | "urgency";
+  orderedIds?: Set<number>;
+  onMarkOrdered?: (item: ShoppingListItem) => void;
 }
 
 const fmt = (v: number) => v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const eur = (v: number) => `€\u202f${fmt(v)}`;
 
-export function ShoppingListTable({ items, groupBy }: ShoppingListTableProps) {
+export function ShoppingListTable({ items, groupBy, orderedIds, onMarkOrdered }: ShoppingListTableProps) {
   if (groupBy === "none") {
-    return <ItemsTable items={items} />;
+    return <ItemsTable items={items} orderedIds={orderedIds} onMarkOrdered={onMarkOrdered} />;
   }
 
   const groups = groupItems(items, groupBy);
@@ -27,14 +32,14 @@ export function ShoppingListTable({ items, groupBy }: ShoppingListTableProps) {
               {groupItems.length} itens · ~{eur(subtotal)}
             </span>
           </div>
-          <ItemsTable items={groupItems} />
+          <ItemsTable items={groupItems} orderedIds={orderedIds} onMarkOrdered={onMarkOrdered} />
         </div>
       ))}
     </div>
   );
 }
 
-function ItemsTable({ items }: { items: ShoppingListItem[] }) {
+function ItemsTable({ items, orderedIds, onMarkOrdered }: { items: ShoppingListItem[]; orderedIds?: Set<number>; onMarkOrdered?: (item: ShoppingListItem) => void }) {
   return (
     <div className="rounded-lg border bg-card overflow-x-auto">
       <Table>
@@ -48,14 +53,19 @@ function ItemsTable({ items }: { items: ShoppingListItem[] }) {
             <TableHead className="text-right">Preço Médio</TableHead>
             <TableHead className="text-right">Estimativa</TableHead>
             <TableHead className="text-center">Urgência</TableHead>
+            {onMarkOrdered && <TableHead className="w-10" />}
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((item) => {
             const lineCost = item.suggested_qty * item.avg_price;
+            const isOrdered = orderedIds?.has(item.ingredient_id);
             return (
-              <TableRow key={item.ingredient_id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
+              <TableRow key={item.ingredient_id} className={cn(isOrdered && "opacity-50")}>
+                <TableCell className="font-medium">
+                  {isOrdered && <CheckCircle2 className="inline mr-1.5 h-3.5 w-3.5 text-emerald-400" />}
+                  {item.name}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{item.supplier_name || "—"}</TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {fmt(item.current_stock)} {item.unit}
@@ -71,6 +81,20 @@ function ItemsTable({ items }: { items: ShoppingListItem[] }) {
                 <TableCell className="text-center">
                   <UrgencyBadge urgency={item.urgency} />
                 </TableCell>
+                {onMarkOrdered && (
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={isOrdered}
+                      onClick={() => onMarkOrdered(item)}
+                      title="Marcar como encomendado"
+                    >
+                      <CheckCircle2 className={cn("h-4 w-4", isOrdered ? "text-emerald-400" : "text-muted-foreground")} />
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}
