@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+HOST="${1:?usage: bin/setup-paperless-token <user@host>}"
+DIR="/home/cc/cc"
+ADMIN="${2:-admin}"
+
+echo "waiting for paperless to be healthy…"
+ssh "$HOST" "cd $DIR && docker compose exec paperless curl -sf http://localhost:8000 > /dev/null" \
+  || { echo "paperless not ready — try again in a minute"; exit 1; }
+
+echo "creating API token for user '$ADMIN'…"
+TOKEN=$(ssh "$HOST" "cd $DIR && docker compose exec paperless python3 manage.py create_api_auth_token $ADMIN" \
+  | grep -oP '[\da-f]{40}')
+
+if [ -z "$TOKEN" ]; then
+  echo "error: could not extract token"
+  exit 1
+fi
+
+echo "writing PAPERLESS_TOKEN to server .env…"
+ssh "$HOST" "cd $DIR && sed -i 's/^PAPERLESS_TOKEN=.*/PAPERLESS_TOKEN=$TOKEN/' .env \
+  || echo 'PAPERLESS_TOKEN=$TOKEN' >> .env"
+
+echo "restarting app…"
+ssh "$HOST" "cd $DIR && docker compose restart app"
+
+echo "done — token: ${TOKEN:0:8}…"

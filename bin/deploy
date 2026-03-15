@@ -20,9 +20,11 @@ ssh "$HOST" "mkdir -p $DIR/bin"
 scp docker-compose.yml Caddyfile "$HOST:$DIR/"
 scp bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
 
-# Copy .env if it exists locally (never overwrite a production .env that's already there)
+# Copy .env only on first deploy (never overwrite production secrets)
 if [ -f .env ]; then
-  scp .env "$HOST:$DIR/.env"
+  ssh "$HOST" "test -f $DIR/.env" \
+    && echo ".env already exists on server — skipping (edit manually if needed)" \
+    || scp .env "$HOST:$DIR/.env"
 fi
 
 ssh "$HOST" "cd $DIR && docker compose pull app \
