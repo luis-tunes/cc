@@ -55,6 +55,7 @@ def init_db():
                 document_id         INTEGER NOT NULL REFERENCES documents(id),
                 bank_transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id),
                 match_confidence    NUMERIC(5,4) NOT NULL,
+                status              VARCHAR(16) NOT NULL DEFAULT 'pendente',
                 created_at          TIMESTAMPTZ DEFAULT now(),
                 UNIQUE(document_id, bank_transaction_id)
             );
@@ -75,6 +76,13 @@ def init_db():
                 EXCEPTION WHEN duplicate_column THEN NULL;
                 END $$;
             """)
+        # Reconciliation status column (migration)
+        conn.execute("""
+            DO $$ BEGIN
+                ALTER TABLE reconciliations ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'pendente';
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;
+        """)
         # Make date nullable and set defaults (old DBs had NOT NULL without defaults)
         conn.execute("""
             ALTER TABLE documents ALTER COLUMN date DROP NOT NULL;
@@ -240,6 +248,64 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_documents_date ON documents(tenant_id, date);
             CREATE INDEX IF NOT EXISTS idx_bank_transactions_tenant ON bank_transactions(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(tenant_id, date);
+        """)
+
+        # ── Alerts ────────────────────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS alerts (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                type        VARCHAR(32) NOT NULL,
+                severity    VARCHAR(16) NOT NULL DEFAULT 'info',
+                title       TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                action_url  TEXT,
+                read        BOOLEAN NOT NULL DEFAULT false,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(tenant_id, read);
+        """)
+
+        # ── Assets ────────────────────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS assets (
+                id                    SERIAL PRIMARY KEY,
+                tenant_id             TEXT NOT NULL,
+                name                  TEXT NOT NULL,
+                category              VARCHAR(32) NOT NULL DEFAULT 'equipamento',
+                acquisition_date      DATE NOT NULL,
+                acquisition_cost      NUMERIC(12,2) NOT NULL,
+                useful_life_years     INTEGER NOT NULL DEFAULT 5,
+                depreciation_method   VARCHAR(32) NOT NULL DEFAULT 'linha-reta',
+                current_value         NUMERIC(12,2) NOT NULL DEFAULT 0,
+                status                VARCHAR(16) NOT NULL DEFAULT 'ativo',
+                supplier              TEXT,
+                invoice_ref           TEXT,
+                notes                 TEXT,
+                created_at            TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_assets_tenant ON assets(tenant_id);
+        """)
+
+        # ── Movement Rules ────────────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS movement_rules (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                name        TEXT NOT NULL DEFAULT '',
+                pattern     TEXT NOT NULL,
+                category    TEXT NOT NULL DEFAULT '',
+                snc_account VARCHAR(16) NOT NULL DEFAULT '',
+                entity_nif  VARCHAR(9),
+                priority    INTEGER NOT NULL DEFAULT 0,
+                active      BOOLEAN NOT NULL DEFAULT true,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_movement_rules_tenant ON movement_rules(tenant_id);
         """)
 
         # ── Unique constraints (safe to run repeatedly) ───────────────
