@@ -21,6 +21,7 @@ import {
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DocumentListProps {
   documents: DocumentRecord[];
@@ -47,8 +48,57 @@ export function DocumentList({
 }: DocumentListProps) {
   const allSelected =
     documents.length > 0 && documents.every((d) => selectedIds.has(d.id));
-
   const { focusedIndex, containerRef } = useKeyboardNav(documents.length);
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className={cn("space-y-2", className)}>
+        {documents.map((doc) => {
+          const FileIcon = doc.fileType === "pdf" ? FileText : Image;
+          return (
+            <div
+              key={doc.id}
+              onClick={() => onOpenDocument(doc)}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border bg-card p-3 active:bg-accent/50 transition-colors cursor-pointer",
+                selectedIds.has(doc.id) && "border-primary/40 bg-accent/30"
+              )}
+            >
+              <Checkbox
+                checked={selectedIds.has(doc.id)}
+                onCheckedChange={() => onToggleSelect(doc.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-0.5 shrink-0"
+              />
+              <FileIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{doc.fileName}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {documentTypeLabels[doc.documentType]} · {doc.supplier || doc.nif || "—"}
+                </p>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className={cn(
+                    "text-sm font-mono font-medium",
+                    doc.total && doc.total < 0 ? "text-tim-danger" : "text-foreground"
+                  )}>
+                    {doc.total != null ? formatCurrency(doc.total) : "—"}
+                  </span>
+                  <StatusBadge status={doc.classificationStatus} />
+                </div>
+                {doc.date && (
+                  <p className="mt-1 text-xs text-muted-foreground">{doc.date}</p>
+                )}
+              </div>
+              {doc.needsReview && (
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { BankMovement } from "@/lib/movements-data";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MovementLedgerProps {
   movements: BankMovement[];
@@ -32,6 +33,60 @@ export function MovementLedger({
   className,
 }: MovementLedgerProps) {
   const { focusedIndex, containerRef } = useKeyboardNav(movements.length);
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className={cn("space-y-2", className)}>
+        {movements.map((mv) => {
+          const isDebit = mv.type === "debito";
+          const hasFlags = mv.isAnomaly || mv.isDuplicate;
+          return (
+            <div
+              key={mv.id}
+              onClick={() => onOpenMovement(mv)}
+              className={cn(
+                "rounded-lg border bg-card p-3 active:bg-accent/50 transition-colors cursor-pointer",
+                hasFlags && "border-tim-danger/30"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    {isDebit ? (
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-tim-danger/70" />
+                    ) : (
+                      <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-tim-success/70" />
+                    )}
+                    <span className="truncate text-sm font-medium text-foreground">{mv.description}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{mv.date}</p>
+                </div>
+                <span className={cn(
+                  "text-sm font-mono font-semibold tabular-nums whitespace-nowrap",
+                  isDebit ? "text-foreground" : "text-tim-success"
+                )}>
+                  {isDebit ? "-" : "+"}€{Math.abs(mv.amount).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <StatusBadge status={mv.classificationStatus} />
+                {mv.detectedEntity && (
+                  <span className="truncate text-xs text-muted-foreground">{mv.detectedEntity}</span>
+                )}
+                {hasFlags && (
+                  <div className="ml-auto flex items-center gap-1">
+                    {mv.isAnomaly && <AlertTriangle className="h-3 w-3 text-tim-danger" />}
+                    {mv.isDuplicate && <Copy className="h-3 w-3 text-tim-warning" />}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div
