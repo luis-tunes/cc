@@ -105,6 +105,7 @@ export default function Inventory() {
         icon={Package}
         title={ingredients.length === 0 ? emptyLabel : "Nenhum resultado"}
         description={ingredients.length === 0 ? "Adicione o seu primeiro ingrediente para começar a gerir o stock." : "Tente alterar os filtros."}
+        tutorial={ingredients.length === 0 ? "O inventário permite controlar entradas, saídas e desperdício de cada ingrediente. Defina stocks mínimos para receber alertas automáticos quando estiver a ficar sem algo." : undefined}
         actionLabel={ingredients.length === 0 ? "Novo Ingrediente" : undefined}
         onAction={ingredients.length === 0 ? () => setShowAddIngredient(true) : undefined}
       />
@@ -213,6 +214,7 @@ export default function Inventory() {
               icon={ArrowDownToLine}
               title="Sem movimentos"
               description="Os movimentos de stock aparecerão aqui à medida que registar entradas e saídas."
+              tutorial="Cada vez que receber mercadoria ou usar ingredientes numa produção, o movimento fica registado aqui com data, quantidade e custo."
             />
           ) : (
             <StockEventList events={events} />

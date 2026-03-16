@@ -145,6 +145,7 @@ export default function Products() {
                   ? "Adicione o seu primeiro produto para definir receitas e calcular custos."
                   : "Tente alterar os filtros."
               }
+              tutorial={products.length === 0 ? "Defina os seus produtos com receita (ingredientes e quantidades), preço de venda e o sistema calcula automaticamente o custo e a margem de lucro." : undefined}
               actionLabel={products.length === 0 ? "Novo Produto" : undefined}
               onAction={products.length === 0 ? () => setDialogOpen(true) : undefined}
             />

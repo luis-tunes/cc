@@ -6,6 +6,7 @@ interface EmptyStateProps {
   icon?: LucideIcon;
   title: string;
   description?: string;
+  tutorial?: string;
   actionLabel?: string;
   onAction?: () => void;
   className?: string;
@@ -15,6 +16,7 @@ export function EmptyState({
   icon: Icon = FolderOpen,
   title,
   description,
+  tutorial,
   actionLabel,
   onAction,
   className,
@@ -31,7 +33,12 @@ export function EmptyState({
       </div>
       <h3 className="mt-4 text-sm font-medium text-foreground">{title}</h3>
       {description && (
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      )}
+      {tutorial && (
+        <p className="mt-3 max-w-sm text-xs text-muted-foreground/80 leading-relaxed">
+          {tutorial}
+        </p>
       )}
       {actionLabel && onAction && (
         <Button variant="outline" size="sm" className="mt-4" onClick={onAction}>

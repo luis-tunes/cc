@@ -120,6 +120,7 @@ export default function Reconciliation() {
           icon={GitMerge}
           title="Sem dados para reconciliar"
           description="Importe documentos e movimentos bancários para iniciar a reconciliação automática."
+          tutorial="A reconciliação liga cada fatura ao respetivo pagamento no banco. Carregue faturas na página Documentos e importe o extrato CSV em Movimentos Bancários — o sistema faz a correspondência automaticamente."
           className="py-20"
         />
       ) : (

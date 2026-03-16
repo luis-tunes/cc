@@ -120,6 +120,7 @@ export default function BankMovements() {
           icon={Landmark}
           title="Sem movimentos bancários"
           description="Importe um extrato CSV para começar a classificar e reconciliar transações automaticamente."
+          tutorial="Exporte o extrato do seu banco em formato CSV (a maioria dos bancos permite isto no homebanking). O ficheiro deve ter colunas: data, descrição e valor."
           actionLabel="Importar extrato"
           onAction={() => setShowImport(true)}
           className="py-20"

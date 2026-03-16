@@ -144,6 +144,7 @@ export default function Suppliers() {
                   ? "Adicione o seu primeiro fornecedor para começar a gerir preços e entregas."
                   : "Tente alterar a pesquisa."
               }
+              tutorial={suppliers.length === 0 ? "Registe os seus fornecedores com NIF, categoria e prazo médio de entrega. Isto permite acompanhar custos e comparar preços ao longo do tempo." : undefined}
               actionLabel={suppliers.length === 0 ? "Novo Fornecedor" : undefined}
               onAction={suppliers.length === 0 ? () => setDialogOpen(true) : undefined}
             />
