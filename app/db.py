@@ -213,7 +213,10 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_price_history_supplier ON price_history(supplier_id);
             CREATE INDEX IF NOT EXISTS idx_price_history_tenant ON price_history(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(tenant_id, status);
+            CREATE INDEX IF NOT EXISTS idx_documents_date ON documents(tenant_id, date);
             CREATE INDEX IF NOT EXISTS idx_bank_transactions_tenant ON bank_transactions(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(tenant_id, date);
         """)
 
         # ── Unique constraints (safe to run repeatedly) ───────────────
