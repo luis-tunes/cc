@@ -2,7 +2,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Supplier } from "@/lib/api";
+import { useState } from "react";
 
 interface SupplierTableProps {
   suppliers: Supplier[];
@@ -11,7 +13,18 @@ interface SupplierTableProps {
 }
 
 export function SupplierTable({ suppliers, onEdit, onDelete }: SupplierTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
+
   return (
+    <>
+    <ConfirmDialog
+      open={!!deleteTarget}
+      onOpenChange={(open) => !open && setDeleteTarget(null)}
+      title="Remover fornecedor"
+      description={`Tem a certeza que quer remover "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+      confirmLabel="Remover"
+      onConfirm={() => { if (deleteTarget) { onDelete(deleteTarget.id); setDeleteTarget(null); } }}
+    />
     <div className="rounded-lg border bg-card overflow-x-auto">
       <Table>
         <TableHeader>
@@ -52,7 +65,7 @@ export function SupplierTable({ suppliers, onEdit, onDelete }: SupplierTableProp
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm(`Remover "${s.name}"?`)) onDelete(s.id); }}>
+                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(s)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Remover
                     </DropdownMenuItem>
@@ -64,14 +77,15 @@ export function SupplierTable({ suppliers, onEdit, onDelete }: SupplierTableProp
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }
 
 function ReliabilityBadge({ value }: { value: number }) {
   const pct = Math.round(value);
   const color =
-    pct >= 90 ? "text-emerald-400" :
-    pct >= 70 ? "text-yellow-400" :
-    "text-red-400";
+    pct >= 90 ? "text-emerald-600" :
+    pct >= 70 ? "text-amber-600" :
+    "text-red-600";
   return <span className={`text-sm font-mono ${color}`}>{pct}%</span>;
 }

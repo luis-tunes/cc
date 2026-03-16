@@ -3,9 +3,11 @@ import { StockStatusBadge } from "./StockStatusBadge";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Ingredient } from "@/lib/api";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface IngredientTableProps {
   ingredients: Ingredient[];
@@ -18,8 +20,18 @@ const fmt = (v: number) => v.toLocaleString("pt-PT", { minimumFractionDigits: 2,
 
 export function IngredientTable({ ingredients, onAddStock, onRemoveStock, onDelete }: IngredientTableProps) {
   const { focusedIndex, containerRef } = useKeyboardNav(ingredients.length);
+  const [deleteTarget, setDeleteTarget] = useState<Ingredient | null>(null);
 
   return (
+    <>
+    <ConfirmDialog
+      open={!!deleteTarget}
+      onOpenChange={(open) => !open && setDeleteTarget(null)}
+      title="Remover ingrediente"
+      description={`Tem a certeza que quer remover "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+      confirmLabel="Remover"
+      onConfirm={() => { if (deleteTarget) { onDelete(deleteTarget.id); setDeleteTarget(null); } }}
+    />
     <div ref={containerRef} tabIndex={0} className="rounded-lg border bg-card overflow-x-auto outline-none">
       <Table>
         <TableHeader>
@@ -66,7 +78,7 @@ export function IngredientTable({ ingredients, onAddStock, onRemoveStock, onDele
                       <ArrowUpFromLine className="mr-2 h-4 w-4" />
                       Saída
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm(`Remover "${ing.name}"?`)) onDelete(ing.id); }}>
+                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(ing)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Remover
                     </DropdownMenuItem>
@@ -78,5 +90,6 @@ export function IngredientTable({ ingredients, onAddStock, onRemoveStock, onDele
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }

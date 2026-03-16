@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { TrialGate } from "@/components/billing/TrialGate";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 
 // Auth pages (small — keep eager)
@@ -48,6 +49,7 @@ function PageLoader() {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <TooltipProvider>
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -108,5 +110,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </TooltipProvider>
+    </ErrorBoundary>
   );
 }

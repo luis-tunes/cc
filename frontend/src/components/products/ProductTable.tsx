@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Pencil, Trash2, Play } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { Product } from "@/lib/api";
+import { useState } from "react";
 
 interface ProductTableProps {
   products: Product[];
@@ -15,7 +17,18 @@ interface ProductTableProps {
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function ProductTable({ products, onEdit, onDelete, onProduce }: ProductTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+
   return (
+    <>
+    <ConfirmDialog
+      open={!!deleteTarget}
+      onOpenChange={(open) => !open && setDeleteTarget(null)}
+      title="Remover produto"
+      description={`Tem a certeza que quer remover "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+      confirmLabel="Remover"
+      onConfirm={() => { if (deleteTarget) { onDelete(deleteTarget.id); setDeleteTarget(null); } }}
+    />
     <div className="rounded-lg border bg-card overflow-x-auto">
       <Table>
         <TableHeader>
@@ -44,7 +57,7 @@ export function ProductTable({ products, onEdit, onDelete, onProduce }: ProductT
               </TableCell>
               <TableCell className="text-center font-mono text-sm">{p.ingredients.length}</TableCell>
               <TableCell className="text-center">
-                <Badge variant={p.active ? "default" : "secondary"} className={p.active ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : ""}>
+                <Badge variant={p.active ? "default" : "secondary"} className={p.active ? "bg-emerald-100 text-emerald-700 border-emerald-200" : ""}>
                   {p.active ? "Ativo" : "Inativo"}
                 </Badge>
               </TableCell>
@@ -65,7 +78,7 @@ export function ProductTable({ products, onEdit, onDelete, onProduce }: ProductT
                       Editar
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm(`Remover "${p.name}"?`)) onDelete(p.id); }}>
+                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(p)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Remover
                     </DropdownMenuItem>
@@ -77,15 +90,16 @@ export function ProductTable({ products, onEdit, onDelete, onProduce }: ProductT
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }
 
 function MarginBadge({ margin }: { margin: number }) {
   const pct = Math.round(margin * 100);
   const color =
-    pct >= 60 ? "text-emerald-400" :
-    pct >= 40 ? "text-yellow-400" :
-    pct >= 20 ? "text-orange-400" :
-    "text-red-400";
+    pct >= 60 ? "text-emerald-600" :
+    pct >= 40 ? "text-amber-600" :
+    pct >= 20 ? "text-orange-600" :
+    "text-red-600";
   return <span className={`text-sm font-mono ${color}`}>{pct}%</span>;
 }
