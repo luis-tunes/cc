@@ -555,6 +555,10 @@ class FakeConn:
             return FakeCursor([{"id": sid}] if deleted else [])
         if sql_lower.startswith("select"):
             has_pk = ("where id = %s" in sql_lower or "and id = %s" in sql_lower)
+            if "count(" in sql_lower and not has_pk:
+                tid = params[0] if params else None
+                rows = [s for s in _tables["suppliers"] if s["tenant_id"] == tid]
+                return FakeCursor([{"count": len(rows)}])
             if has_pk:
                 sid = params[0] if params else None
                 tid = params[1] if len(params) > 1 else None
@@ -642,6 +646,14 @@ class FakeConn:
                 prices = [p["price"] for p in _tables["price_history"] if p["ingredient_id"] == iid]
                 avg_p = sum(prices) / len(prices) if prices else None
                 return FakeCursor([{"avg_price": avg_p}])
+            if "any(%s)" in sql_lower or "any (%s)" in sql_lower:
+                # Batch fetch (used for FOR UPDATE lock and batch lookups)
+                ids = params[0] if params else []
+                tid = params[1] if len(params) > 1 else None
+                rows = [i for i in _tables["ingredients"] if i["id"] in ids]
+                if tid:
+                    rows = [i for i in rows if i["tenant_id"] == tid]
+                return FakeCursor(rows)
             if "left join suppliers" in sql_lower or "supplier_name" in sql_lower:
                 tid = params[0] if params else None
                 # Find category filter if present
@@ -1007,6 +1019,8 @@ class FakeConn:
             rows = [a for a in _tables["alerts"] if a.get("tenant_id") == tid]
             if "read = false" in sql_lower:
                 rows = [a for a in rows if not a.get("read", False)]
+            if "count(" in sql_lower:
+                return FakeCursor([{"count": len(rows)}])
             return FakeCursor(rows)
         return FakeCursor([])
 
@@ -1054,6 +1068,14 @@ class FakeConn:
             return FakeCursor([{"id": asset_id}] if deleted else [])
         if sql_lower.startswith("select"):
             has_pk = "where id = %s" in sql_lower or "and id = %s" in sql_lower
+            if "count(" in sql_lower and not has_pk:
+                # Aggregate query: COUNT(*) + SUM(acquisition_cost)
+                tid = params[0] if params else None
+                rows = [a for a in _tables["assets"] if a.get("tenant_id") == tid]
+                if "status = 'ativo'" in sql_lower:
+                    rows = [a for a in rows if a.get("status") == "ativo"]
+                cost = sum(a.get("acquisition_cost", Decimal("0")) for a in rows)
+                return FakeCursor([{"count": len(rows), "cost": cost}])
             if has_pk:
                 asset_id = params[0]
                 tid = params[1] if len(params) > 1 else None
@@ -1133,6 +1155,29 @@ class FakeConn:
             if "tenant_id = %s" in sql_lower and params:
                 docs = [d for d in docs if d.get("tenant_id") == params[-1]]
             return FakeCursor([{_ck: len(docs)}])
+        # Generic: simple COUNT or SUM not matched above
+        if "count" in sql_lower and "from documents" in sql_lower:
+            docs = list(_tables["documents"])
+            if "tenant_id = %s" in sql_lower and params:
+                docs = [d for d in docs if d.get("tenant_id") == params[-1]]
+            return FakeCursor([{_ck: len(docs)}])
+        if "sum" in sql_lower and "from documents" in sql_lower:
+            docs = list(_tables["documents"])
+            if "tenant_id = %s" in sql_lower and params:
+                docs = [d for d in docs if d.get("tenant_id") == params[-1]]
+            total_v = sum(d.get("total", Decimal("0")) for d in docs)
+            vat_v = sum(d.get("vat", Decimal("0")) for d in docs)
+            return FakeCursor([{"total": total_v, "vat": vat_v}])
+        if "from bank_transactions" in sql_lower:
+            txs = list(_tables["bank_transactions"])
+            if "tenant_id = %s" in sql_lower and params:
+                txs = [t for t in txs if t.get("tenant_id") == params[-1]]
+            if "amount > 0" in sql_lower:
+                txs = [t for t in txs if float(t.get("amount", 0)) > 0]
+            elif "amount < 0" in sql_lower:
+                txs = [t for t in txs if float(t.get("amount", 0)) < 0]
+            total_v = sum(t.get("amount", Decimal("0")) for t in txs)
+            return FakeCursor([{"total": total_v, _ck: len(txs)}])
         if "count(" in sql_lower:
             return FakeCursor([{_ck: 0}])
         return FakeCursor([])
@@ -1156,7 +1201,10 @@ def _clean_db_and_patch():
          patch("app.parse.get_conn", fake_get_conn), \
          patch("app.classify.get_conn", fake_get_conn), \
          patch("app.alerts.get_conn", fake_get_conn), \
-         patch("app.classify_movements.get_conn", fake_get_conn):
+         patch("app.classify_movements.get_conn", fake_get_conn), \
+         patch("app.assistant.get_conn", fake_get_conn), \
+         patch("app.cache.cache_get", return_value=None), \
+         patch("app.cache.cache_set", return_value=None):
         yield
 
 
