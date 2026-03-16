@@ -53,7 +53,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           <StatusIcon className={cn("h-3.5 w-3.5", config.color)} />
-          <span className={cn("text-[10px] font-semibold uppercase tracking-wider", config.color)}>
+          <span className={cn("text-xs font-semibold uppercase tracking-wider", config.color)}>
             {config.label}
           </span>
         </div>
@@ -67,7 +67,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Documento
               </span>
             </div>
@@ -104,10 +104,10 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
               {pair.confidence}%
             </span>
             {pair.amountDelta === 0 && (
-              <span className="mt-1 text-[9px] text-tim-success">Valor exato</span>
+              <span className="mt-1 text-xs text-tim-success">Valor exato</span>
             )}
             {pair.dateDelta > 0 && (
-              <span className={cn("text-[9px]", pair.dateDelta <= 3 ? "text-muted-foreground" : "text-tim-warning")}>
+              <span className={cn("text-xs", pair.dateDelta <= 3 ? "text-muted-foreground" : "text-tim-warning")}>
                 {pair.dateDelta}d diferença
               </span>
             )}
@@ -119,7 +119,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Movimento
               </span>
             </div>
@@ -151,7 +151,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
       {/* Reasoning */}
       {pair.reasoning && (
         <div className="border-t px-4 py-2">
-          <p className="text-[10px] leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             <Bot className="mr-1 inline h-3 w-3 text-primary/70" />
             {pair.reasoning}
           </p>
@@ -162,7 +162,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
       {pair.exceptions && pair.exceptions.length > 0 && (
         <div className="border-t bg-tim-danger/[0.03] px-4 py-2">
           {pair.exceptions.map((ex, i) => (
-            <p key={i} className="flex items-start gap-1.5 text-[10px] text-tim-danger">
+            <p key={i} className="flex items-start gap-1.5 text-xs text-tim-danger">
               <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" />
               {ex}
             </p>
@@ -176,7 +176,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-[10px] border-tim-success/30 text-tim-success hover:bg-tim-success/10"
+            className="h-6 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10"
             onClick={() => onApprove(pair.id)}
           >
             <Check className="mr-1 h-2.5 w-2.5" /> Aprovar
@@ -184,7 +184,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-[10px]"
+            className="h-6 text-xs"
             onClick={() => onReview(pair.id)}
           >
             <Eye className="mr-1 h-2.5 w-2.5" /> Rever
@@ -192,7 +192,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 text-[10px] text-muted-foreground"
+            className="h-6 text-xs text-muted-foreground"
             onClick={() => onFlag(pair.id)}
           >
             <Flag className="mr-1 h-2.5 w-2.5" /> Exceção
@@ -216,7 +216,7 @@ function MetaRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span
         className={cn(
           "text-right text-xs",

@@ -33,20 +33,20 @@ export function AppTopbar({ title }: AppTopbarProps) {
         <div className="flex items-center gap-3">
           <SidebarTrigger className="text-muted-foreground" />
           {title && (
-            <h1 className="text-sm font-semibold text-foreground">{title}</h1>
+            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           )}
         </div>
 
         {/* Center */}
         <div className="hidden items-center gap-3 md:flex">
-          <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-            <Building2 className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-sm text-muted-foreground">
+            <Building2 className="h-4 w-4" />
             <span className="font-medium text-foreground">
               {user?.organizationMemberships?.[0]?.organization?.name || "TIM"}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-            <CalendarDays className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-sm text-muted-foreground">
+            <CalendarDays className="h-4 w-4" />
             <span>{new Date().getFullYear()}</span>
           </div>
         </div>
@@ -73,9 +73,9 @@ export function AppTopbar({ title }: AppTopbarProps) {
             className="shrink-0 rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40"
             title="O meu perfil"
           >
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-8 w-8">
               <AvatarImage src={user?.imageUrl} />
-              <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+              <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>

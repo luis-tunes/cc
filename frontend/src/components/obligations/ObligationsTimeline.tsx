@@ -27,7 +27,7 @@ function ObligationRow({ ob }: { ob: ObligationEntry }) {
       )}
     >
       {/* Category badge */}
-      <span className={cn("rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider shrink-0 w-16 text-center", cat.bgColor, cat.color)}>
+      <span className={cn("rounded px-2 py-0.5 text-xs font-bold uppercase tracking-wider shrink-0 w-16 text-center", cat.bgColor, cat.color)}>
         {cat.label}
       </span>
 
@@ -40,19 +40,19 @@ function ObligationRow({ ob }: { ob: ObligationEntry }) {
         {ob.blockers.length > 0 && (
           <div className="mt-0.5 flex items-center gap-1">
             <Lock className="h-2.5 w-2.5 text-tim-danger shrink-0" />
-            <span className="text-[10px] text-tim-danger truncate">
+            <span className="text-xs text-tim-danger truncate">
               {ob.blockers[0]}{ob.blockers.length > 1 && ` (+${ob.blockers.length - 1})`}
             </span>
           </div>
         )}
-        <p className="mt-0.5 text-[10px] text-muted-foreground">{ob.nextAction}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{ob.nextAction}</p>
       </div>
 
       {/* Readiness */}
       <div className="w-20 shrink-0">
         <div className="flex items-center justify-between mb-0.5">
-          <span className="text-[9px] text-muted-foreground">Prontidão</span>
-          <span className={cn("text-[10px] font-semibold tabular-nums", ob.readiness >= 80 ? "text-tim-success" : ob.readiness >= 40 ? "text-tim-warning" : "text-tim-danger")}>
+          <span className="text-xs text-muted-foreground">Prontidão</span>
+          <span className={cn("text-xs font-semibold tabular-nums", ob.readiness >= 80 ? "text-tim-success" : ob.readiness >= 40 ? "text-tim-warning" : "text-tim-danger")}>
             {ob.readiness}%
           </span>
         </div>
@@ -60,14 +60,14 @@ function ObligationRow({ ob }: { ob: ObligationEntry }) {
       </div>
 
       {/* Status */}
-      <span className={cn("rounded px-2 py-0.5 text-[10px] font-medium shrink-0", stat.bgColor, stat.color)}>
+      <span className={cn("rounded px-2 py-0.5 text-xs font-medium shrink-0", stat.bgColor, stat.color)}>
         {stat.label}
       </span>
 
       {/* Days left */}
       {ob.status !== "concluído" && (
         <span className={cn(
-          "rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums shrink-0 w-10 text-center",
+          "rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums shrink-0 w-10 text-center",
           ob.daysLeft <= 3 && "bg-tim-danger/15 text-tim-danger",
           ob.daysLeft > 3 && ob.daysLeft <= 7 && "bg-tim-warning/15 text-tim-warning",
           ob.daysLeft > 7 && ob.daysLeft <= 30 && "bg-muted text-muted-foreground",
@@ -107,7 +107,7 @@ export function ObligationsTimeline({ className }: { className?: string }) {
             <div key={key} className="py-1">
               <div className="flex items-center gap-2 px-4 py-2">
                 <div className={cn("h-2 w-2 rounded-full", hasUrgent ? "bg-tim-warning" : "bg-border")} />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</span>
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</span>
               </div>
               <div className="px-1 pb-1 space-y-0.5">
                 {items.map((ob) => (

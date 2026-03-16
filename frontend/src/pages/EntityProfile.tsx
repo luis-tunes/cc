@@ -86,8 +86,8 @@ export default function EntityProfile() {
       {/* Step progress */}
       <div className="rounded-lg border bg-card px-4 py-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Configuração</span>
-          <span className="text-[10px] font-semibold text-primary tabular-nums">{activeStep}/{totalSteps}</span>
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Configuração</span>
+          <span className="text-xs font-semibold text-primary tabular-nums">{activeStep}/{totalSteps}</span>
         </div>
         <Progress value={progressPct} className="h-1.5 bg-muted mb-3" />
         <div className="flex gap-1">
@@ -106,13 +106,13 @@ export default function EntityProfile() {
                   <Check className="h-3.5 w-3.5 text-tim-success" />
                 ) : (
                   <span className={cn(
-                    "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold",
+                    "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold",
                     activeStep === step.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                   )}>{step.id}</span>
                 )}
                 <div>
-                  <p className={cn("text-[11px] font-medium", activeStep === step.id ? "text-foreground" : "text-muted-foreground")}>{step.title}</p>
-                  <p className="text-[9px] text-muted-foreground hidden sm:block">{step.description}</p>
+                  <p className={cn("text-xs font-medium", activeStep === step.id ? "text-foreground" : "text-muted-foreground")}>{step.title}</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">{step.description}</p>
                 </div>
               </div>
             </button>
@@ -175,8 +175,8 @@ export default function EntityProfile() {
                         <p className="text-xs font-medium text-foreground">{cat.label}</p>
                         {data.entityCategory === cat.value && <Check className="h-3.5 w-3.5 text-primary ml-auto" />}
                       </div>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">{cat.description}</p>
-                      <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{cat.regime}</span>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{cat.description}</p>
+                      <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{cat.regime}</span>
                     </button>
                   ))}
                 </div>
@@ -279,7 +279,7 @@ export default function EntityProfile() {
                 <div className="flex items-center gap-2 mb-3">
                   <Shield className="h-4 w-4 text-muted-foreground" />
                   <h4 className="text-xs font-medium text-foreground">Representante Fiscal</h4>
-                  <span className="text-[9px] text-muted-foreground">(se aplicável)</span>
+                  <span className="text-xs text-muted-foreground">(se aplicável)</span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField label="Nome" value={data.fiscalRepName} onChange={(v) => update("fiscalRepName", v)} placeholder="Não definido" />
@@ -288,7 +288,7 @@ export default function EntityProfile() {
                 {!data.fiscalRepName && (
                   <div className="mt-3 flex items-start gap-2 rounded-md bg-tim-warning/5 border border-tim-warning/20 px-3 py-2">
                     <AlertTriangle className="h-3.5 w-3.5 text-tim-warning mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Representante fiscal necessário se a sede for fora de Portugal ou se existirem sócios não-residentes com obrigações fiscais.
                     </p>
                   </div>
@@ -324,12 +324,12 @@ export default function EntityProfile() {
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
               <div className="flex items-center gap-1.5 mb-2">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-[10px] font-medium uppercase tracking-wider text-primary">Categoria Recomendada</span>
+                <span className="text-xs font-medium uppercase tracking-wider text-primary">Categoria Recomendada</span>
               </div>
               <p className="text-sm font-semibold text-foreground">{recommendedCategory.label}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">{recommendedCategory.description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{recommendedCategory.description}</p>
               <div className="mt-2 rounded bg-muted/50 px-2 py-1">
-                <span className="text-[10px] font-medium text-primary">{recommendedCategory.regime}</span>
+                <span className="text-xs font-medium text-primary">{recommendedCategory.regime}</span>
               </div>
             </div>
           )}
@@ -353,11 +353,11 @@ export default function EntityProfile() {
                       <Info className="h-3 w-3 text-tim-info shrink-0" />
                     )}
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-[10px] font-medium text-foreground">{ci.field}</span>
-                      <span className="text-[9px] text-muted-foreground">— {ci.condition}</span>
+                      <span className="text-xs font-medium text-foreground">{ci.field}</span>
+                      <span className="text-xs text-muted-foreground">— {ci.condition}</span>
                     </div>
                   </div>
-                  <p className="mt-1 pl-5 text-[10px] text-muted-foreground">{ci.impact}</p>
+                  <p className="mt-1 pl-5 text-xs text-muted-foreground">{ci.impact}</p>
                 </div>
               ))}
             </div>
@@ -389,7 +389,7 @@ function FormField({
 }) {
   return (
     <div>
-      <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{label}</Label>
+      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{label}</Label>
       <div className="relative">
         {Icon && <Icon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />}
         <Input
@@ -400,7 +400,7 @@ function FormField({
           disabled={disabled}
         />
       </div>
-      {hint && <p className="mt-0.5 text-[9px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -413,7 +413,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{label}</Label>
+      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{label}</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="h-9 text-xs bg-muted/30">
           <SelectValue />
@@ -423,7 +423,7 @@ function SelectField({
             <SelectItem key={opt.value} value={opt.value} className="text-xs">
               <div>
                 <span>{opt.label}</span>
-                {opt.description && <span className="ml-2 text-muted-foreground text-[10px]">{opt.description}</span>}
+                {opt.description && <span className="ml-2 text-muted-foreground text-xs">{opt.description}</span>}
               </div>
             </SelectItem>
           ))}
@@ -436,8 +436,8 @@ function SelectField({
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-[10px] text-muted-foreground shrink-0">{label}</span>
-      <span className="text-[10px] font-medium text-foreground text-right truncate">{value}</span>
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="text-xs font-medium text-foreground text-right truncate">{value}</span>
     </div>
   );
 }

@@ -54,13 +54,13 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-xs font-semibold text-foreground">{alert.title}</p>
             {alert.aiGenerated && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">
+              <span className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                 <Sparkles className="h-2.5 w-2.5" />
                 IA
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">{alert.detail}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{alert.detail}</p>
 
           {/* Blockers */}
           {alert.blockers && alert.blockers.length > 0 && (
@@ -68,7 +68,7 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
               {alert.blockers.map((b, i) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <Lock className="h-2.5 w-2.5 text-tim-danger shrink-0" />
-                  <span className="text-[10px] text-tim-danger">{b}</span>
+                  <span className="text-xs text-tim-danger">{b}</span>
                 </div>
               ))}
             </div>
@@ -78,7 +78,7 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
           {alert.waitingOn && (
             <div className="mt-1.5 flex items-center gap-1.5">
               <UserCheck className="h-2.5 w-2.5 text-tim-info shrink-0" />
-              <span className="text-[10px] text-tim-info">Aguarda: {alert.waitingOn}</span>
+              <span className="text-xs text-tim-info">Aguarda: {alert.waitingOn}</span>
             </div>
           )}
 
@@ -86,7 +86,7 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
-              className="h-7 text-[10px] gap-1.5"
+              className="h-7 text-xs gap-1.5"
               onClick={() => {
                 if (alert.nextStepAction) navigate(alert.nextStepAction);
               }}
@@ -97,7 +97,7 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
             <Button
               size="sm"
               variant="ghost"
-              className="h-7 text-[10px] text-muted-foreground"
+              className="h-7 text-xs text-muted-foreground"
               onClick={() => {
                 onDismiss(alert.id);
                 toast.success("Alerta arquivado");
@@ -113,7 +113,7 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
         {alert.daysLeft !== undefined && (
           <span
             className={cn(
-              "rounded px-2 py-0.5 text-[10px] font-bold tabular-nums shrink-0",
+              "rounded px-2 py-0.5 text-xs font-bold tabular-nums shrink-0",
               alert.daysLeft <= 3 && "bg-tim-danger/15 text-tim-danger",
               alert.daysLeft > 3 && alert.daysLeft <= 7 && "bg-tim-warning/15 text-tim-warning",
               alert.daysLeft > 7 && alert.daysLeft <= 30 && "bg-tim-info/15 text-tim-info",
@@ -152,11 +152,11 @@ export function AlertCenter({ className }: { className?: string }) {
         </div>
         <div className="flex items-center gap-2">
           {grouped.critico.length > 0 && (
-            <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-[10px] font-bold text-tim-danger">
+            <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-xs font-bold text-tim-danger">
               {grouped.critico.length} crítico{grouped.critico.length > 1 ? "s" : ""}
             </span>
           )}
-          <span className="text-[10px] text-muted-foreground">{alerts.length} alertas</span>
+          <span className="text-xs text-muted-foreground">{alerts.length} alertas</span>
         </div>
       </div>
 
@@ -170,10 +170,10 @@ export function AlertCenter({ className }: { className?: string }) {
             <div key={key}>
               <div className="flex items-center gap-2 mb-2">
                 <div className={cn("h-2 w-2 rounded-full", cfg.dot)} />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   {label}
                 </span>
-                <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-bold", cfg.bg, cfg.color)}>
+                <span className={cn("rounded px-1.5 py-0.5 text-xs font-bold", cfg.bg, cfg.color)}>
                   {items.length}
                 </span>
               </div>

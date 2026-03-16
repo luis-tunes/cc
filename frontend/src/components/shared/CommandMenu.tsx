@@ -97,7 +97,7 @@ export function CommandMenu() {
                     {doc.supplier || "—"} · {doc.documentType}
                   </span>
                   {doc.date && (
-                    <span className="ml-auto text-[11px] text-muted-foreground">
+                    <span className="ml-auto text-xs text-muted-foreground">
                       {doc.date}
                     </span>
                   )}

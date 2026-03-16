@@ -111,18 +111,18 @@ export function QuickAddButton() {
           {/* Header with context hint */}
           <div className="border-b border-border px-4 py-3">
             <p className="text-xs font-semibold text-foreground">Adicionar</p>
-            <p className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Zap className="h-2.5 w-2.5 text-primary" />
               {ctx.hint}
             </p>
-            <p className="mt-1 text-[10px] text-muted-foreground/50">
-              Atalho · <kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">N</kbd>
+            <p className="mt-1 text-xs text-muted-foreground/50">
+              Atalho · <kbd className="rounded border border-border bg-secondary px-1 font-mono text-xs">N</kbd>
             </p>
           </div>
 
           <div className="max-h-[460px] overflow-y-auto py-1">
             {/* Recommended section */}
-            <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-widest text-primary/70">
+            <p className="px-4 pb-1 pt-2.5 text-xs font-semibold uppercase tracking-widest text-primary/70">
               Sugestões para esta página
             </p>
             {recommended.map((item, i) => (
@@ -138,13 +138,13 @@ export function QuickAddButton() {
             <div className="mx-3 my-1.5 border-t border-border/50" />
 
             {/* Other grouped actions */}
-            <p className="px-4 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            <p className="px-4 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
               Mais ações
             </p>
             {groupedOthers.map((group, gi) => (
               <div key={group.key}>
                 {gi > 0 && <div className="mx-3 my-1 border-t border-border/30" />}
-                <p className="px-4 pb-0.5 pt-2 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">
+                <p className="px-4 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/40">
                   {group.label}
                 </p>
                 {group.items.map((item) => (
@@ -207,12 +207,12 @@ function ActionRow({
         {action.label}
       </span>
       {action.shortcut && (
-        <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+        <kbd className="rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
           {action.shortcut}
         </kbd>
       )}
       {action.badge && (
-        <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[9px] text-muted-foreground">
+        <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
           <Clock className="h-2.5 w-2.5" />
           {action.badge}
         </span>

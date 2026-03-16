@@ -75,7 +75,7 @@ export function ImportPanel({
               {importResult.success} movimentos importados
             </p>
             {importResult.failed > 0 && (
-              <p className="text-[10px] text-tim-danger">
+              <p className="text-xs text-tim-danger">
                 {importResult.failed} linhas com erro
               </p>
             )}
@@ -86,7 +86,7 @@ export function ImportPanel({
             <p className="mt-2 text-sm font-medium text-foreground">
               Importar extrato CSV
             </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Formato: Data, Descrição, Referência, Montante, Saldo
             </p>
             <label>
@@ -136,8 +136,8 @@ function SyncCard({
     <div className="flex flex-col items-center justify-center rounded-lg border bg-card/50 px-4 py-6 opacity-50">
       <Icon className="h-5 w-5 text-muted-foreground" />
       <p className="mt-2 text-xs font-medium text-foreground">{title}</p>
-      <p className="text-[10px] text-muted-foreground">{description}</p>
-      <span className="mt-2 rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs text-muted-foreground">{description}</p>
+      <span className="mt-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {status}
       </span>
     </div>

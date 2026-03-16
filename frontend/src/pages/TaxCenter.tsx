@@ -76,7 +76,7 @@ export default function TaxCenter() {
             <TabsTrigger value="auditoria" className="h-6 px-3 text-xs">
               Auditoria
               {auditData && auditData.total_issues > 0 && (
-                <Badge variant="destructive" className="ml-1.5 h-4 px-1.5 text-[10px]">
+                <Badge variant="destructive" className="ml-1.5 h-4 px-1.5 text-xs">
                   {auditData.total_issues}
                 </Badge>
               )}
@@ -155,7 +155,7 @@ export default function TaxCenter() {
                       { label: "IRC Estimado", value: irc.irc_estimate, color: "text-tim-warning" },
                     ].map((item) => (
                       <div key={item.label} className="rounded-lg bg-muted/40 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">{item.label}</p>
                         <p className={cn("mt-1 text-xl font-semibold", item.color)}>{fmt(item.value)}</p>
                       </div>
                     ))}
@@ -191,7 +191,7 @@ export default function TaxCenter() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold">{flag.label}</p>
-                          <Badge variant="outline" className="text-[10px]">{flag.count} ocorrências</Badge>
+                          <Badge variant="outline" className="text-xs">{flag.count} ocorrências</Badge>
                         </div>
                         <p className="mt-0.5 text-xs opacity-80">{flag.description}</p>
                       </div>

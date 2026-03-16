@@ -68,7 +68,7 @@ export default function Reports() {
             { label: "IVA Dedutível", value: totals.iva_dedutivel, color: "text-tim-info" },
           ].map((item) => (
             <div key={item.label} className="rounded-lg border bg-card px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{item.label}</p>
               <p className={cn("mt-0.5 text-lg font-semibold", item.color)}>{fmt(item.value)}</p>
             </div>
           ))}
@@ -188,10 +188,10 @@ export default function Reports() {
               <div className="divide-y">
                 {topSuppliers.map((s, i) => (
                   <div key={s.supplier_nif} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">{i + 1}</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{s.supplier_nif}</p>
-                      <p className="text-[10px] text-muted-foreground">{s.doc_count} docs · último {s.last_date ? new Date(s.last_date).toLocaleDateString("pt-PT") : "—"}</p>
+                      <p className="text-xs text-muted-foreground">{s.doc_count} docs · último {s.last_date ? new Date(s.last_date).toLocaleDateString("pt-PT") : "—"}</p>
                     </div>
                     <p className="text-xs font-semibold text-tim-danger">{fmt(s.total_spend)}</p>
                   </div>

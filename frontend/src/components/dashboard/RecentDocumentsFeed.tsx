@@ -29,7 +29,7 @@ export function RecentDocumentsFeed({ className }: { className?: string }) {
         <h3 className="text-sm font-semibold">Documentos Recentes</h3>
         <Link
           to="/documentos"
-          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
         >
           Ver todos <ArrowRight className="h-3 w-3" />
         </Link>
@@ -67,7 +67,7 @@ export function RecentDocumentsFeed({ className }: { className?: string }) {
                 <p className="truncate text-xs font-medium text-foreground">
                   {doc.supplier || "—"} · {doc.documentType}
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {doc.date ? formatDate(doc.date) : "—"}
                 </p>
               </div>

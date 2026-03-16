@@ -106,7 +106,7 @@ export function AddSupplierDialog({ open, onOpenChange, editSupplier }: AddSuppl
                 maxLength={9}
                 className={nifError ? "border-red-500" : ""}
               />
-              {nifError && <p className="text-[11px] text-red-400">{nifError}</p>}
+              {nifError && <p className="text-xs text-destructive">{nifError}</p>}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sup-category">Categoria</Label>

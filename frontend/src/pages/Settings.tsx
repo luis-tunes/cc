@@ -128,8 +128,8 @@ export default function SettingsPage() {
                   formFieldLabel: "text-xs text-muted-foreground",
                   formFieldInput: "bg-background border-border text-foreground text-sm",
                   membersPageInviteButton: "bg-primary text-primary-foreground hover:bg-primary/90 text-xs",
-                  tableHead: "text-[10px] uppercase tracking-wider text-muted-foreground",
-                  badge: "text-[10px]",
+                  tableHead: "text-xs uppercase tracking-wider text-muted-foreground",
+                  badge: "text-xs",
                 },
               }}
             />

@@ -28,7 +28,7 @@ export default function PricingPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold tracking-tight text-primary">TIM</span>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Time is Money
               </span>
             </div>
@@ -99,7 +99,7 @@ export default function PricingPage() {
                   )}
                 >
                   {isPro && (
-                    <div className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
+                    <div className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-foreground">
                       Recomendado
                     </div>
                   )}
@@ -115,7 +115,7 @@ export default function PricingPage() {
                           <span className="text-sm text-muted-foreground">/mês</span>
                         </div>
                         {plan.vat_note && (
-                          <p className="mt-1 text-[11px] text-muted-foreground">{plan.vat_note}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{plan.vat_note}</p>
                         )}
                       </>
                     )}

@@ -48,11 +48,11 @@ export function FilingReadinessBoard({ className }: { className?: string }) {
               {statusIcon[item.status]}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground">{item.label}</p>
-                <p className="text-[10px] text-muted-foreground">{item.detail}</p>
+                <p className="text-xs text-muted-foreground">{item.detail}</p>
               </div>
               {item.count !== undefined && (
                 <span className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                  "rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                   item.status === "ok" && "bg-tim-success/10 text-tim-success",
                   item.status === "warning" && "bg-tim-warning/10 text-tim-warning",
                   item.status === "danger" && "bg-tim-danger/10 text-tim-danger"

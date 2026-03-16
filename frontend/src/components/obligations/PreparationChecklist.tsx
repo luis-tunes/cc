@@ -27,7 +27,7 @@ export function PreparationChecklist({ className }: { className?: string }) {
       </div>
 
       <div className="p-4 space-y-2">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-primary/70 mb-2">
+        <p className="text-xs font-medium uppercase tracking-wider text-primary/70 mb-2">
           Gerado por IA — ações prioritárias
         </p>
 
@@ -42,7 +42,7 @@ export function PreparationChecklist({ className }: { className?: string }) {
               <p className={cn("text-xs text-foreground", item.done && "line-through text-muted-foreground")}>
                 {item.label}
               </p>
-              <span className="text-[9px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+              <span className="text-xs rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
                 {item.obligation}
               </span>
             </div>
@@ -50,14 +50,14 @@ export function PreparationChecklist({ className }: { className?: string }) {
         ))}
 
         <div className="pt-3 border-t mt-3 space-y-2">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Lembretes
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 text-[10px] h-8"
+              className="flex-1 text-xs h-8"
               onClick={() => toast.success("Lembrete ativado para obrigações próximas")}
             >
               <Bell className="mr-1.5 h-3 w-3" />
@@ -66,7 +66,7 @@ export function PreparationChecklist({ className }: { className?: string }) {
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 text-[10px] h-8 opacity-60"
+              className="flex-1 text-xs h-8 opacity-60"
               disabled
             >
               <Mail className="mr-1.5 h-3 w-3" />

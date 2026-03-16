@@ -60,17 +60,17 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
                 <StatusBadge status={movement.classificationStatus} />
                 <StatusBadge status={movement.reconciliationStatus} />
                 {movement.isAnomaly && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-tim-danger/30 bg-tim-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-tim-danger">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-tim-danger/30 bg-tim-danger/10 px-1.5 py-0.5 text-xs font-medium text-tim-danger">
                     <AlertTriangle className="h-2.5 w-2.5" /> Anomalia
                   </span>
                 )}
                 {movement.isDuplicate && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-tim-warning/30 bg-tim-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-tim-warning">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-tim-warning/30 bg-tim-warning/10 px-1.5 py-0.5 text-xs font-medium text-tim-warning">
                     <Copy className="h-2.5 w-2.5" /> Possível duplicado
                   </span>
                 )}
                 {movement.isRecurring && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                     <RotateCcw className="h-2.5 w-2.5" /> Recorrente
                   </span>
                 )}
@@ -109,7 +109,7 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
             <div className="rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-4">
               <div className="flex items-center gap-2">
                 <Bot className="h-3.5 w-3.5 text-primary" />
-                <span className="text-[10px] font-medium uppercase tracking-widest text-primary">
+                <span className="text-xs font-medium uppercase tracking-widest text-primary">
                   Classificação Sugerida
                 </span>
                 <ConfidenceIndicator value={movement.confidence} size="sm" className="ml-auto" />
@@ -118,13 +118,13 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
               {movement.suggestedAccount && (
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Conta SNC</p>
+                    <p className="text-xs text-muted-foreground">Conta SNC</p>
                     <p className="mt-0.5 text-sm font-semibold text-primary font-mono">
                       {movement.suggestedAccount}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Classe</p>
+                    <p className="text-xs text-muted-foreground">Classe</p>
                     <p className="mt-0.5 text-sm font-medium text-foreground">
                       {movement.sncClass || "—"}
                     </p>
@@ -135,7 +135,7 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
               {/* Detected entity */}
               {movement.detectedEntity && (
                 <div className="mt-3">
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {movement.detectedEntityType === "fornecedor" ? "Fornecedor detetado" : "Cliente detetado"}
                   </p>
                   <p className="mt-0.5 text-xs font-medium text-foreground">
@@ -147,7 +147,7 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
               {/* AI explanation */}
               {movement.aiExplanation && (
                 <div className="mt-3 rounded-md bg-muted/50 px-3 py-2">
-                  <p className="text-[10px] font-medium text-muted-foreground mb-1">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
                     Porquê esta sugestão?
                   </p>
                   <p className="text-xs leading-relaxed text-foreground/80">
@@ -209,7 +209,7 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
       {children}
     </h4>
   );
@@ -218,7 +218,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function InfoItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className={cn("mt-0.5 text-xs text-foreground", mono && "font-mono")}>{value}</p>
     </div>
   );

@@ -33,7 +33,7 @@ function ObligationRow({ ob }: { ob: Obligation }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium truncate">{ob.description}</p>
-          <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", TYPE_COLOR[ob.type] ?? "bg-muted text-muted-foreground")}>
+          <span className={cn("rounded px-1.5 py-0.5 text-xs font-semibold", TYPE_COLOR[ob.type] ?? "bg-muted text-muted-foreground")}>
             {ob.type}
           </span>
         </div>
@@ -44,7 +44,7 @@ function ObligationRow({ ob }: { ob: Obligation }) {
         </p>
       </div>
       <div className="shrink-0 text-right">
-        <Badge variant={cfg.badge} className="text-[10px]">{cfg.label}</Badge>
+        <Badge variant={cfg.badge} className="text-xs">{cfg.label}</Badge>
         <p className={cn("mt-1 text-xs font-semibold", ob.days_left < 0 ? "text-tim-danger" : ob.days_left <= 7 ? "text-tim-warning" : "text-muted-foreground")}>
           {ob.days_left < 0 ? `${Math.abs(ob.days_left)}d atraso` : ob.days_left === 0 ? "Hoje" : `${ob.days_left}d`}
         </p>

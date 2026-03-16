@@ -154,12 +154,12 @@ export default function Inventory() {
             <TabsTrigger value="materias-primas" className="gap-1.5">
               <Wheat className="h-3.5 w-3.5" />
               Matérias Primas
-              {mpStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono">{mpStats.total}</span>}
+              {mpStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-mono">{mpStats.total}</span>}
             </TabsTrigger>
             <TabsTrigger value="consumiveis" className="gap-1.5">
               <Wrench className="h-3.5 w-3.5" />
               Consumíveis
-              {consStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono">{consStats.total}</span>}
+              {consStats.total > 0 && <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-mono">{consStats.total}</span>}
             </TabsTrigger>
             <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
           </TabsList>

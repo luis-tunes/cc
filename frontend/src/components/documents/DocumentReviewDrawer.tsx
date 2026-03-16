@@ -256,12 +256,12 @@ export function DocumentReviewDrawer({
               <div className="rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3">
                 <div className="flex items-center gap-2">
                   <Bot className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[10px] font-medium uppercase tracking-widest text-primary">Recomendação IA</span>
+                  <span className="text-xs font-medium uppercase tracking-widest text-primary">Recomendação IA</span>
                 </div>
                 <p className="mt-2 text-xs text-foreground">
                   Classificar como <span className="font-semibold text-primary">62 — Fornecimentos e Serviços Externos</span>
                 </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">Baseado em 12 documentos similares do mesmo fornecedor</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Baseado em 12 documentos similares do mesmo fornecedor</p>
                 <div className="mt-2 flex items-center gap-2">
                   <ConfidenceIndicator value={89} size="sm" />
                 </div>
@@ -301,7 +301,7 @@ export function DocumentReviewDrawer({
               <SectionTitle>Reclassificar Documento</SectionTitle>
               <div className="mt-3 space-y-3">
                 <div>
-                  <label className="text-[10px] font-medium text-muted-foreground">Conta SNC</label>
+                  <label className="text-xs font-medium text-muted-foreground">Conta SNC</label>
                   <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                     <SelectTrigger className="mt-1 h-8 text-xs">
                       <SelectValue placeholder="Selecionar conta…" />
@@ -314,7 +314,7 @@ export function DocumentReviewDrawer({
                   </Select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-medium text-muted-foreground">Tipo de documento</label>
+                  <label className="text-xs font-medium text-muted-foreground">Tipo de documento</label>
                   <Select value={selectedDocType || document.documentType} onValueChange={(v) => setSelectedDocType(v as DocumentType)}>
                     <SelectTrigger className="mt-1 h-8 text-xs">
                       <SelectValue />
@@ -344,7 +344,7 @@ export function DocumentReviewDrawer({
               <SectionTitle>Rejeitar Documento</SectionTitle>
               <div className="mt-3 space-y-3">
                 <div>
-                  <label className="text-[10px] font-medium text-muted-foreground">Motivo da rejeição</label>
+                  <label className="text-xs font-medium text-muted-foreground">Motivo da rejeição</label>
                   <Textarea
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
@@ -454,13 +454,13 @@ export function DocumentReviewDrawer({
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>;
+  return <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>;
 }
 
 function InfoItem({ label, value, mono, large }: { label: string; value: string; mono?: boolean; large?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className={cn("mt-0.5 text-foreground", large ? "text-sm font-semibold" : "text-xs", mono && "font-mono")}>{value}</p>
     </div>
   );
@@ -486,13 +486,13 @@ function ExtractedFieldRow({ field, onConfirm }: { field: ExtractedField; onConf
       )}
 
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-2 items-center">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{field.label}</span>
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{field.label}</span>
         <div className="text-xs">
           <span className="text-muted-foreground line-through mr-1.5">{field.sourceValue}</span>
         </div>
         <span className={cn("text-xs font-medium", field.confirmed ? "text-foreground" : "text-primary")}>
           {field.interpretedValue}
-          {!field.confirmed && <span className="ml-1 text-[9px] text-primary/60">(sugerido)</span>}
+          {!field.confirmed && <span className="ml-1 text-xs text-primary/60">(sugerido)</span>}
         </span>
       </div>
 

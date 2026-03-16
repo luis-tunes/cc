@@ -68,7 +68,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
               key={w}
               onClick={() => setTimeWindow(w)}
               className={cn(
-                "rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded px-2.5 py-1 text-xs font-medium transition-colors",
                 timeWindow === w
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -175,7 +175,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
       {/* Cash position strip */}
       <div className="flex items-center gap-6 border-t px-4 py-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Total Receita
           </p>
           <p className="text-sm font-semibold text-foreground">
@@ -184,7 +184,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
         </div>
         <div className="h-6 w-px bg-border" />
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Total IVA
           </p>
           <p className="text-sm font-semibold text-foreground">
@@ -193,7 +193,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
         </div>
         <div className="h-6 w-px bg-border" />
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Resultado
           </p>
           <p className="text-sm font-semibold text-tim-success">

@@ -64,12 +64,12 @@ export function ObligationsTimeline({ className }: { className?: string }) {
 
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-xs font-medium text-foreground">{ob.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{ob.deadline}</p>
+                  <p className="text-xs text-muted-foreground">{ob.deadline}</p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={cn(
-                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium",
+                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
                     cfg.className
                   )}>
                     <StatusIcon className="h-3 w-3" />
@@ -78,7 +78,7 @@ export function ObligationsTimeline({ className }: { className?: string }) {
 
                   {ob.status !== "concluído" && (
                     <span className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                      "rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                       ob.daysLeft <= 5 && "bg-tim-danger/15 text-tim-danger",
                       ob.daysLeft > 5 && ob.daysLeft <= 15 && "bg-tim-warning/15 text-tim-warning",
                       ob.daysLeft > 15 && "bg-muted text-muted-foreground"

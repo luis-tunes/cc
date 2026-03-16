@@ -206,7 +206,7 @@ export function GlobalUploadModal({
           {/* File queue */}
           {files.length > 0 && (
             <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>
                   {files.length} ficheiro{files.length > 1 ? "s" : ""}
                 </span>
@@ -243,7 +243,7 @@ export function GlobalUploadModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-border px-6 py-3">
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {allDone &&
               failed === 0 &&
               "Todos os ficheiros processados com sucesso"}
@@ -285,7 +285,7 @@ function FileRow({
 
   return (
     <div className="flex items-center gap-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary text-[10px] font-bold text-muted-foreground">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary text-xs font-bold text-muted-foreground">
         {ext}
       </div>
       <div className="min-w-0 flex-1">
@@ -293,24 +293,24 @@ function FileRow({
           {file.file.name}
         </p>
         <div className="mt-0.5 flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground">{sizeKb} KB</span>
+          <span className="text-xs text-muted-foreground">{sizeKb} KB</span>
           {file.status === "uploading" && (
             <Progress value={file.progress} className="h-1 flex-1" />
           )}
           {file.status === "processing" && (
-            <span className="flex items-center gap-1 text-[10px] text-primary">
+            <span className="flex items-center gap-1 text-xs text-primary">
               <ScanSearch className="h-3 w-3 animate-pulse" />
               OCR + classificação…
             </span>
           )}
           {file.status === "success" && (
-            <span className="flex items-center gap-1 text-[10px] text-tim-success">
+            <span className="flex items-center gap-1 text-xs text-tim-success">
               <CheckCircle2 className="h-3 w-3" />
               Processado
             </span>
           )}
           {file.status === "error" && (
-            <span className="flex items-center gap-1 text-[10px] text-tim-danger">
+            <span className="flex items-center gap-1 text-xs text-tim-danger">
               <AlertCircle className="h-3 w-3" />
               {file.errorMessage}
             </span>

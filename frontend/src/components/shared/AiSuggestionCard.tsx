@@ -37,7 +37,7 @@ export function AiSuggestionCard({
           <div className="rounded-md bg-primary/10 p-1.5">
             <Bot className="h-3.5 w-3.5 text-primary" />
           </div>
-          <span className="text-[10px] font-medium uppercase tracking-widest text-primary">
+          <span className="text-xs font-medium uppercase tracking-widest text-primary">
             Sugerido por IA
           </span>
         </div>
@@ -50,7 +50,7 @@ export function AiSuggestionCard({
       </p>
 
       {source && (
-        <p className="mt-2 text-[10px] text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           Fonte: <span className="text-foreground/70">{source}</span>
         </p>
       )}

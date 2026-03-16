@@ -279,7 +279,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
                 </span>
                 {pvpNum > 0 && (
                   <span className="text-muted-foreground">
-                    Margem: <span className={`font-mono font-medium ${margin >= 0.4 ? "text-emerald-400" : margin >= 0.2 ? "text-yellow-400" : "text-red-400"}`}>
+                    Margem: <span className={`font-mono font-medium ${margin >= 0.4 ? "text-emerald-600" : margin >= 0.2 ? "text-amber-600" : "text-red-600"}`}>
                       {Math.round(margin * 100)}%
                     </span>
                   </span>

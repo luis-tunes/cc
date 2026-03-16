@@ -54,11 +54,11 @@ function RuleRow({ rule, onDelete, onToggle }: { rule: ClassificationRule; onDel
       <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40" />
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <Badge variant="outline" className="text-[10px]">{FIELD_LABELS[rule.field]}</Badge>
+          <Badge variant="outline" className="text-xs">{FIELD_LABELS[rule.field]}</Badge>
           <span className="text-muted-foreground">{OPERATOR_LABELS[rule.operator]}</span>
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{rule.value}</code>
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{rule.value}</code>
           <span className="text-muted-foreground">→</span>
-          <Badge className="bg-primary/20 text-primary text-[10px]">{rule.account} — {SNC_ACCOUNTS.find(a => a.code === rule.account)?.label ?? rule.label}</Badge>
+          <Badge className="bg-primary/20 text-primary text-xs">{rule.account} — {SNC_ACCOUNTS.find(a => a.code === rule.account)?.label ?? rule.label}</Badge>
         </div>
       </div>
       <div className="flex items-center gap-2">

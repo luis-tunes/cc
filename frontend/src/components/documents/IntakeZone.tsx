@@ -96,7 +96,7 @@ export function IntakeZone({ uploadQueue, onUpload, onDismiss, className }: Inta
       {/* Processing queue */}
       {hasQueue && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Fila de Processamento
           </p>
           {uploadQueue.map((file) => (
@@ -136,7 +136,7 @@ function QueueItem({
           />
         )}
         {file.error && (
-          <p className="mt-0.5 text-[10px] text-tim-danger">{file.error}</p>
+          <p className="mt-0.5 text-xs text-tim-danger">{file.error}</p>
         )}
       </div>
       {(file.status === "extracted" || file.status === "failed") && (
@@ -155,25 +155,25 @@ function StatusIndicator({ status }: { status: UploadingFile["status"] }) {
   switch (status) {
     case "uploading":
       return (
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" /> A carregar…
         </span>
       );
     case "processing":
       return (
-        <span className="flex items-center gap-1 text-[10px] text-tim-info">
+        <span className="flex items-center gap-1 text-xs text-tim-info">
           <Loader2 className="h-3 w-3 animate-spin" /> A extrair…
         </span>
       );
     case "extracted":
       return (
-        <span className="flex items-center gap-1 text-[10px] text-tim-success">
+        <span className="flex items-center gap-1 text-xs text-tim-success">
           <CheckCircle2 className="h-3 w-3" /> Extraído
         </span>
       );
     case "failed":
       return (
-        <span className="flex items-center gap-1 text-[10px] text-tim-danger">
+        <span className="flex items-center gap-1 text-xs text-tim-danger">
           <AlertCircle className="h-3 w-3" /> Erro
         </span>
       );

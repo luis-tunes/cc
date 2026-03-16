@@ -83,14 +83,14 @@ export function ProduceDialog({ open, onOpenChange, product }: ProduceDialogProp
                         <TableCell className="text-right font-mono text-sm">
                           {fmt(item.needed)} {item.unit}
                         </TableCell>
-                        <TableCell className={`text-right font-mono text-sm ${!item.sufficient ? "text-red-400" : ""}`}>
+                        <TableCell className={`text-right font-mono text-sm ${!item.sufficient ? "text-red-600" : ""}`}>
                           {fmt(item.after)} {item.unit}
                         </TableCell>
                         <TableCell>
                           {item.sufficient ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                           ) : (
-                            <AlertTriangle className="h-4 w-4 text-red-400" />
+                            <AlertTriangle className="h-4 w-4 text-red-600" />
                           )}
                         </TableCell>
                       </TableRow>
@@ -99,7 +99,7 @@ export function ProduceDialog({ open, onOpenChange, product }: ProduceDialogProp
                 </Table>
               </div>
               {!impact.sufficient && (
-                <p className="text-sm text-red-400 flex items-center gap-1.5">
+                <p className="text-sm text-red-600 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   Stock insuficiente para alguns ingredientes.
                 </p>

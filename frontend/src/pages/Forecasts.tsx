@@ -50,18 +50,18 @@ export default function Forecasts() {
       {historical.length > 0 && (
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-tim-info/30 bg-tim-info/5 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Receitas projetadas (6m)</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Receitas projetadas (6m)</p>
             <p className="mt-1 text-xl font-semibold text-tim-info">{fmt(totalProjectedReceitas)}</p>
           </div>
           <div className={cn("rounded-lg border p-4", totalProjectedResultado >= 0 ? "border-tim-success/30 bg-tim-success/5" : "border-tim-danger/30 bg-tim-danger/5")}>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Resultado projetado (6m)</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Resultado projetado (6m)</p>
             <div className="flex items-center gap-1.5">
               {totalProjectedResultado >= 0 ? <TrendingUp className="h-4 w-4 text-tim-success" /> : <TrendingDown className="h-4 w-4 text-tim-danger" />}
               <p className={cn("mt-1 text-xl font-semibold", totalProjectedResultado >= 0 ? "text-tim-success" : "text-tim-danger")}>{fmt(totalProjectedResultado)}</p>
             </div>
           </div>
           <div className="rounded-lg border border-tim-warning/30 bg-tim-warning/5 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Média mensal (último trimestre)</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Média mensal (último trimestre)</p>
             <p className="mt-1 text-xl font-semibold text-tim-warning">{fmt(avgReceitas - avgGastos)}</p>
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function Forecasts() {
       <div className="rounded-lg border bg-card">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h3 className="text-sm font-semibold">Histórico + Projeção 6 meses</h3>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(145,50%,42%)" }} /> Receitas</span>
             <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(0,65%,50%)" }} /> Gastos</span>
             <span className="flex items-center gap-1"><span className="h-2 w-4 rounded border-2 border-dashed" style={{ borderColor: "hsl(40,80%,55%)", background: "transparent" }} /> Projeção</span>

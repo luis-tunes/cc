@@ -27,7 +27,7 @@ export function AuditFlagsPanel({ className }: { className?: string }) {
           <h3 className="text-sm font-semibold text-foreground">Alertas de Auditoria</h3>
         </div>
         {high > 0 && (
-          <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-[10px] font-semibold text-tim-danger">
+          <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-xs font-semibold text-tim-danger">
             {high} alta prioridade
           </span>
         )}
@@ -52,12 +52,12 @@ export function AuditFlagsPanel({ className }: { className?: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-medium text-foreground">{flag.title}</p>
-                  <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-medium uppercase", cfg.badge)}>
+                  <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium uppercase", cfg.badge)}>
                     {flag.severity}
                   </span>
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{flag.detail}</p>
-                <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">{flag.detail}</p>
+                <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                   {categoryLabels[flag.category]}
                 </span>
               </div>

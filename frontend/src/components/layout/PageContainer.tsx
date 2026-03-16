@@ -22,11 +22,11 @@ export function PageContainer({
         {/* Page Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
             )}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}

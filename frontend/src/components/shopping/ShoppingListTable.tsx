@@ -63,7 +63,7 @@ function ItemsTable({ items, orderedIds, onMarkOrdered }: { items: ShoppingListI
             return (
               <TableRow key={item.ingredient_id} className={cn(isOrdered && "opacity-50")}>
                 <TableCell className="font-medium">
-                  {isOrdered && <CheckCircle2 className="inline mr-1.5 h-3.5 w-3.5 text-emerald-400" />}
+                  {isOrdered && <CheckCircle2 className="inline mr-1.5 h-3.5 w-3.5 text-emerald-600" />}
                   {item.name}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{item.supplier_name || "—"}</TableCell>
@@ -91,7 +91,7 @@ function ItemsTable({ items, orderedIds, onMarkOrdered }: { items: ShoppingListI
                       onClick={() => onMarkOrdered(item)}
                       title="Marcar como encomendado"
                     >
-                      <CheckCircle2 className={cn("h-4 w-4", isOrdered ? "text-emerald-400" : "text-muted-foreground")} />
+                      <CheckCircle2 className={cn("h-4 w-4", isOrdered ? "text-emerald-600" : "text-muted-foreground")} />
                     </Button>
                   </TableCell>
                 )}

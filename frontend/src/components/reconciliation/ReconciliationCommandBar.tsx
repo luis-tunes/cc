@@ -78,7 +78,7 @@ export function ReconciliationCommandBar({
                 key={f.key}
                 onClick={() => onFilterChange(f.key)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
+                  "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
                   activeFilter === f.key
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -87,7 +87,7 @@ export function ReconciliationCommandBar({
                 {f.label}
                 <span
                   className={cn(
-                    "rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums",
+                    "rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                     activeFilter === f.key ? "bg-muted text-foreground" : "bg-transparent"
                   )}
                 >
@@ -116,7 +116,7 @@ export function ReconciliationCommandBar({
                 style={{ width: `${pctResolved}%` }}
               />
             </div>
-            <span className="text-[10px] font-semibold tabular-nums text-foreground">{pctResolved}%</span>
+            <span className="text-xs font-semibold tabular-nums text-foreground">{pctResolved}%</span>
           </div>
         </div>
       </div>
@@ -146,7 +146,7 @@ function SummaryStat({
     <div className="flex items-center gap-1.5">
       <Icon className={cn("h-3 w-3", colors[variant])} />
       <span className={cn("text-xs font-semibold tabular-nums", colors[variant])}>{value}</span>
-      <span className="hidden text-[10px] text-muted-foreground xl:inline">{label}</span>
+      <span className="hidden text-xs text-muted-foreground xl:inline">{label}</span>
     </div>
   );
 }

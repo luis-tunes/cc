@@ -43,7 +43,7 @@ export function MonthCalendarView({ className }: { className?: string }) {
         {/* Weekday headers */}
         <div className="grid grid-cols-7 mb-1">
           {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => (
-            <div key={d} className="text-center text-[9px] font-medium uppercase tracking-widest text-muted-foreground py-1">
+            <div key={d} className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground py-1">
               {d}
             </div>
           ))}
@@ -73,7 +73,7 @@ export function MonthCalendarView({ className }: { className?: string }) {
                 )}
               >
                 <span className={cn(
-                  "text-[10px] tabular-nums",
+                  "text-xs tabular-nums",
                   isToday ? "font-bold text-primary" : "text-muted-foreground",
                   day < today && "text-muted-foreground/50"
                 )}>
@@ -86,7 +86,7 @@ export function MonthCalendarView({ className }: { className?: string }) {
                       return (
                         <div
                           key={o.id}
-                          className={cn("rounded px-1 py-0.5 truncate text-[8px] font-medium", cat.bgColor, cat.color)}
+                          className={cn("rounded px-1 py-0.5 truncate text-xs font-medium", cat.bgColor, cat.color)}
                           title={o.title}
                         >
                           {cat.label}
@@ -94,7 +94,7 @@ export function MonthCalendarView({ className }: { className?: string }) {
                       );
                     })}
                     {obs.length > 2 && (
-                      <span className="text-[8px] text-muted-foreground">+{obs.length - 2}</span>
+                      <span className="text-xs text-muted-foreground">+{obs.length - 2}</span>
                     )}
                   </div>
                 )}

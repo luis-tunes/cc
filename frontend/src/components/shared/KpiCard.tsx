@@ -56,7 +56,7 @@ export function KpiCard({
         <p
           className={cn(
             "font-medium uppercase tracking-wider text-muted-foreground",
-            compact ? "text-[10px]" : "text-xs"
+            compact ? "text-xs" : "text-sm"
           )}
         >
           {label}
@@ -77,7 +77,7 @@ export function KpiCard({
           <p
             className={cn(
               "font-semibold tracking-tight",
-              compact ? "mt-0.5 text-lg" : "mt-1 text-2xl",
+              compact ? "mt-0.5 text-2xl" : "mt-1 text-3xl",
               accent ? "text-primary" : "text-foreground",
               variant === "danger" && "text-tim-danger",
               variant === "warning" && "text-tim-warning"
@@ -98,7 +98,7 @@ export function KpiCard({
               )}
               <span
                 className={cn(
-                  "text-[11px]",
+                  "text-xs",
                   trend.direction === "up" && "text-tim-success",
                   trend.direction === "down" && "text-tim-danger",
                   trend.direction === "neutral" && "text-muted-foreground"

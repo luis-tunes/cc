@@ -33,7 +33,7 @@ export function TimelineMarker({
         {detail && (
           <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
         )}
-        <p className="mt-1 text-[10px] text-muted-foreground/70">{timestamp}</p>
+        <p className="mt-1 text-xs text-muted-foreground/70">{timestamp}</p>
       </div>
     </div>
   );

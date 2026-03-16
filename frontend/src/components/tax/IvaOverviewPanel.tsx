@@ -43,7 +43,7 @@ export function IvaOverviewPanel({ className }: { className?: string }) {
 
         {/* Rate split */}
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
             Repartição por Taxa
           </p>
           <div className="flex gap-2">
@@ -55,7 +55,7 @@ export function IvaOverviewPanel({ className }: { className?: string }) {
               <div key={r.rate} className="flex-1 rounded-md bg-muted/50 px-3 py-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-0.5">
                   <div className={cn("h-1.5 w-1.5 rounded-full", r.color)} />
-                  <span className="text-[10px] font-medium text-muted-foreground">{r.rate}</span>
+                  <span className="text-xs font-medium text-muted-foreground">{r.rate}</span>
                 </div>
                 <p className="text-sm font-semibold text-foreground">{fmt(r.value)}</p>
               </div>
@@ -65,7 +65,7 @@ export function IvaOverviewPanel({ className }: { className?: string }) {
 
         {/* Trend chart */}
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
             Tendência Mensal
           </p>
           <div className="h-32">

@@ -42,15 +42,15 @@ export function MovementLedger({
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
-            <TableHead className="w-24 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Data</TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Descrição</TableHead>
-            <TableHead className="w-20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ref.</TableHead>
-            <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Montante</TableHead>
-            <TableHead className="w-24 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Conta</TableHead>
-            <TableHead className="w-32 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Classe SNC</TableHead>
-            <TableHead className="w-36 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Entidade</TableHead>
-            <TableHead className="w-28 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</TableHead>
-            <TableHead className="w-20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Confiança</TableHead>
+            <TableHead className="w-24 text-sm font-medium text-muted-foreground">Data</TableHead>
+            <TableHead className="text-sm font-medium text-muted-foreground">Descrição</TableHead>
+            <TableHead className="w-20 text-sm font-medium text-muted-foreground">Ref.</TableHead>
+            <TableHead className="w-28 text-right text-sm font-medium text-muted-foreground">Montante</TableHead>
+            <TableHead className="w-24 text-sm font-medium text-muted-foreground">Conta</TableHead>
+            <TableHead className="w-32 text-sm font-medium text-muted-foreground">Classe SNC</TableHead>
+            <TableHead className="w-36 text-sm font-medium text-muted-foreground">Entidade</TableHead>
+            <TableHead className="w-28 text-sm font-medium text-muted-foreground">Estado</TableHead>
+            <TableHead className="w-20 text-sm font-medium text-muted-foreground">Confiança</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -89,13 +89,13 @@ export function MovementLedger({
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-[10px] font-mono text-muted-foreground">
+                <TableCell className="text-sm font-mono text-muted-foreground">
                   {mv.reference || "—"}
                 </TableCell>
                 <TableCell className="text-right">
                   <span
                     className={cn(
-                      "text-xs font-mono font-semibold tabular-nums",
+                      "text-sm font-mono font-semibold tabular-nums",
                       isDebit ? "text-foreground" : "text-tim-success"
                     )}
                   >
@@ -122,7 +122,7 @@ export function MovementLedger({
                   {mv.sncClass ? (
                     <span
                       className={cn(
-                        "text-[10px]",
+                        "text-xs",
                         mv.classificationStatus === "classificado" || mv.classificationStatus === "revisto"
                           ? "text-muted-foreground"
                           : "text-primary/70 italic"
@@ -131,7 +131,7 @@ export function MovementLedger({
                       {mv.sncClass}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">—</span>
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell>
@@ -139,7 +139,7 @@ export function MovementLedger({
                     <div className="min-w-0">
                       <p className="truncate text-xs text-foreground max-w-[130px]">{mv.detectedEntity}</p>
                       {mv.detectedEntityType && (
-                        <p className="text-[9px] text-muted-foreground capitalize">{mv.detectedEntityType}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{mv.detectedEntityType}</p>
                       )}
                     </div>
                   ) : (

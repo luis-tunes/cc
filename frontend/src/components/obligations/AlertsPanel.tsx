@@ -20,7 +20,7 @@ export function AlertsPanel({ className }: { className?: string }) {
           <h3 className="text-sm font-semibold text-foreground">Alertas</h3>
         </div>
         {critical > 0 && (
-          <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-[10px] font-semibold text-tim-danger">
+          <span className="rounded-md bg-tim-danger/15 px-2 py-0.5 text-xs font-semibold text-tim-danger">
             {critical} crítico{critical > 1 ? "s" : ""}
           </span>
         )}
@@ -45,10 +45,10 @@ export function AlertsPanel({ className }: { className?: string }) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground">{alert.title}</p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">{alert.reason}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{alert.reason}</p>
               </div>
               <span className={cn(
-                "rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums shrink-0",
+                "rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums shrink-0",
                 alert.daysLeft <= 3 && "bg-tim-danger/15 text-tim-danger",
                 alert.daysLeft > 3 && alert.daysLeft <= 7 && "bg-tim-warning/15 text-tim-warning",
                 alert.daysLeft > 7 && "bg-muted text-muted-foreground"

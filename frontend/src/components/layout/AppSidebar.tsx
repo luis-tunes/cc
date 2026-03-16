@@ -41,7 +41,7 @@ export function AppSidebar() {
             TIM
           </span>
           {!collapsed && (
-            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Time is Money
             </span>
           )}
@@ -51,7 +51,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2 py-2">
         {navigation.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -114,18 +114,18 @@ export function AppSidebar() {
           </div>
         )}
         <div className="flex items-center gap-2">
-          <Avatar className="h-7 w-7">
+          <Avatar className="h-8 w-8">
             <AvatarImage src={user?.imageUrl} />
-            <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
               {initials}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-xs font-medium text-foreground">
+              <p className="truncate text-sm font-medium text-foreground">
                 {user?.fullName || "Utilizador"}
               </p>
-              <p className="truncate text-[10px] text-muted-foreground">
+              <p className="truncate text-xs text-muted-foreground">
                 {user?.primaryEmailAddress?.emailAddress}
               </p>
             </div>
