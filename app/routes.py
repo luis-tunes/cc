@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn
-from app.parse import ingest_document
+from app.parse import ingest_document, validate_nif
 from app.reconcile import reconcile_all
 
 logger = logging.getLogger(__name__)
@@ -274,18 +274,29 @@ async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_aut
         raise HTTPException(status_code=422, detail="CSV must have columns: date, description, amount")
     tid = auth.tenant_id if auth else None
     count = 0
+    errors = []
     with get_conn() as conn:
-        for row in reader:
-            tx_date = datetime.date.fromisoformat(row["date"].strip())
+        for line_num, row in enumerate(reader, start=2):
+            try:
+                tx_date = datetime.date.fromisoformat(row["date"].strip())
+            except (ValueError, AttributeError):
+                errors.append(f"Linha {line_num}: data inválida '{row.get('date', '')}'")
+                continue
             description = row["description"].strip()
-            amount = Decimal(row["amount"].strip().replace(",", "."))
+            try:
+                amount = Decimal(row["amount"].strip().replace(",", "."))
+            except Exception:
+                errors.append(f"Linha {line_num}: valor inválido '{row.get('amount', '')}'")
+                continue
             conn.execute(
                 "INSERT INTO bank_transactions (date, description, amount, tenant_id) VALUES (%s, %s, %s, %s)",
                 (tx_date, description, amount, tid),
             )
             count += 1
         conn.commit()
-    return {"imported": count}
+    if errors and count == 0:
+        raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:5]))
+    return {"imported": count, "errors": errors[:10]}
 
 @router.get("/bank-transactions", response_model=list[BankTransactionOut])
 async def list_bank_transactions(
@@ -487,7 +498,6 @@ async def list_unit_families(auth: AuthInfo = Depends(require_auth)):
         for f in families:
             result.append({**dict(f), "conversions": conv_map.get(f["id"], [])})
     return result
-    return result
 
 
 @router.post("/unit-families")
@@ -565,6 +575,8 @@ async def create_supplier(body: dict, auth: AuthInfo = Depends(require_auth)):
     nif = (body.get("nif") or "").strip()
     if nif and (not nif.isdigit() or len(nif) != 9):
         raise HTTPException(status_code=422, detail="NIF must be exactly 9 digits")
+    if nif and not validate_nif(nif):
+        raise HTTPException(status_code=422, detail="NIF inválido (checksum mod-11 falhou)")
     try:
         reliability = min(max(Decimal(str(body.get("reliability", 80))), Decimal("0")), Decimal("100"))
         avg_days = max(int(body.get("avg_delivery_days", 3)), 0)
@@ -598,6 +610,8 @@ async def update_supplier(supplier_id: int, body: dict, auth: AuthInfo = Depends
         nif = (fields["nif"] or "").strip()
         if nif and (not nif.isdigit() or len(nif) != 9):
             raise HTTPException(status_code=422, detail="NIF must be exactly 9 digits")
+        if nif and not validate_nif(nif):
+            raise HTTPException(status_code=422, detail="NIF inválido (checksum mod-11 falhou)")
         fields["nif"] = nif
     if "name" in fields:
         name = (fields["name"] or "").strip()

@@ -236,13 +236,23 @@ async def stripe_webhook(request: Request):
     return {"received": True}
 
 
+WEBHOOK_TOLERANCE_SECONDS = 300  # 5 minutes
+
+
 def _verify_stripe_signature(payload: bytes, sig_header: str) -> None:
-    """Basic Stripe webhook signature verification."""
+    """Stripe webhook signature verification with replay protection."""
     parts = dict(p.split("=", 1) for p in sig_header.split(",") if "=" in p)
     timestamp = parts.get("t", "")
     v1 = parts.get("v1", "")
     if not timestamp or not v1:
         raise ValueError("Missing signature components")
+    try:
+        ts = int(timestamp)
+    except ValueError:
+        raise ValueError("Invalid timestamp")
+    now = int(datetime.now(timezone.utc).timestamp())
+    if abs(now - ts) > WEBHOOK_TOLERANCE_SECONDS:
+        raise ValueError("Webhook timestamp too old (possible replay)")
     signed = f"{timestamp}.".encode() + payload
     expected = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), signed, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, v1):

@@ -94,8 +94,9 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
             f.flush()
             path = f.name
         result = extract_data(path, templates=get_templates())
-    except (OSError, EnvironmentError):
-        # pdftotext not available — fall through to OCR text fallback
+    except (OSError, EnvironmentError) as exc:
+        import logging
+        logging.getLogger(__name__).warning("pdftotext not available, falling back to OCR text: %s", exc)
         result = None
     finally:
         if path:

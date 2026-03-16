@@ -11,7 +11,8 @@ def reconcile_all(tenant_id: str | None = None) -> list[dict]:
     with get_conn() as conn:
         docs = conn.execute(
             f"""SELECT id, total, date FROM documents
-               WHERE id NOT IN (SELECT document_id FROM reconciliations){tf}""",
+               WHERE date IS NOT NULL AND total IS NOT NULL
+                 AND id NOT IN (SELECT document_id FROM reconciliations){tf}""",
             tp,
         ).fetchall()
         txs = conn.execute(
