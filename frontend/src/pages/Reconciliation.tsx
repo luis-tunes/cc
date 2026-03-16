@@ -5,14 +5,17 @@ import { MatchCard } from "@/components/reconciliation/MatchCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { GitMerge, CheckCircle2, PartyPopper } from "lucide-react";
 import { type ReconciliationPair } from "@/lib/reconciliation-data";
-import { useReconciliations, useRunReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
+import { useReconciliations, useRunReconciliation, usePatchReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
 import { toast } from "sonner";
 
 /** Map backend Reconciliation to frontend ReconciliationPair */
 function toPair(r: Reconciliation): ReconciliationPair {
+  const status = r.reconciliation_status === "aprovado" ? "approved"
+    : r.reconciliation_status === "rejeitado" || r.reconciliation_status === "a_rever" ? "exception"
+    : "auto-matched";
   return {
     id: String(r.id),
-    status: "auto-matched",
+    status,
     confidence: Math.round((r.match_confidence ?? 0.95) * 100),
     reasoning: "Correspondência automática por montante e data.",
     amountDelta: r.total && r.amount ? Math.abs(Number(r.total) - Math.abs(Number(r.amount))) : 0,
@@ -39,14 +42,9 @@ function toPair(r: Reconciliation): ReconciliationPair {
 export default function Reconciliation() {
   const { data: rawReconciliations = [], isLoading } = useReconciliations();
   const runRecon = useRunReconciliation();
+  const patchRecon = usePatchReconciliation();
 
-  const apiPairs = useMemo(() => rawReconciliations.map(toPair), [rawReconciliations]);
-  const [localOverrides, setLocalOverrides] = useState<Record<string, ReconciliationPair["status"]>>({});
-
-  const pairs = useMemo(() =>
-    apiPairs.map((p) => localOverrides[p.id] ? { ...p, status: localOverrides[p.id] } : p),
-    [apiPairs, localOverrides]
-  );
+  const pairs = useMemo(() => rawReconciliations.map(toPair), [rawReconciliations]);
 
   const [activeFilter, setActiveFilter] = useState("all");
   const running = runRecon.isPending;
@@ -77,18 +75,19 @@ export default function Reconciliation() {
   }, [runRecon]);
 
   const handleApprove = useCallback((id: string) => {
-    setLocalOverrides((prev) => ({ ...prev, [id]: "approved" }));
+    patchRecon.mutate({ id: Number(id), status: "aprovado" });
     toast.success("Par aprovado");
-  }, []);
+  }, [patchRecon]);
 
   const handleReview = useCallback((id: string) => {
-    toast.info("Abrir revisão detalhada");
-  }, []);
+    patchRecon.mutate({ id: Number(id), status: "a_rever" });
+    toast.info("Marcado para revisão");
+  }, [patchRecon]);
 
   const handleFlag = useCallback((id: string) => {
-    setLocalOverrides((prev) => ({ ...prev, [id]: "exception" }));
+    patchRecon.mutate({ id: Number(id), status: "rejeitado" });
     toast.warning("Marcado como exceção");
-  }, []);
+  }, [patchRecon]);
 
   const allResolved = summary.approved + summary.autoMatched === summary.total && summary.total > 0;
 

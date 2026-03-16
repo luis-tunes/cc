@@ -1,10 +1,6 @@
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 import {
-  complianceAlerts,
   priorityConfig,
-  getAlertsByPriority,
-  type ComplianceAlert,
   type AlertPriority,
 } from "@/lib/compliance-alerts-data";
 import {
@@ -12,16 +8,14 @@ import {
   AlertTriangle,
   Clock,
   Info,
-  ChevronRight,
-  Lock,
-  UserCheck,
-  Sparkles,
   ArrowRight,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useAlerts, useMarkAlertRead, useGenerateAlerts } from "@/hooks/use-alerts";
+import type { Alert } from "@/lib/api";
 
 const priorityIcons: Record<AlertPriority, React.ElementType> = {
   critico: Siren,
@@ -30,19 +24,26 @@ const priorityIcons: Record<AlertPriority, React.ElementType> = {
   info: Info,
 };
 
-function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (id: string) => void }) {
-  const [expanded, setExpanded] = useState(false);
+function severityToPriority(severity: string): AlertPriority {
+  if (severity === "critico") return "critico";
+  if (severity === "urgente") return "urgente";
+  if (severity === "atencao") return "atencao";
+  return "info";
+}
+
+function AlertCard({ alert, onDismiss }: { alert: Alert; onDismiss: (id: number) => void }) {
   const navigate = useNavigate();
-  const cfg = priorityConfig[alert.priority];
-  const Icon = priorityIcons[alert.priority];
+  const priority = severityToPriority(alert.severity);
+  const cfg = priorityConfig[priority];
+  const Icon = priorityIcons[priority];
 
   return (
     <div
       className={cn(
         "rounded-lg border px-3.5 py-3 transition-all",
         cfg.border,
-        alert.priority === "critico" && "bg-tim-danger/5",
-        alert.priority === "urgente" && "bg-tim-warning/5"
+        priority === "critico" && "bg-tim-danger/5",
+        priority === "urgente" && "bg-tim-warning/5"
       )}
     >
       <div className="flex items-start gap-3">
@@ -51,89 +52,52 @@ function AlertCard({ alert, onDismiss }: { alert: ComplianceAlert; onDismiss: (i
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs font-semibold text-foreground">{alert.title}</p>
-            {alert.aiGenerated && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                <Sparkles className="h-2.5 w-2.5" />
-                IA
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{alert.detail}</p>
+          <p className="text-xs font-semibold text-foreground">{alert.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{alert.description}</p>
 
-          {/* Blockers */}
-          {alert.blockers && alert.blockers.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {alert.blockers.map((b, i) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <Lock className="h-2.5 w-2.5 text-tim-danger shrink-0" />
-                  <span className="text-xs text-tim-danger">{b}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Waiting on */}
-          {alert.waitingOn && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <UserCheck className="h-2.5 w-2.5 text-tim-info shrink-0" />
-              <span className="text-xs text-tim-info">Aguarda: {alert.waitingOn}</span>
-            </div>
-          )}
-
-          {/* Next step */}
           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-            <Button
-              size="sm"
-              className="h-7 text-xs gap-1.5"
-              onClick={() => {
-                if (alert.nextStepAction) navigate(alert.nextStepAction);
-              }}
-            >
-              <ArrowRight className="h-3 w-3" />
-              {alert.nextStep}
-            </Button>
+            {alert.action_url && (
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => navigate(alert.action_url!)}
+              >
+                <ArrowRight className="h-3 w-3" />
+                Ver
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => {
-                onDismiss(alert.id);
-                toast.success("Alerta arquivado");
-              }}
+              onClick={() => onDismiss(alert.id)}
             >
               <CheckCircle2 className="mr-1 h-3 w-3" />
               Resolvido
             </Button>
           </div>
         </div>
-
-        {/* Days left badge */}
-        {alert.daysLeft !== undefined && (
-          <span
-            className={cn(
-              "rounded px-2 py-0.5 text-xs font-bold tabular-nums shrink-0",
-              alert.daysLeft <= 3 && "bg-tim-danger/15 text-tim-danger",
-              alert.daysLeft > 3 && alert.daysLeft <= 7 && "bg-tim-warning/15 text-tim-warning",
-              alert.daysLeft > 7 && alert.daysLeft <= 30 && "bg-tim-info/15 text-tim-info",
-              alert.daysLeft > 30 && "bg-muted text-muted-foreground"
-            )}
-          >
-            {alert.daysLeft}d
-          </span>
-        )}
       </div>
     </div>
   );
 }
 
 export function AlertCenter({ className }: { className?: string }) {
-  const [alerts, setAlerts] = useState(complianceAlerts);
-  const grouped = getAlertsByPriority(alerts);
+  const { data: alerts = [], isLoading } = useAlerts();
+  const markRead = useMarkAlertRead();
+  const genAlerts = useGenerateAlerts();
 
-  const dismiss = (id: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  const dismiss = (id: number) => {
+    markRead.mutate(id);
+  };
+
+  const visible = alerts.filter((a) => !a.read);
+
+  const grouped: Record<AlertPriority, Alert[]> = {
+    critico: visible.filter((a) => a.severity === "critico"),
+    urgente: visible.filter((a) => a.severity === "urgente"),
+    atencao: visible.filter((a) => a.severity === "atencao"),
+    info: visible.filter((a) => !["critico", "urgente", "atencao"].includes(a.severity)),
   };
 
   const sections: { key: AlertPriority; label: string }[] = [
@@ -156,11 +120,24 @@ export function AlertCenter({ className }: { className?: string }) {
               {grouped.critico.length} crítico{grouped.critico.length > 1 ? "s" : ""}
             </span>
           )}
-          <span className="text-xs text-muted-foreground">{alerts.length} alertas</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground"
+            onClick={() => genAlerts.mutate()}
+            disabled={genAlerts.isPending || isLoading}
+            title="Verificar alertas"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", genAlerts.isPending && "animate-spin")} />
+          </Button>
+          <span className="text-xs text-muted-foreground">{visible.length} alertas</span>
         </div>
       </div>
 
       <div className="p-3 space-y-4">
+        {isLoading && (
+          <div className="py-6 text-center text-xs text-muted-foreground">A carregar alertas…</div>
+        )}
         {sections.map(({ key, label }) => {
           const items = grouped[key];
           if (items.length === 0) return null;
@@ -186,10 +163,20 @@ export function AlertCenter({ className }: { className?: string }) {
           );
         })}
 
-        {alerts.length === 0 && (
+        {!isLoading && visible.length === 0 && (
           <div className="py-8 text-center">
             <CheckCircle2 className="mx-auto h-8 w-8 text-tim-success/50" />
             <p className="mt-2 text-xs text-muted-foreground">Sem alertas pendentes</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 text-xs text-muted-foreground"
+              onClick={() => genAlerts.mutate()}
+              disabled={genAlerts.isPending}
+            >
+              <RefreshCw className="mr-1.5 h-3 w-3" />
+              Verificar agora
+            </Button>
           </div>
         )}
       </div>
