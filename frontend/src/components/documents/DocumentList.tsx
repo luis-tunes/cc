@@ -65,31 +65,22 @@ export function DocumentList({
                 onCheckedChange={onToggleAll}
               />
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <TableHead className="text-sm font-medium text-muted-foreground">
               Documento
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Tipo
+            <TableHead className="text-sm font-medium text-muted-foreground">
+              Entidade
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Entidade / NIF
-            </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+            <TableHead className="text-sm font-medium text-muted-foreground text-right">
               Total
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
-              IVA
-            </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <TableHead className="text-sm font-medium text-muted-foreground">
               Data
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Extração
-            </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <TableHead className="text-sm font-medium text-muted-foreground">
               Estado
             </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider text-muted-foreground w-10" />
+            <TableHead className="text-sm font-medium text-muted-foreground w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -118,33 +109,25 @@ export function DocumentList({
                   />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex items-center gap-3">
+                    <FileIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-foreground max-w-[200px]">
+                      <p className="truncate text-sm font-medium text-foreground max-w-[240px]">
                         {doc.fileName}
                       </p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <SourceIcon className="h-2.5 w-2.5 text-muted-foreground/60" />
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatDate(doc.uploadedAt)}
-                        </span>
-                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {documentTypeLabels[doc.documentType]} · {formatDate(doc.uploadedAt)}
+                      </p>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {documentTypeLabels[doc.documentType]}
-                  </span>
-                </TableCell>
-                <TableCell>
                   <div className="min-w-0">
-                    <p className="truncate text-xs text-foreground max-w-[140px]">
+                    <p className="truncate text-sm text-foreground max-w-[180px]">
                       {doc.supplier || doc.customer || "—"}
                     </p>
                     {doc.nif && (
-                      <p className="text-[10px] font-mono text-muted-foreground">
+                      <p className="text-xs font-mono text-muted-foreground mt-0.5">
                         {doc.nif}
                       </p>
                     )}
@@ -152,31 +135,23 @@ export function DocumentList({
                 </TableCell>
                 <TableCell className="text-right">
                   <span className={cn(
-                    "text-xs font-mono font-medium",
+                    "text-sm font-mono font-medium",
                     doc.total && doc.total < 0 ? "text-tim-danger" : "text-foreground"
                   )}>
                     {doc.total != null ? formatCurrency(doc.total) : "—"}
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {doc.vat != null ? formatCurrency(doc.vat) : "—"}
-                  </span>
-                </TableCell>
                 <TableCell>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {doc.date || "—"}
                   </span>
-                </TableCell>
-                <TableCell>
-                  <ConfidenceIndicator value={doc.extractionConfidence} size="sm" />
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={doc.classificationStatus} />
                 </TableCell>
                 <TableCell>
                   {doc.needsReview && (
-                    <AlertTriangle className="h-3.5 w-3.5 text-tim-warning" />
+                    <AlertTriangle className="h-4 w-4 text-tim-warning" />
                   )}
                 </TableCell>
               </TableRow>
