@@ -14,9 +14,11 @@ import {
   AlertCircle,
   Loader2,
   ScanSearch,
+  Camera,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { uploadDocument } from "@/lib/api";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface UploadFile {
   id: string;
@@ -45,6 +47,8 @@ export function GlobalUploadModal({
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const processFile = useCallback(
     async (uf: UploadFile) => {
@@ -201,7 +205,33 @@ export function GlobalUploadModal({
                 e.target.value = "";
               }}
             />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
           </div>
+
+          {/* Camera capture button (mobile only) */}
+          {isMobile && (
+            <Button
+              variant="outline"
+              className="mt-3 h-11 w-full gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                cameraRef.current?.click();
+              }}
+            >
+              <Camera className="h-4 w-4" />
+              Tirar foto do documento
+            </Button>
+          )}
 
           {/* File queue */}
           {files.length > 0 && (
