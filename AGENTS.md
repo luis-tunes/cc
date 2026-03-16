@@ -114,10 +114,10 @@ frontend/                     # React SPA
     hooks/                    # TanStack Query hooks (use-documents, use-billing, etc.)
     lib/
       api.ts                  # FastAPI client (/api/*) + Stripe billing API
-      navigation.ts           # Sidebar nav config (5 groups, 20 items)
+      navigation.ts           # Sidebar nav config (3 groups, 13 items)
       *-data.ts               # Mock data + TypeScript types
     pages/                    # 20 page components
-  tailwind.config.ts          # TIM dark theme
+  tailwind.config.ts          # TIM light theme
   vite.config.ts              # Proxy /api → :8080
 bin/                          # Scripts
 Dockerfile                    # Multi-stage: Node build → Python runtime
@@ -158,9 +158,21 @@ REVENUE_SPLIT_PERCENT=50       # Platform keeps 50%, partner gets 50%
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
-## Won't Do
+## Won't Do (For Now)
 
 AT integration. SAFT. ML. Complex billing. ORM.
+
+## Target User
+
+Business owner (not accountant). All UI text in simple Portuguese.
+Explain accounting concepts via HelpTooltip. Minimize information density.
+Mobile-first responsive design is essential.
+
+## OCR Strategy
+
+Paperless-ngx uses Tesseract via ocrmypdf (PAPERLESS_OCR_LANGUAGE: por+eng).
+Abstraction layer in app/ocr.py allows swapping engine (e.g., Google Document AI) via env var.
+invoice2data templates in app/ for structured extraction. Fallback: regex on OCR text.
 
 ## Rules
 
@@ -181,11 +193,14 @@ AT integration. SAFT. ML. Complex billing. ORM.
 
 ## UI Theme
 
-- Dark mode only. TIM dark theme with gold accent.
-- Colors: primary gold `hsl(40 80% 55%)`, success teal, danger red, info blue.
-- Sidebar: collapsible, 5 nav groups, active indicator with gold bar.
+- **Light mode only**. Clean, professional light theme.
+- Colors: primary gold `hsl(40 75% 48%)`, success teal, danger red, info blue.
+- Sidebar: collapsible, 3 nav groups (Principal, Negócio, Definições), active indicator with gold bar.
 - Inter font. Smooth scrollbars. WCAG AA contrast.
 - shadcn/ui components (Radix-based). No custom CSS except theme vars.
+- Min font size: `text-xs` (12px). Never use `text-[10px]` or `text-[11px]`.
+- Body text: `text-sm` (14px). Section headings: `text-base` (16px). Page titles: `text-2xl`.
+- Buttons: minimum `h-9 text-sm`. KPI values: `text-2xl`+.
 
 ## AI Rules
 
