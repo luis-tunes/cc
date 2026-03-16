@@ -14,17 +14,18 @@ import {
   CheckCircle2,
   Clock,
   Upload,
-  Loader2,
 } from "lucide-react";
 import { type DocumentRecord } from "@/lib/documents-data";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { toast } from "sonner";
+import { TableSkeleton, KpiSkeleton } from "@/components/shared/LoadingSkeletons";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 type ViewTab = "todos" | "revisao" | "classificados" | "reconciliados";
 
 export default function Documents() {
-  const { documents, isLoading, refetch } = useDocuments();
+  const { documents, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
   const [filters, setFilters] = useState<DocumentFilters>({
     search: "",
@@ -104,6 +105,21 @@ export default function Documents() {
     setSelectedIds(new Set());
   };
 
+  const pendingHighConfidence = useMemo(
+    () => documents.filter((d) => d.classificationStatus === "pendente" && d.extractionConfidence >= 80).length,
+    [documents]
+  );
+
+  const handleApproveAll = useCallback(() => {
+    const toApprove = documents.filter(
+      (d) => d.classificationStatus === "pendente" && d.extractionConfidence >= 80
+    );
+    for (const doc of toApprove) {
+      actions.onApprove(doc.id);
+    }
+    toast.success(`${toApprove.length} documentos aprovados automaticamente`);
+  }, [documents, actions]);
+
   const handleDocumentProcessed = useCallback(() => {
     refetch();
   }, [refetch]);
@@ -159,7 +175,9 @@ export default function Documents() {
         {/* Bulk Actions */}
         <BulkActionsBar
           selectedCount={selectedIds.size}
+          pendingHighConfidence={pendingHighConfidence}
           onApprove={() => bulkAction("Aprovados")}
+          onApproveAll={handleApproveAll}
           onClassify={() => bulkAction("Classificados")}
           onFlag={() => bulkAction("Sinalizados")}
           onExport={() => bulkAction("Exportados")}
@@ -168,11 +186,10 @@ export default function Documents() {
         />
 
         {/* Document List */}
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
-            <p className="mt-3 text-sm text-muted-foreground">A carregar documentos…</p>
-          </div>
+        {error ? (
+          <ErrorState onRetry={refetch} />
+        ) : isLoading ? (
+          <TableSkeleton rows={6} cols={5} />
         ) : filtered.length > 0 ? (
           <DocumentList
             documents={filtered}

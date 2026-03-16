@@ -6,11 +6,14 @@ import {
   Flag,
   Download,
   Archive,
+  CheckCheck,
 } from "lucide-react";
 
 interface BulkActionsBarProps {
   selectedCount: number;
+  pendingHighConfidence?: number;
   onApprove: () => void;
+  onApproveAll?: () => void;
   onClassify: () => void;
   onFlag: () => void;
   onExport: () => void;
@@ -21,7 +24,9 @@ interface BulkActionsBarProps {
 
 export function BulkActionsBar({
   selectedCount,
+  pendingHighConfidence,
   onApprove,
+  onApproveAll,
   onClassify,
   onFlag,
   onExport,
@@ -29,7 +34,7 @@ export function BulkActionsBar({
   onClear,
   className,
 }: BulkActionsBarProps) {
-  if (selectedCount === 0) return null;
+  if (selectedCount === 0 && !pendingHighConfidence) return null;
 
   return (
     <div
@@ -39,40 +44,54 @@ export function BulkActionsBar({
         className
       )}
     >
-      <span className="text-xs font-medium text-primary">
-        {selectedCount} {selectedCount === 1 ? "selecionado" : "selecionados"}
-      </span>
-      <div className="mx-2 h-4 w-px bg-border" />
+      {/* Approve all high-confidence (shown when nothing selected) */}
+      {selectedCount === 0 && pendingHighConfidence && pendingHighConfidence > 0 && onApproveAll && (
+        <>
+          <Button size="sm" className="h-8 text-xs" onClick={onApproveAll}>
+            <CheckCheck className="mr-1 h-3.5 w-3.5" />
+            Aprovar {pendingHighConfidence} {pendingHighConfidence === 1 ? "documento" : "documentos"} de alta confiança
+          </Button>
+        </>
+      )}
 
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onApprove}>
-        <CheckCircle2 className="mr-1 h-3 w-3" />
-        Aprovar
-      </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onClassify}>
-        <Tags className="mr-1 h-3 w-3" />
-        Classificar
-      </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onFlag}>
-        <Flag className="mr-1 h-3 w-3" />
-        Sinalizar
-      </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onExport}>
-        <Download className="mr-1 h-3 w-3" />
-        Exportar
-      </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs text-muted-foreground" onClick={onArchive}>
-        <Archive className="mr-1 h-3 w-3" />
-        Arquivar
-      </Button>
+      {/* Selection actions */}
+      {selectedCount > 0 && (
+        <>
+          <span className="text-sm font-medium text-primary">
+            {selectedCount} {selectedCount === 1 ? "selecionado" : "selecionados"}
+          </span>
+          <div className="mx-2 h-4 w-px bg-border" />
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="ml-auto h-7 text-xs text-muted-foreground"
-        onClick={onClear}
-      >
-        Limpar seleção
-      </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onApprove}>
+            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+            Aprovar
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onClassify}>
+            <Tags className="mr-1 h-3.5 w-3.5" />
+            Classificar
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onFlag}>
+            <Flag className="mr-1 h-3.5 w-3.5" />
+            Sinalizar
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onExport}>
+            <Download className="mr-1 h-3.5 w-3.5" />
+            Exportar
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs text-muted-foreground" onClick={onArchive}>
+            <Archive className="mr-1 h-3.5 w-3.5" />
+            Arquivar
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-8 text-xs text-muted-foreground"
+            onClick={onClear}
+          >
+            Limpar seleção
+          </Button>
+        </>
+      )}
     </div>
   );
 }
