@@ -30,6 +30,7 @@ ALL_TABLES = (
     "suppliers", "ingredients", "stock_events",
     "products", "recipe_ingredients",
     "price_history", "supplier_ingredients",
+    "classification_rules",
 )
 
 ALL_SEQ_TABLES = (
@@ -38,6 +39,7 @@ ALL_SEQ_TABLES = (
     "suppliers", "ingredients", "stock_events",
     "products", "recipe_ingredients",
     "price_history",
+    "classification_rules",
 )
 
 _tables: dict[str, list[dict]] = {}
@@ -86,7 +88,7 @@ class FakeConn:
             return FakeCursor([])
 
         # ── Aggregates first (COUNT/SUM on any table) — before table routing ──
-        if sql_lower.startswith("select") and ("count" in sql_lower or ("sum" in sql_lower and "coalesce" in sql_lower)):
+        if sql_lower.startswith("select") and ("count(" in sql_lower or ("sum(" in sql_lower and "coalesce" in sql_lower)):
             # Only route to aggregate handler for top-level COUNT/SUM queries
             # (not subqueries like "WHERE id NOT IN (SELECT ...)")
             if "from documents" in sql_lower or "from bank_transactions" in sql_lower or "from reconciliations" in sql_lower:
@@ -99,6 +101,10 @@ class FakeConn:
         # ── Tenant settings ──
         if "tenant_settings" in sql_lower:
             return self._handle_tenant_settings(sql, params)
+
+        # ── Classification rules ──
+        if "classification_rules" in sql_lower:
+            return self._handle_classification_rules(sql, params)
 
         # ── Unit conversions (before unit_families) ──
         if "unit_conversions" in sql_lower:
@@ -163,7 +169,7 @@ class FakeConn:
             return self._handle_documents(sql, params)
 
         # ── Aggregates / fallback ──
-        if "count" in sql_lower or "sum" in sql_lower:
+        if "count(" in sql_lower or "sum(" in sql_lower:
             return self._handle_aggregate(sql, params)
         if "to_char" in sql_lower:
             return FakeCursor([])
@@ -194,6 +200,9 @@ class FakeConn:
                 "status": "pendente",
                 "paperless_id": None,
                 "created_at": "2025-01-01T00:00:00+00:00",
+                "notes": None,
+                "snc_account": None,
+                "classification_source": None,
             }
             if params:
                 # Upload route: ('','',0,0,'outro',filename,status,tid) — 8 params
@@ -345,6 +354,54 @@ class FakeConn:
             _tables["tenant_settings"] = [r for r in _tables["tenant_settings"] if r.get("tenant_id") != params[0]]
             _tables["tenant_settings"].append(entry)
             return FakeCursor([entry])
+        return FakeCursor([])
+
+    # ────── Classification rules ──────
+
+    def _handle_classification_rules(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [r for r in _tables["classification_rules"] if r.get("tenant_id") == tid]
+            if "active = true" in sql_lower or "active = %s" in sql_lower:
+                rows = [r for r in rows if r.get("active", True)]
+            rows.sort(key=lambda r: (r.get("priority", 0), r.get("id", 0)))
+            return FakeCursor(rows)
+        if sql_lower.startswith("insert"):
+            _seq["classification_rules"] += 1
+            rule = {
+                "id": _seq["classification_rules"],
+                "tenant_id": params[0],
+                "field": params[1],
+                "operator": params[2],
+                "value": params[3],
+                "account": params[4],
+                "label": params[5] if len(params) > 5 else "",
+                "priority": params[6] if len(params) > 6 else 0,
+                "active": params[7] if len(params) > 7 else True,
+            }
+            _tables["classification_rules"].append(rule)
+            return FakeCursor([rule])
+        if sql_lower.startswith("update"):
+            rule_id = params[-2] if len(params) >= 2 else None
+            tid = params[-1] if params else None
+            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), None)
+            if not rule:
+                return FakeCursor([])
+            set_part = sql.split("SET")[1].split("WHERE")[0]
+            field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
+            for i, fname in enumerate(field_names):
+                if i < len(params) - 2:
+                    rule[fname] = params[i]
+            return FakeCursor([rule])
+        if sql_lower.startswith("delete"):
+            rule_id = params[0] if params else None
+            tid = params[1] if len(params) > 1 else None
+            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), None)
+            if rule:
+                _tables["classification_rules"].remove(rule)
+                return FakeCursor([rule])
+            return FakeCursor([])
         return FakeCursor([])
 
     # ────── Tenant plans ──────
@@ -585,7 +642,7 @@ class FakeConn:
                     tid = params[1]
                     rows = [i for i in rows if i["tenant_id"] == tid]
                 return FakeCursor(rows)
-            if "count" in sql_lower:
+            if "count(" in sql_lower:
                 tid = params[0] if params else None
                 cnt = len([i for i in _tables["ingredients"] if i["tenant_id"] == tid])
                 return FakeCursor([{"count": cnt}])
@@ -666,7 +723,7 @@ class FakeConn:
                     elif e["type"] == "ajuste":
                         total += e["qty"]
                 return FakeCursor([{"stock": total}])
-            if "count" in sql_lower:
+            if "count(" in sql_lower:
                 tid = params[0] if params else None
                 rows = [e for e in _tables["stock_events"] if e["tenant_id"] == tid]
                 if "entrada" in sql_lower:
@@ -897,7 +954,7 @@ class FakeConn:
             if "tenant_id = %s" in sql_lower and params:
                 docs = [d for d in docs if d.get("tenant_id") == params[-1]]
             return FakeCursor([{"count": len(docs)}])
-        if "count" in sql_lower:
+        if "count(" in sql_lower:
             return FakeCursor([{"count": 0}])
         return FakeCursor([])
 
@@ -917,7 +974,8 @@ def _clean_db_and_patch():
          patch("app.billing.get_conn", fake_get_conn), \
          patch("app.db.get_conn", fake_get_conn), \
          patch("app.reconcile.get_conn", fake_get_conn), \
-         patch("app.parse.get_conn", fake_get_conn):
+         patch("app.parse.get_conn", fake_get_conn), \
+         patch("app.classify.get_conn", fake_get_conn):
         yield
 
 
