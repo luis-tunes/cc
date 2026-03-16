@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Circle, Upload, Landmark, GitMerge, Building2, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEntity } from "@/hooks/use-entity";
 
 interface OnboardingChecklistProps {
   docCount: number;
@@ -36,26 +37,31 @@ const steps = [
   {
     id: "entity",
     title: "Preencher perfil da entidade",
-    description: "Configure os dados fiscais da sua empresa",
+    description: "Configure os dados fiscais da sua empresa (NIF, morada, CAE)",
     icon: Building2,
     path: "/entidade",
-    check: () => false, // We don't persist entity yet
+    check: "entity",
   },
 ];
 
 export function OnboardingChecklist(props: OnboardingChecklistProps) {
   const navigate = useNavigate();
-  const completed = steps.filter((s) => s.check(props)).length;
+  const { data: entityData } = useEntity();
+  const hasEntity = !!(entityData && Object.keys(entityData).length > 0 && entityData.nif);
+  const completed = steps.filter((s) => {
+    if (s.check === "entity") return hasEntity;
+    return (s.check as (p: OnboardingChecklistProps) => boolean)(props);
+  }).length;
   const pct = Math.round((completed / steps.length) * 100);
 
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-5 py-4">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-foreground">
             Bem-vindo ao TIM 👋
           </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Complete estes passos para configurar a sua conta
           </p>
         </div>
@@ -66,7 +72,7 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="text-sm font-medium text-muted-foreground">
             {completed}/{steps.length}
           </span>
         </div>
@@ -74,7 +80,7 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
 
       <div className="divide-y divide-border/50">
         {steps.map((step) => {
-          const done = step.check(props);
+          const done = step.check === "entity" ? hasEntity : (step.check as (p: OnboardingChecklistProps) => boolean)(props);
           const Icon = step.icon;
           return (
             <button
