@@ -14,6 +14,7 @@ from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn
 from app.parse import ingest_document, validate_nif
 from app.reconcile import reconcile_all, suggest_matches
+from app.cache import cache_get, cache_set, cache_invalidate
 
 logger = logging.getLogger(__name__)
 
@@ -845,11 +846,16 @@ async def export_assets_csv(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/dashboard/summary")
 async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id if auth and auth.tenant_id else None
+    cache_key = f"dashboard:{tid or 'anon'}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
     tf = ""
     tp: list = []
-    if auth and auth.tenant_id:
+    if tid:
         tf = " WHERE tenant_id = %s"
-        tp = [auth.tenant_id]
+        tp = [tid]
     with get_conn() as conn:
         docs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents{tf}", tp).fetchone()
         txs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM bank_transactions{tf}", tp).fetchone()
@@ -860,7 +866,7 @@ async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
         ).fetchone()
         pending = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status = 'pendente'{' AND tenant_id = %s' if tp else ''}", tp).fetchone()
         classified = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
-    return {
+    result = {
         "documents": {"count": docs["count"], "total": str(docs["total"])},
         "bank_transactions": {"count": txs["count"], "total": str(txs["total"])},
         "reconciliations": recs["count"],
@@ -868,6 +874,8 @@ async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
         "pending_review": pending["count"],
         "classified": classified["count"],
     }
+    cache_set(cache_key, result, ttl=300)
+    return result
 
 @router.get("/dashboard/monthly")
 async def monthly_summary(auth: AuthInfo = Depends(require_auth)):
@@ -1163,6 +1171,33 @@ def _get_ingredient_status(stock: Decimal, min_threshold: Decimal) -> str:
     if min_threshold > 0 and stock > min_threshold * 3:
         return "excesso"
     return "normal"
+
+
+def _get_batch_stock(conn, ingredient_ids: list[int], tenant_id: str | None = None) -> dict[int, Decimal]:
+    """Compute current stock for multiple ingredients in one query. Returns {ingredient_id: stock}."""
+    if not ingredient_ids:
+        return {}
+    sql = """SELECT ingredient_id,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN type = 'entrada' THEN qty
+                            WHEN type IN ('saída', 'desperdício') THEN -qty
+                            WHEN type = 'ajuste' THEN qty
+                            ELSE 0
+                        END
+                    ), 0) AS stock
+             FROM stock_events
+             WHERE ingredient_id = ANY(%s)"""
+    params: list = [ingredient_ids]
+    if tenant_id:
+        sql += " AND tenant_id = %s"
+        params.append(tenant_id)
+    sql += " GROUP BY ingredient_id"
+    rows = conn.execute(sql, params).fetchall()
+    result = {row["ingredient_id"]: row["stock"] for row in rows}
+    for iid in ingredient_ids:
+        result.setdefault(iid, Decimal("0"))
+    return result
 
 
 @router.get("/ingredients")
@@ -1599,12 +1634,18 @@ async def produce_product(product_id: int, body: dict, auth: AuthInfo = Depends(
         ).fetchall()
         if not recipe:
             raise HTTPException(status_code=422, detail="product has no recipe")
-        # Verify sufficient stock before producing
+        ing_ids = [ri["ingredient_id"] for ri in recipe]
+        # Lock ingredient rows to prevent concurrent produce race condition
+        conn.execute(
+            "SELECT id FROM ingredients WHERE id = ANY(%s) AND tenant_id = %s FOR UPDATE",
+            (ing_ids, tid),
+        )
+        # Verify sufficient stock (inside exclusive lock)
+        stock_map = _get_batch_stock(conn, ing_ids, tid)
         for ri in recipe:
             waste_mult = 1 + ri["wastage_percent"] / 100
             needed = ri["qty"] * waste_mult * qty_to_produce
-            current = _get_current_stock(conn, ri["ingredient_id"], tid)
-            if current < needed:
+            if stock_map.get(ri["ingredient_id"], Decimal("0")) < needed:
                 raise HTTPException(status_code=422, detail=f"insufficient stock for ingredient {ri['ingredient_id']}")
         events_created = []
         for ri in recipe:
@@ -1677,8 +1718,9 @@ async def inventory_stats(auth: AuthInfo = Depends(require_auth)):
         rutura_count = 0
         baixo_count = 0
         stock_value = Decimal("0")
+        stock_map = _get_batch_stock(conn, [i["id"] for i in ingredients], tid)
         for ing in ingredients:
-            stock = _get_current_stock(conn, ing["id"], tid)
+            stock = stock_map.get(ing["id"], Decimal("0"))
             status = _get_ingredient_status(stock, ing["min_threshold"])
             if status == "rutura":
                 rutura_count += 1
@@ -1717,8 +1759,9 @@ async def shopping_list(auth: AuthInfo = Depends(require_auth)):
             (tid,),
         ).fetchall()
         items = []
+        stock_map = _get_batch_stock(conn, [i["id"] for i in ingredients], tid)
         for ing in ingredients:
-            stock = _get_current_stock(conn, ing["id"], tid)
+            stock = stock_map.get(ing["id"], Decimal("0"))
             if stock >= ing["min_threshold"]:
                 continue  # No need to reorder
             suggested_qty = float(ing["min_threshold"] * 2 - stock)
@@ -2171,3 +2214,46 @@ async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(requ
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")
+
+
+# --- AI Assistant ---
+
+from app.assistant import answer_question as _answer_question  # noqa: E402
+
+_QUICK_PROMPTS = [
+    {"id": "dashboard",   "label": "Resumo da conta",         "prompt": "Qual é o resumo da minha conta?",                 "category": "análise"},
+    {"id": "pending",     "label": "Documentos pendentes",    "prompt": "Quantos documentos estão pendentes de revisão?",   "category": "operacional"},
+    {"id": "recon",       "label": "Estado das reconciliações","prompt": "Qual é o estado das reconciliações?",              "category": "operacional"},
+    {"id": "iva",         "label": "IVA do trimestre",        "prompt": "Qual é o IVA do trimestre atual?",                 "category": "fiscal"},
+    {"id": "alerts",      "label": "Alertas ativos",          "prompt": "Tenho alertas de compliance ativos?",              "category": "fiscal"},
+    {"id": "bank",        "label": "Saldo bancário",          "prompt": "Qual é o saldo dos movimentos bancários?",         "category": "análise"},
+    {"id": "docs_month",  "label": "Documentos este mês",     "prompt": "Quantos documentos registei este mês?",            "category": "análise"},
+    {"id": "assets",      "label": "Ativos registados",       "prompt": "Quantos ativos tenho registados?",                 "category": "operacional"},
+]
+
+
+@router.get("/assistant/prompts")
+async def assistant_prompts(_auth: AuthInfo = Depends(require_auth)):
+    """Return suggested quick-prompts for the assistant UI."""
+    return _QUICK_PROMPTS
+
+
+class ChatRequest(BaseModel):
+    question: str
+
+
+@router.post("/assistant/chat")
+async def assistant_chat(body: ChatRequest, auth: AuthInfo = Depends(require_auth)):
+    """Answer a natural-language accounting question using live DB data."""
+    question = body.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question is required")
+    if len(question) > 500:
+        raise HTTPException(status_code=422, detail="question too long (max 500 chars)")
+    tid = auth.tenant_id if auth and auth.tenant_id else None
+    result = _answer_question(question, tid)
+    return {
+        "question": question,
+        "intent": result["intent"],
+        "answer": result["answer"],
+    }
