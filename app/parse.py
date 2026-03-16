@@ -7,6 +7,8 @@ import httpx
 from invoice2data import extract_data
 from invoice2data.extract.loader import read_templates
 from app.db import get_conn
+from app.ocr import extract_text
+from app.classify import classify_document
 
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
@@ -107,8 +109,8 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 
-    # Always fetch OCR text for storage
-    raw_text = fetch_document_text(paperless_id)
+    # Always fetch OCR text for storage (via abstraction layer)
+    raw_text = extract_text(pdf, paperless_id=paperless_id)
 
     # ── Fallback: use Paperless OCR text when invoice2data finds nothing ──
     if not data:
@@ -162,4 +164,26 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
             (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
         ).fetchone()
         conn.commit()
-    return row["id"]
+
+    doc_id = row["id"]
+
+    # Auto-classify using tenant rules
+    doc_data = {
+        "supplier_nif": supplier_nif,
+        "client_nif": client_nif,
+        "total": total,
+        "type": doc_type,
+        "raw_text": raw_text,
+    }
+    result = classify_document(doc_data, tenant_id)
+    if result:
+        with get_conn() as conn:
+            conn.execute(
+                """UPDATE documents SET snc_account = %s, classification_source = %s,
+                       status = CASE WHEN status = 'extraído' THEN 'classificado' ELSE status END
+                   WHERE id = %s""",
+                (result["account"], result["source"], doc_id),
+            )
+            conn.commit()
+
+    return doc_id

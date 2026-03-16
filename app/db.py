@@ -66,6 +66,8 @@ def init_db():
             ("raw_text", "TEXT"),
             ("status", "VARCHAR(32) DEFAULT 'pendente'"),
             ("notes", "TEXT"),
+            ("snc_account", "VARCHAR(16)"),
+            ("classification_source", "VARCHAR(16)"),
         ]:
             conn.execute(f"""
                 DO $$ BEGIN
@@ -99,6 +101,26 @@ def init_db():
                 updated_at  TIMESTAMPTZ DEFAULT now(),
                 PRIMARY KEY (tenant_id, key)
             );
+        """)
+
+        # ── Classification rules ──────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS classification_rules (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                name        TEXT NOT NULL DEFAULT '',
+                field       VARCHAR(32) NOT NULL,
+                operator    VARCHAR(16) NOT NULL,
+                value       TEXT NOT NULL,
+                account     VARCHAR(16) NOT NULL,
+                label       TEXT NOT NULL DEFAULT '',
+                priority    INTEGER NOT NULL DEFAULT 0,
+                active      BOOLEAN NOT NULL DEFAULT true,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_classification_rules_tenant
+                ON classification_rules(tenant_id);
         """)
 
         # ── Inventory / Operations ────────────────────────────────────
