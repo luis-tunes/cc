@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, type StatusType } from "@/components/shared/StatusBadge";
-import { ConfidenceIndicator } from "@/components/shared/ConfidenceIndicator";
+import { HelpTooltip } from "@/components/shared/HelpTooltip";
 import {
   FileText,
   Image,
@@ -138,7 +138,7 @@ export function DocumentReviewDrawer({
                 <FileIcon className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <SheetTitle className="truncate text-sm font-semibold text-foreground">
+                <SheetTitle className="truncate text-base font-semibold text-foreground">
                   {document.fileName}
                 </SheetTitle>
                 <div className="mt-1 flex items-center gap-2">
@@ -160,18 +160,20 @@ export function DocumentReviewDrawer({
           </div>
 
           {/* Extraction confidence banner */}
-          <div className={cn("flex items-center gap-3 px-5 py-3", isLowConf ? "bg-tim-danger/5" : "bg-tim-success/5")}>
+          <div className={cn("flex items-center gap-3 px-5 py-3", isLowConf ? "bg-tim-danger/5 border-l-4 border-l-tim-danger" : "bg-tim-success/5 border-l-4 border-l-tim-success")}>
             {isLowConf ? (
-              <AlertTriangle className="h-4 w-4 text-tim-danger" />
+              <AlertTriangle className="h-5 w-5 text-tim-danger" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 text-tim-success" />
+              <CheckCircle2 className="h-5 w-5 text-tim-success" />
             )}
             <div className="flex-1">
-              <p className="text-xs font-medium text-foreground">
-                {isLowConf ? "Extração com baixa confiança — revisão manual recomendada" : "Extração com alta confiança"}
+              <p className="text-sm font-medium text-foreground">
+                {isLowConf ? "Extração com baixa confiança" : "Dados extraídos corretamente"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isLowConf ? "Reveja os campos abaixo e corrija o que for necessário" : "Confirme e aprove o documento"}
               </p>
             </div>
-            <ConfidenceIndicator value={document.extractionConfidence} size="md" />
           </div>
 
           {/* Extracted fields — with confirm action */}
@@ -195,7 +197,7 @@ export function DocumentReviewDrawer({
             <SectionTitle>Informação da Entidade</SectionTitle>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <InfoItem label={document.supplier ? "Fornecedor" : "Cliente"} value={document.supplier || document.customer || "—"} />
-              <InfoItem label="NIF" value={document.nif || "—"} mono />
+              <InfoItem label="NIF" value={document.nif || "—"} mono help="NIF" />
               <InfoItem label="Tipo" value={documentTypeLabels[document.documentType]} />
               <InfoItem label="Data" value={document.date || "—"} />
             </div>
@@ -206,8 +208,8 @@ export function DocumentReviewDrawer({
             <SectionTitle>Valores</SectionTitle>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <InfoItem label="Total" value={document.total != null ? `€${Math.abs(document.total).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large />
-              <InfoItem label="IVA" value={document.vat != null ? `€${Math.abs(document.vat).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large />
-              <InfoItem label="Base Tributável" value={document.total != null && document.vat != null ? `€${(Math.abs(document.total) - Math.abs(document.vat)).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large />
+              <InfoItem label="IVA" value={document.vat != null ? `€${Math.abs(document.vat).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="IVA" />
+              <InfoItem label="Base Tributável" value={document.total != null && document.vat != null ? `€${(Math.abs(document.total) - Math.abs(document.vat)).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="Base Tributável" />
             </div>
           </div>
 
@@ -216,7 +218,7 @@ export function DocumentReviewDrawer({
             <div className="px-5 py-4">
               <SectionTitle>Linhas do Documento</SectionTitle>
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
                       <th className="pb-2 font-medium">Descrição</th>
@@ -246,7 +248,7 @@ export function DocumentReviewDrawer({
           {document.notes && (
             <div className="px-5 py-4">
               <SectionTitle>Notas</SectionTitle>
-              <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">{document.notes}</p>
+              <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{document.notes}</p>
             </div>
           )}
 
@@ -262,8 +264,8 @@ export function DocumentReviewDrawer({
                   Classificar como <span className="font-semibold text-primary">62 — Fornecimentos e Serviços Externos</span>
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">Baseado em 12 documentos similares do mesmo fornecedor</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <ConfidenceIndicator value={89} size="sm" />
+                <div className="mt-2">
+                  <span className="inline-flex items-center rounded-full bg-tim-success/10 px-2 py-0.5 text-xs font-medium text-tim-success">89% confiança</span>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <Button
@@ -396,8 +398,8 @@ export function DocumentReviewDrawer({
           {/* Actions footer */}
           <div className="sticky bottom-0 flex items-center gap-2 border-t bg-card px-5 py-3">
             {!isApproved && !isArchived && (
-              <Button size="sm" className="h-8 text-xs" onClick={handleApprove}>
-                <CheckCircle2 className="mr-1 h-3 w-3" />
+              <Button size="sm" className="h-9 text-sm" onClick={handleApprove}>
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />
                 Aprovar
               </Button>
             )}
@@ -405,10 +407,10 @@ export function DocumentReviewDrawer({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 text-xs"
+                className="h-9 text-sm"
                 onClick={() => { setShowReclassify(!showReclassify); setShowReject(false); }}
               >
-                <Tags className="mr-1 h-3 w-3" />
+                <Tags className="mr-1.5 h-4 w-4" />
                 Reclassificar
               </Button>
             )}
@@ -416,10 +418,10 @@ export function DocumentReviewDrawer({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 text-xs text-tim-danger border-tim-danger/20 hover:bg-tim-danger/5"
+                className="h-9 text-sm text-tim-danger border-tim-danger/20 hover:bg-tim-danger/5"
                 onClick={() => { setShowReject(!showReject); setShowReclassify(false); }}
               >
-                <ThumbsDown className="mr-1 h-3 w-3" />
+                <ThumbsDown className="mr-1.5 h-4 w-4" />
                 Rejeitar
               </Button>
             )}
@@ -427,21 +429,21 @@ export function DocumentReviewDrawer({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 text-xs text-muted-foreground"
+                className="h-9 text-sm text-muted-foreground"
                 onClick={() => setShowNote(!showNote)}
               >
-                <MessageSquare className="mr-1 h-3 w-3" />
+                <MessageSquare className="mr-1.5 h-4 w-4" />
                 Nota
               </Button>
               {!isArchived && (
-                <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={handleArchive}>
-                  <Archive className="mr-1 h-3 w-3" />
+                <Button size="sm" variant="ghost" className="h-9 text-sm text-muted-foreground" onClick={handleArchive}>
+                  <Archive className="mr-1.5 h-4 w-4" />
                   Arquivar
                 </Button>
               )}
               {isArchived && (
-                <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={handleApprove}>
-                  <RotateCcw className="mr-1 h-3 w-3" />
+                <Button size="sm" variant="ghost" className="h-9 text-sm text-muted-foreground" onClick={handleApprove}>
+                  <RotateCcw className="mr-1.5 h-4 w-4" />
                   Restaurar
                 </Button>
               )}
@@ -454,14 +456,16 @@ export function DocumentReviewDrawer({
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>;
+  return <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>;
 }
 
-function InfoItem({ label, value, mono, large }: { label: string; value: string; mono?: boolean; large?: boolean }) {
+function InfoItem({ label, value, mono, large, help }: { label: string; value: string; mono?: boolean; large?: boolean; help?: string }) {
   return (
     <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("mt-0.5 text-foreground", large ? "text-sm font-semibold" : "text-xs", mono && "font-mono")}>{value}</p>
+      <p className="text-xs text-muted-foreground">
+        {help ? <HelpTooltip term={help}>{label}</HelpTooltip> : label}
+      </p>
+      <p className={cn("mt-0.5 text-foreground", large ? "text-base font-semibold" : "text-sm", mono && "font-mono")}>{value}</p>
     </div>
   );
 }
@@ -473,38 +477,36 @@ function ExtractedFieldRow({ field, onConfirm }: { field: ExtractedField; onConf
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2",
-        field.confirmed ? "bg-muted/30" : isLow ? "bg-tim-danger/5 border border-tim-danger/15" : isMid ? "bg-tim-warning/5 border border-tim-warning/15" : "bg-muted/30 border border-border"
+        "flex items-center gap-3 rounded-md px-3 py-2.5",
+        field.confirmed ? "bg-muted/30" : isLow ? "bg-tim-danger/5 border-l-2 border-l-tim-danger" : isMid ? "bg-tim-warning/5 border-l-2 border-l-tim-warning" : "bg-tim-success/5 border-l-2 border-l-tim-success"
       )}
     >
       {field.confirmed ? (
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-tim-success" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-tim-success" />
       ) : isLow ? (
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-tim-danger" />
+        <AlertTriangle className="h-4 w-4 shrink-0 text-tim-danger" />
       ) : (
-        <Eye className="h-3.5 w-3.5 shrink-0 text-tim-warning" />
+        <Eye className="h-4 w-4 shrink-0 text-tim-warning" />
       )}
 
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-2 items-center">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{field.label}</span>
-        <div className="text-xs">
+        <div className="text-sm">
           <span className="text-muted-foreground line-through mr-1.5">{field.sourceValue}</span>
         </div>
-        <span className={cn("text-xs font-medium", field.confirmed ? "text-foreground" : "text-primary")}>
+        <span className={cn("text-sm font-medium", field.confirmed ? "text-foreground" : "text-primary")}>
           {field.interpretedValue}
           {!field.confirmed && <span className="ml-1 text-xs text-primary/60">(sugerido)</span>}
         </span>
       </div>
 
-      <ConfidenceIndicator value={field.confidence} size="sm" className="shrink-0" />
-
       {!field.confirmed && (
         <button
           onClick={onConfirm}
-          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           title="Confirmar campo"
         >
-          <Check className="h-3 w-3" />
+          <Check className="h-4 w-4" />
         </button>
       )}
     </div>
