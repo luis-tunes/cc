@@ -31,6 +31,7 @@ ALL_TABLES = (
     "products", "recipe_ingredients",
     "price_history", "supplier_ingredients",
     "classification_rules",
+    "movement_rules", "alerts", "assets",
 )
 
 ALL_SEQ_TABLES = (
@@ -40,6 +41,7 @@ ALL_SEQ_TABLES = (
     "products", "recipe_ingredients",
     "price_history",
     "classification_rules",
+    "movement_rules", "alerts", "assets",
 )
 
 _tables: dict[str, list[dict]] = {}
@@ -106,6 +108,18 @@ class FakeConn:
         if "classification_rules" in sql_lower:
             return self._handle_classification_rules(sql, params)
 
+        # ── Movement rules ──
+        if "movement_rules" in sql_lower:
+            return self._handle_movement_rules(sql, params)
+
+        # ── Alerts ──
+        if "alerts" in sql_lower and any(k in sql_lower for k in ("from alerts", "into alerts", "delete from alerts", "update alerts")):
+            return self._handle_alerts(sql, params)
+
+        # ── Assets (before suppliers to avoid substring match) ──
+        if "assets" in sql_lower and any(k in sql_lower for k in ("from assets", "into assets", "update assets", "delete from assets")):
+            return self._handle_assets(sql, params)
+
         # ── Unit conversions (before unit_families) ──
         if "unit_conversions" in sql_lower:
             return self._handle_unit_conversions(sql, params)
@@ -158,6 +172,8 @@ class FakeConn:
         if "from reconciliations" in sql_lower and "not in" not in sql_lower:
             return self._handle_reconciliations(sql, params)
         if "into reconciliations" in sql_lower:
+            return self._handle_reconciliations(sql, params)
+        if "update reconciliations" in sql_lower:
             return self._handle_reconciliations(sql, params)
 
         # ── Bank transactions ──
@@ -326,6 +342,7 @@ class FakeConn:
                 "bank_transaction_id": params[1],
                 "match_confidence": Decimal(str(params[2])),
                 "tenant_id": params[3] if len(params) > 3 else None,
+                "status": "pendente",
             }
             # ON CONFLICT DO NOTHING
             existing = [r for r in _tables["reconciliations"]
@@ -333,6 +350,19 @@ class FakeConn:
             if not existing:
                 _tables["reconciliations"].append(row)
             return FakeCursor([])
+        if sql_lower.startswith("update"):
+            # PATCH status endpoint: UPDATE reconciliations SET status = %s WHERE id = %s AND tenant_id = %s
+            recon_id = params[-2] if len(params) >= 2 else None
+            tid = params[-1] if params else None
+            rec = next((r for r in _tables["reconciliations"] if r["id"] == recon_id and r.get("tenant_id") == tid), None)
+            if not rec:
+                return FakeCursor([])
+            set_part = sql.split("SET")[1].split("WHERE")[0]
+            field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
+            for i, fname in enumerate(field_names):
+                if i < len(params) - 2:
+                    rec[fname] = params[i]
+            return FakeCursor([rec])
         if sql_lower.startswith("select"):
             rows = list(_tables["reconciliations"])
             if "tenant_id = %s" in sql_lower and params:
@@ -891,10 +921,159 @@ class FakeConn:
             return FakeCursor([])
         return FakeCursor([])
 
+    # ────── Movement rules ──────
+
+    def _handle_movement_rules(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["movement_rules"] += 1
+            row = {
+                "id": _seq["movement_rules"],
+                "tenant_id": params[0],
+                "name": params[1],
+                "pattern": params[2],
+                "category": params[3],
+                "snc_account": params[4],
+                "entity_nif": params[5],
+                "priority": params[6],
+                "active": params[7],
+            }
+            _tables["movement_rules"].append(row)
+            return FakeCursor([row])
+        if sql_lower.startswith("update"):
+            rule_id = params[-2]
+            tid = params[-1]
+            rule = next((r for r in _tables["movement_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), None)
+            if not rule:
+                return FakeCursor([])
+            set_part = sql.split("SET")[1].split("WHERE")[0]
+            field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
+            for i, fname in enumerate(field_names):
+                if i < len(params) - 2:
+                    rule[fname] = params[i]
+            return FakeCursor([rule])
+        if sql_lower.startswith("delete"):
+            rule_id = params[0]
+            tid = params[1] if len(params) > 1 else None
+            deleted = [r for r in _tables["movement_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid]
+            _tables["movement_rules"] = [r for r in _tables["movement_rules"] if not (r["id"] == rule_id and r.get("tenant_id") == tid)]
+            return FakeCursor([{"id": rule_id}] if deleted else [])
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [r for r in _tables["movement_rules"] if r.get("tenant_id") == tid]
+            if "active = true" in sql_lower or "active = %s" in sql_lower:
+                rows = [r for r in rows if r.get("active", True)]
+            rows.sort(key=lambda r: (r.get("priority", 0), r.get("id", 0)))
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+    # ────── Alerts ──────
+
+    def _handle_alerts(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("delete"):
+            # DELETE FROM alerts WHERE tenant_id = %s AND read = false
+            tid = params[0] if params else None
+            before = len(_tables["alerts"])
+            _tables["alerts"] = [a for a in _tables["alerts"]
+                                  if not (a.get("tenant_id") == tid and not a.get("read", False))]
+            return FakeCursor([])
+        if sql_lower.startswith("insert"):
+            _seq["alerts"] += 1
+            row = {
+                "id": _seq["alerts"],
+                "tenant_id": params[0],
+                "type": params[1],
+                "severity": params[2],
+                "title": params[3],
+                "description": params[4],
+                "action_url": params[5] if len(params) > 5 else None,
+                "read": False,
+                "created_at": None,
+            }
+            _tables["alerts"].append(row)
+            return FakeCursor([row])
+        if sql_lower.startswith("update"):
+            # UPDATE alerts SET read = true WHERE id = %s AND tenant_id = %s
+            alert_id = params[0]
+            tid = params[1] if len(params) > 1 else None
+            alert = next((a for a in _tables["alerts"] if a["id"] == alert_id and a.get("tenant_id") == tid), None)
+            if not alert:
+                return FakeCursor([])
+            alert["read"] = True
+            return FakeCursor([alert])
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [a for a in _tables["alerts"] if a.get("tenant_id") == tid]
+            if "read = false" in sql_lower:
+                rows = [a for a in rows if not a.get("read", False)]
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+    # ────── Assets ──────
+
+    def _handle_assets(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["assets"] += 1
+            row = {
+                "id": _seq["assets"],
+                "tenant_id": params[0],
+                "name": params[1],
+                "category": params[2],
+                "acquisition_date": params[3],
+                "acquisition_cost": Decimal(str(params[4])),
+                "useful_life_years": params[5],
+                "depreciation_method": params[6],
+                "current_value": Decimal(str(params[7])),
+                "status": params[8],
+                "supplier": params[9] if len(params) > 9 else None,
+                "invoice_ref": params[10] if len(params) > 10 else None,
+                "notes": params[11] if len(params) > 11 else None,
+                "created_at": None,
+            }
+            _tables["assets"].append(row)
+            return FakeCursor([row])
+        if sql_lower.startswith("update"):
+            asset_id = params[-2]
+            tid = params[-1]
+            asset = next((a for a in _tables["assets"] if a["id"] == asset_id and a.get("tenant_id") == tid), None)
+            if not asset:
+                return FakeCursor([])
+            set_part = sql.split("SET")[1].split("WHERE")[0]
+            field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
+            for i, fname in enumerate(field_names):
+                if i < len(params) - 2:
+                    asset[fname] = params[i]
+            return FakeCursor([asset])
+        if sql_lower.startswith("delete"):
+            asset_id = params[0]
+            tid = params[1] if len(params) > 1 else None
+            deleted = [a for a in _tables["assets"] if a["id"] == asset_id and a.get("tenant_id") == tid]
+            _tables["assets"] = [a for a in _tables["assets"] if not (a["id"] == asset_id and a.get("tenant_id") == tid)]
+            return FakeCursor([{"id": asset_id}] if deleted else [])
+        if sql_lower.startswith("select"):
+            has_pk = "where id = %s" in sql_lower or "and id = %s" in sql_lower
+            if has_pk:
+                asset_id = params[0]
+                tid = params[1] if len(params) > 1 else None
+                rows = [a for a in _tables["assets"] if a["id"] == asset_id]
+                if tid:
+                    rows = [a for a in rows if a.get("tenant_id") == tid]
+                return FakeCursor(rows)
+            tid = params[0] if params else None
+            rows = [a for a in _tables["assets"] if a.get("tenant_id") == tid]
+            return FakeCursor(rows)
+        return FakeCursor([])
+
     # ────── Aggregates ──────
 
     def _handle_aggregate(self, sql, params):
+        import re as _re
         sql_lower = sql.strip().lower()
+        # Detect COUNT alias (e.g. COUNT(*) as cnt → _ck="cnt")
+        _cm = _re.search(r'count\(\*\)\s+as\s+(\w+)', sql_lower)
+        _ck = _cm.group(1) if _cm else "count"
         if "to_char" in sql_lower:
             return FakeCursor([])
         # Tax IRC: SUM(CASE WHEN type=...) AS receitas/gastos + COUNT(*) from documents
@@ -910,9 +1089,9 @@ class FakeConn:
             return FakeCursor([])
         # Tax audit flags (zero vat, round amounts, missing nif, duplicates)
         if "vat = 0" in sql_lower or "mod(" in sql_lower or "having count" in sql_lower:
-            return FakeCursor([{"count": 0}])
+            return FakeCursor([{_ck: 0}])
         if "supplier_nif is null" in sql_lower or "(supplier_nif = ''" in sql_lower:
-            return FakeCursor([{"count": 0}])
+            return FakeCursor([{_ck: 0}])
         # Top suppliers: SUM(total) GROUP BY supplier_nif
         if "supplier_nif" in sql_lower and "sum" in sql_lower:
             return FakeCursor([])
@@ -935,7 +1114,7 @@ class FakeConn:
             recs = list(_tables["reconciliations"])
             if "tenant_id = %s" in sql_lower and params:
                 recs = [r for r in recs if r.get("tenant_id") == params[-1]]
-            return FakeCursor([{"count": len(recs)}])
+            return FakeCursor([{_ck: len(recs)}])
         # Dashboard: unmatched documents (NOT IN reconciliations subquery)
         if "count" in sql_lower and "not in" in sql_lower and "document_id" in sql_lower:
             docs = list(_tables["documents"])
@@ -943,7 +1122,7 @@ class FakeConn:
             docs = [d for d in docs if d["id"] not in rec_doc_ids]
             if "tenant_id = %s" in sql_lower and params:
                 docs = [d for d in docs if d.get("tenant_id") == params[-1]]
-            return FakeCursor([{"count": len(docs)}])
+            return FakeCursor([{_ck: len(docs)}])
         # Dashboard: pending/classified status filter
         if "count" in sql_lower and "status" in sql_lower and "from documents" in sql_lower:
             docs = list(_tables["documents"])
@@ -953,9 +1132,9 @@ class FakeConn:
                 docs = [d for d in docs if d.get("status") in ("classificado", "revisto")]
             if "tenant_id = %s" in sql_lower and params:
                 docs = [d for d in docs if d.get("tenant_id") == params[-1]]
-            return FakeCursor([{"count": len(docs)}])
+            return FakeCursor([{_ck: len(docs)}])
         if "count(" in sql_lower:
-            return FakeCursor([{"count": 0}])
+            return FakeCursor([{_ck: 0}])
         return FakeCursor([])
 
 
@@ -975,7 +1154,9 @@ def _clean_db_and_patch():
          patch("app.db.get_conn", fake_get_conn), \
          patch("app.reconcile.get_conn", fake_get_conn), \
          patch("app.parse.get_conn", fake_get_conn), \
-         patch("app.classify.get_conn", fake_get_conn):
+         patch("app.classify.get_conn", fake_get_conn), \
+         patch("app.alerts.get_conn", fake_get_conn), \
+         patch("app.classify_movements.get_conn", fake_get_conn):
         yield
 
 
