@@ -45,6 +45,8 @@ class DocumentOut(BaseModel):
     paperless_id: int | None = None
     created_at: datetime.datetime | None = None
     notes: str | None = None
+    snc_account: str | None = None
+    classification_source: str | None = None
 
 class DocumentPatch(BaseModel):
     status: Optional[str] = None
@@ -219,7 +221,7 @@ async def list_documents(
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source FROM documents {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall()
     return rows
@@ -232,7 +234,7 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     where = "WHERE " + " AND ".join(clauses)
     with get_conn() as conn:
         row = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at FROM documents {where}",
+            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source FROM documents {where}",
             params,
         ).fetchone()
     if not row:
@@ -257,7 +259,7 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
     where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes",
+            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source",
             params,
         ).fetchone()
         conn.commit()
@@ -1585,3 +1587,109 @@ async def add_price_point(body: dict, auth: AuthInfo = Depends(require_auth)):
             )
         conn.commit()
     return dict(row)
+
+
+# --- Classification Rules ---
+
+class ClassificationRuleOut(BaseModel):
+    id: int
+    field: str
+    operator: str
+    value: str
+    account: str
+    label: str
+    priority: int
+    active: bool
+
+
+class ClassificationRuleCreate(BaseModel):
+    field: str
+    operator: str
+    value: str
+    account: str
+    label: str = ""
+    priority: int = 0
+    active: bool = True
+
+
+class ClassificationRulePatch(BaseModel):
+    field: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[str] = None
+    account: Optional[str] = None
+    label: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
+
+
+VALID_FIELDS = {"supplier_nif", "description", "amount_gte", "amount_lte", "type"}
+VALID_OPERATORS = {"equals", "contains", "starts_with", "gte", "lte"}
+
+
+@router.get("/classification-rules", response_model=list[ClassificationRuleOut])
+async def list_classification_rules(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, field, operator, value, account, label, priority, active FROM classification_rules WHERE tenant_id = %s ORDER BY priority ASC, id ASC",
+            (tid,),
+        ).fetchall()
+    return rows
+
+
+@router.post("/classification-rules", response_model=ClassificationRuleOut, status_code=201)
+async def create_classification_rule(body: ClassificationRuleCreate, auth: AuthInfo = Depends(require_auth)):
+    if body.field not in VALID_FIELDS:
+        raise HTTPException(status_code=422, detail=f"invalid field: {body.field}")
+    if body.operator not in VALID_OPERATORS:
+        raise HTTPException(status_code=422, detail=f"invalid operator: {body.operator}")
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            """INSERT INTO classification_rules (tenant_id, field, operator, value, account, label, priority, active)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id, field, operator, value, account, label, priority, active""",
+            (tid, body.field, body.operator, body.value, body.account, body.label, body.priority, body.active),
+        ).fetchone()
+        conn.commit()
+    return row
+
+
+@router.patch("/classification-rules/{rule_id}", response_model=ClassificationRuleOut)
+async def update_classification_rule(rule_id: int, patch: ClassificationRulePatch, auth: AuthInfo = Depends(require_auth)):
+    updates = patch.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="no fields to update")
+    if "field" in updates and updates["field"] not in VALID_FIELDS:
+        raise HTTPException(status_code=422, detail=f"invalid field: {updates['field']}")
+    if "operator" in updates and updates["operator"] not in VALID_OPERATORS:
+        raise HTTPException(status_code=422, detail=f"invalid operator: {updates['operator']}")
+    tid = auth.tenant_id or ""
+    set_parts = []
+    params: list = []
+    for k, v in updates.items():
+        set_parts.append(f"{k} = %s")
+        params.append(v)
+    params.extend([rule_id, tid])
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE classification_rules SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, field, operator, value, account, label, priority, active",
+            params,
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return row
+
+
+@router.delete("/classification-rules/{rule_id}", status_code=204)
+async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            "DELETE FROM classification_rules WHERE id = %s AND tenant_id = %s RETURNING id",
+            (rule_id, tid),
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="rule not found")
