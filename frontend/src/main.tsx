@@ -28,12 +28,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <App />
           <Toaster
             position="bottom-right"
-            theme="dark"
+            theme="light"
             toastOptions={{
               style: {
-                background: "hsl(220 18% 9%)",
-                border: "1px solid hsl(220 12% 16%)",
-                color: "hsl(220 10% 92%)",
+                background: "hsl(0 0% 100%)",
+                border: "1px solid hsl(220 12% 90%)",
+                color: "hsl(220 10% 15%)",
               },
             }}
           />
@@ -42,3 +42,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </ClerkProvider>
   </React.StrictMode>
 );
+
+// Register service worker for PWA support
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

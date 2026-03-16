@@ -1,0 +1,18 @@
+{
+  "name": "TIM — Time is Money",
+  "short_name": "TIM",
+  "description": "Contabilidade inteligente para Portugal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#c8960c",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
