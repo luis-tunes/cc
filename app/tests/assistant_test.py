@@ -1,4 +1,4 @@
-"""Phase 6 tests — performance fixes, AI assistant, Redis cache."""
+"""Tests: batch stock queries, AI assistant, dashboard cache."""
 
 import sys
 from decimal import Decimal

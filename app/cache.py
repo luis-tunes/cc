@@ -1,18 +1,4 @@
-"""Optional Redis cache layer.
-
-Falls back gracefully when Redis is unavailable — the app continues to work
-without caching, just without the performance benefit.
-
-Usage:
-    from app.cache import cache_get, cache_set, cache_invalidate
-
-    cached = await cache_get("dashboard:t1")
-    if cached is None:
-        result = compute_expensive_thing()
-        await cache_set("dashboard:t1", result, ttl=300)
-        return result
-    return cached
-"""
+"""Optional Redis cache layer. No-ops when Redis is unavailable."""
 
 import json
 import logging
@@ -28,39 +14,32 @@ _redis_available = False
 
 def _get_redis():
     global _redis, _redis_available
-    if _redis is not None or not _redis_available:
+    if _redis is not None:
         return _redis
+    if not _redis_available:
+        return None
     try:
         import redis as _r
         _redis = _r.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=1)
         _redis.ping()
         _redis_available = True
-        logger.info("Redis cache connected: %s", REDIS_URL)
+        logger.info("Redis connected: %s", REDIS_URL)
     except Exception as exc:
-        logger.debug("Redis unavailable (%s) — caching disabled", exc)
+        logger.debug("Redis unavailable (%s)", exc)
         _redis_available = False
         _redis = None
     return _redis
 
 
-def _try_connect():
-    """Attempt to connect to Redis; idempotent."""
-    global _redis, _redis_available
-    try:
-        import redis as _r
-        client = _r.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=1)
-        client.ping()
-        _redis = client
-        _redis_available = True
-        logger.info("Redis cache connected: %s", REDIS_URL)
-    except Exception as exc:
-        logger.debug("Redis unavailable (%s) — caching disabled", exc)
-        _redis_available = False
-        _redis = None
-
-
-# Try to connect at import time (non-blocking)
-_try_connect()
+# Try to connect at import time
+try:
+    import redis as _r
+    _c = _r.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=1)
+    _c.ping()
+    _redis = _c
+    _redis_available = True
+except Exception:
+    _redis_available = False
 
 
 def cache_get(key: str) -> Any | None:

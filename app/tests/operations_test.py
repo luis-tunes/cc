@@ -1,4 +1,4 @@
-"""Phase 5 tests: reconciliation persistence, movement classification,
+"""Tests: reconciliation persistence, movement classification,
 compliance alerts, asset management, and CSV export endpoints."""
 import base64
 import datetime

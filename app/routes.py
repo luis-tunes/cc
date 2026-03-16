@@ -15,6 +15,7 @@ from app.db import get_conn
 from app.parse import ingest_document, validate_nif
 from app.reconcile import reconcile_all, suggest_matches
 from app.cache import cache_get, cache_set, cache_invalidate
+from app.assistant import answer_question as _answer_question
 
 logger = logging.getLogger(__name__)
 
@@ -2217,8 +2218,6 @@ async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(requ
 
 
 # --- AI Assistant ---
-
-from app.assistant import answer_question as _answer_question  # noqa: E402
 
 _QUICK_PROMPTS = [
     {"id": "dashboard",   "label": "Resumo da conta",         "prompt": "Qual é o resumo da minha conta?",                 "category": "análise"},

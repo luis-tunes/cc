@@ -16,10 +16,8 @@ const categoryColors: Record<string, string> = {
 
 function MessageBubble({ role, content, timestamp }: { role: "user" | "assistant"; content: string; timestamp: Date }) {
   const isUser = role === "user";
-  // Render **bold** markdown and newlines
-  const rendered = content
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\n/g, "<br/>");
+  // Split content into segments: plain text and **bold** markers
+  const parts = content.split(/(\*\*.+?\*\*)/g);
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
       <div className={cn(
@@ -34,11 +32,14 @@ function MessageBubble({ role, content, timestamp }: { role: "user" | "assistant
           ? "bg-primary text-primary-foreground rounded-tr-sm"
           : "bg-card border rounded-tl-sm"
       )}>
-        <p
-          className="whitespace-pre-wrap"
-          dangerouslySetInnerHTML={{ __html: rendered }}
-        />
-        <p className={cn("text-[11px] mt-1 opacity-60", isUser ? "text-right" : "text-left")}>
+        <p className="whitespace-pre-wrap">
+          {parts.map((part, i) =>
+            part.startsWith("**") && part.endsWith("**")
+              ? <strong key={i}>{part.slice(2, -2)}</strong>
+              : part
+          )}
+        </p>
+        <p className={cn("text-xs mt-1 opacity-60", isUser ? "text-right" : "text-left")}>
           {timestamp.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>

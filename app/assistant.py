@@ -1,7 +1,6 @@
 """Data-aware assistant that answers accounting questions in Portuguese.
 
 No LLM required — works by intent matching + live DB queries.
-Supports upgrade to OpenAI/Anthropic via ASSISTANT_BACKEND env var.
 """
 
 import datetime
@@ -225,7 +224,7 @@ def _handle_inventory(conn, tid: str | None) -> str:
     tp = [tid] if tid else []
     total = conn.execute(f"SELECT COUNT(*) as count FROM ingredients{tf}", tp).fetchone()
     return (
-        f"Tem **{total['count']} ingredientes** no invenário. "
+        f"Tem **{total['count']} ingredientes** no inventário. "
         "Aceda a **Inventário** para ver stocks, ruturas e lista de compras."
     )
 

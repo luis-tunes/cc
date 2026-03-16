@@ -37,7 +37,7 @@ export function MobileNav() {
               )}
             >
               <tab.icon className={cn("h-5 w-5", active && "text-primary")} />
-              <span className="text-[11px] leading-tight">{tab.title}</span>
+              <span className="text-xs leading-tight">{tab.title}</span>
               {active && <span className="absolute top-0 h-0.5 w-8 rounded-b bg-primary" />}
             </NavLink>
           );
@@ -50,7 +50,7 @@ export function MobileNav() {
           )}
         >
           <MoreHorizontal className="h-5 w-5" />
-          <span className="text-[11px] leading-tight">Mais</span>
+          <span className="text-xs leading-tight">Mais</span>
         </button>
       </nav>
 
