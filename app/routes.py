@@ -44,6 +44,7 @@ class DocumentOut(BaseModel):
     status: str = "pendente"
     paperless_id: int | None = None
     created_at: datetime.datetime | None = None
+    notes: str | None = None
 
 class DocumentPatch(BaseModel):
     status: Optional[str] = None
@@ -54,6 +55,7 @@ class DocumentPatch(BaseModel):
     vat: Optional[Decimal] = None
     date: Optional[datetime.date] = None
     filename: Optional[str] = None
+    notes: Optional[str] = None
 
 class BankTransactionOut(BaseModel):
     id: int
@@ -255,7 +257,7 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
     where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at",
+            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes",
             params,
         ).fetchone()
         conn.commit()

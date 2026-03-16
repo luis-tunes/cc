@@ -67,8 +67,9 @@ export function useDocumentActions(refetch: () => void) {
       mutation.mutate({ id, patch: { status: "classificado" } });
       toast.success("Sugestão IA aceite");
     },
-    onAddNote: (_id, _note) => {
-      toast.success("Nota adicionada");
+    onAddNote: (id, note) => {
+      mutation.mutate({ id, patch: { notes: note } });
+      toast.success("Nota guardada");
     },
   };
 

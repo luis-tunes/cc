@@ -134,6 +134,7 @@ export interface DocumentPatch {
   vat?: number;
   date?: string;
   filename?: string;
+  notes?: string;
 }
 
 export interface BankTransaction {

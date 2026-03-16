@@ -65,6 +65,7 @@ def init_db():
             ("filename", "TEXT"),
             ("raw_text", "TEXT"),
             ("status", "VARCHAR(32) DEFAULT 'pendente'"),
+            ("notes", "TEXT"),
         ]:
             conn.execute(f"""
                 DO $$ BEGIN
