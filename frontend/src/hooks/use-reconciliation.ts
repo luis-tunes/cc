@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchReconciliations,
   runReconciliation,
+  patchReconciliation,
   type Reconciliation,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -27,6 +28,20 @@ export function useRunReconciliation() {
     },
     onError: (err: Error) => {
       toast.error(`Erro na reconciliação: ${err.message}`);
+    },
+  });
+}
+
+export function usePatchReconciliation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      patchReconciliation(id, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reconciliations"] });
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro: ${err.message}`);
     },
   });
 }

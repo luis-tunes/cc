@@ -151,6 +151,7 @@ export interface Reconciliation {
   document_id: number;
   bank_transaction_id: number;
   match_confidence: number;
+  reconciliation_status?: string;
   supplier_nif?: string;
   total?: number;
   doc_date?: string;
@@ -246,6 +247,25 @@ export async function fetchReconciliations(): Promise<Reconciliation[]> {
 
 export async function runReconciliation(): Promise<{ matched: number; matches: any[] }> {
   return request<{ matched: number; matches: any[] }>("/reconcile", { method: "POST" });
+}
+
+export async function patchReconciliation(id: number, patch: { status: string }): Promise<{ id: number; status: string }> {
+  return request<{ id: number; status: string }>(`/reconciliations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function fetchReconciliationSuggestions(docId: number): Promise<{
+  bank_transaction_id: number;
+  description: string;
+  amount: number;
+  date: string;
+  confidence: number;
+  amount_diff: number;
+  date_diff: number;
+}[]> {
+  return request(`/reconciliations/${docId}/suggestions`);
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────
@@ -686,4 +706,155 @@ export async function patchClassificationRule(id: number, patch: Partial<Classif
 
 export async function deleteClassificationRule(id: number): Promise<void> {
   return request<void>(`/classification-rules/${id}`, { method: "DELETE" });
+}
+
+// ── Alerts ───────────────────────────────────────────────────────────
+
+export interface Alert {
+  id: number;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  action_url: string | null;
+  read: boolean;
+  created_at: string | null;
+}
+
+export async function fetchAlerts(unreadOnly = false): Promise<Alert[]> {
+  const qs = unreadOnly ? "?unread_only=true" : "";
+  return request<Alert[]>(`/alerts${qs}`);
+}
+
+export async function markAlertRead(id: number): Promise<{ id: number; read: boolean }> {
+  return request<{ id: number; read: boolean }>(`/alerts/${id}`, { method: "PATCH" });
+}
+
+export async function generateAlerts(): Promise<{ generated: number }> {
+  return request<{ generated: number }>("/alerts/generate", { method: "POST" });
+}
+
+// ── Assets ───────────────────────────────────────────────────────────
+
+export interface Asset {
+  id: number;
+  name: string;
+  category: string;
+  acquisition_date: string;
+  acquisition_cost: number;
+  useful_life_years: number;
+  depreciation_method: string;
+  current_value: number;
+  status: string;
+  supplier: string | null;
+  invoice_ref: string | null;
+  notes: string | null;
+  created_at: string | null;
+}
+
+export interface AssetCreate {
+  name: string;
+  category?: string;
+  acquisition_date: string;
+  acquisition_cost: number;
+  useful_life_years?: number;
+  depreciation_method?: string;
+  status?: string;
+  supplier?: string;
+  invoice_ref?: string;
+  notes?: string;
+}
+
+export interface AssetSummary {
+  total_assets: number;
+  total_acquisition_value: number;
+  total_current_value: number;
+  total_depreciation: number;
+  annual_depreciation: number;
+  without_method: number;
+}
+
+export async function fetchAssets(): Promise<Asset[]> {
+  return request<Asset[]>("/assets");
+}
+
+export async function fetchAsset(id: number): Promise<Asset> {
+  return request<Asset>(`/assets/${id}`);
+}
+
+export async function createAsset(body: AssetCreate): Promise<Asset> {
+  return request<Asset>("/assets", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function patchAsset(id: number, patch: Partial<AssetCreate>): Promise<Asset> {
+  return request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+export async function deleteAsset(id: number): Promise<void> {
+  return request<void>(`/assets/${id}`, { method: "DELETE" });
+}
+
+export async function fetchAssetsSummary(): Promise<AssetSummary> {
+  return request<AssetSummary>("/assets/summary");
+}
+
+// ── Movement Rules ───────────────────────────────────────────────────
+
+export interface MovementRule {
+  id: number;
+  name: string;
+  pattern: string;
+  category: string;
+  snc_account: string;
+  entity_nif: string | null;
+  priority: number;
+  active: boolean;
+}
+
+export async function fetchMovementRules(): Promise<MovementRule[]> {
+  return request<MovementRule[]>("/movement-rules");
+}
+
+export async function createMovementRule(body: Omit<MovementRule, "id">): Promise<MovementRule> {
+  return request<MovementRule>("/movement-rules", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function deleteMovementRule(id: number): Promise<void> {
+  return request<void>(`/movement-rules/${id}`, { method: "DELETE" });
+}
+
+// ── Enriched Movements ──────────────────────────────────────────────
+
+export interface EnrichedMovement {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  category: string | null;
+  snc_account: string | null;
+  entity_nif: string | null;
+  entity_name: string | null;
+  classified: boolean;
+}
+
+export async function fetchEnrichedMovements(): Promise<EnrichedMovement[]> {
+  return request<EnrichedMovement[]>("/bank-transactions/enrich");
+}
+
+export async function fetchDuplicateMovements(): Promise<any[]> {
+  return request<any[]>("/bank-transactions/duplicates");
+}
+
+// ── CSV Export URLs ──────────────────────────────────────────────────
+
+export function getExportMovementsCSVUrl(): string {
+  return `${BASE}/export/bank-transactions/csv`;
+}
+
+export function getExportReconciliationsCSVUrl(): string {
+  return `${BASE}/export/reconciliations/csv`;
+}
+
+export function getExportAssetsCSVUrl(): string {
+  return `${BASE}/export/assets/csv`;
 }
