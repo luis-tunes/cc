@@ -98,10 +98,10 @@ export default function TaxCenter() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={ivaChartData} barGap={4}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,14%)" />
-                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
-                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,90%)" />
+                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
                       <Bar dataKey="cobrado" name="Cobrado" fill="hsl(40,80%,55%)" radius={[3,3,0,0]} maxBarSize={28} />
                       <Bar dataKey="dedutivel" name="Dedutível" fill="hsl(145,50%,42%)" radius={[3,3,0,0]} maxBarSize={28} />
                       <Bar dataKey="devido" name="A Pagar" fill="hsl(0,65%,50%)" radius={[3,3,0,0]} maxBarSize={28} />

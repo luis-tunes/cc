@@ -95,10 +95,10 @@ export default function Reports() {
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={barData} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,14%)" />
-                    <XAxis dataKey="month_label" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
-                    <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,90%)" />
+                    <XAxis dataKey="month_label" tick={{ fontSize: 11, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                    <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
                     <Bar dataKey="receitas" name="Receitas" fill="hsl(145,50%,42%)" radius={[3,3,0,0]} maxBarSize={28} />
                     <Bar dataKey="gastos" name="Gastos" fill="hsl(0,65%,50%)" radius={[3,3,0,0]} maxBarSize={28} />
                     <Bar dataKey="resultado" name="Resultado" fill="hsl(40,80%,55%)" radius={[3,3,0,0]} maxBarSize={28} />
@@ -173,7 +173,7 @@ export default function Reports() {
                       <Pie data={supplierPieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
                         {supplierPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
+                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                     </PieChart>
                   </ResponsiveContainer>
