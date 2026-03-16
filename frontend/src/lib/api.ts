@@ -123,6 +123,8 @@ export interface Document {
   status: string;
   paperless_id: number | null;
   created_at: string | null;
+  snc_account: string | null;
+  classification_source: string | null;
 }
 
 export interface DocumentPatch {
@@ -639,4 +641,49 @@ export async function fetchPlReport(year?: number): Promise<PlReport> {
 
 export async function fetchTopSuppliers(limit = 10): Promise<TopSupplier[]> {
   return request<TopSupplier[]>(`/reports/top-suppliers?limit=${limit}`);
+}
+
+// ── Classification Rules ────────────────────────────────────────────
+
+export interface ClassificationRule {
+  id: number;
+  field: string;
+  operator: string;
+  value: string;
+  account: string;
+  label: string;
+  priority: number;
+  active: boolean;
+}
+
+export interface ClassificationRuleCreate {
+  field: string;
+  operator: string;
+  value: string;
+  account: string;
+  label?: string;
+  priority?: number;
+  active?: boolean;
+}
+
+export async function fetchClassificationRules(): Promise<ClassificationRule[]> {
+  return request<ClassificationRule[]>("/classification-rules");
+}
+
+export async function createClassificationRule(body: ClassificationRuleCreate): Promise<ClassificationRule> {
+  return request<ClassificationRule>("/classification-rules", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchClassificationRule(id: number, patch: Partial<ClassificationRuleCreate>): Promise<ClassificationRule> {
+  return request<ClassificationRule>(`/classification-rules/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteClassificationRule(id: number): Promise<void> {
+  return request<void>(`/classification-rules/${id}`, { method: "DELETE" });
 }

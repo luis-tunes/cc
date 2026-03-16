@@ -6,20 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Tags, Zap, GripVertical } from "lucide-react";
+import { Plus, Trash2, Tags, Zap, GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useClassificationRules, useCreateClassificationRule, useUpdateClassificationRule, useDeleteClassificationRule } from "@/hooks/use-classifications";
+import type { ClassificationRule, ClassificationRuleCreate } from "@/lib/api";
 
-interface ClassificationRule {
-  id: string;
-  field: "supplier_nif" | "description" | "amount_gte" | "amount_lte" | "type";
-  operator: "equals" | "contains" | "starts_with" | "gte" | "lte";
-  value: string;
-  account: string;
-  label: string;
-  active: boolean;
-}
-
-const FIELD_LABELS: Record<ClassificationRule["field"], string> = {
+const FIELD_LABELS: Record<string, string> = {
   supplier_nif: "NIF Fornecedor",
   description: "Descrição",
   amount_gte: "Montante ≥",
@@ -27,7 +19,7 @@ const FIELD_LABELS: Record<ClassificationRule["field"], string> = {
   type: "Tipo doc.",
 };
 
-const OPERATOR_LABELS: Record<ClassificationRule["operator"], string> = {
+const OPERATOR_LABELS: Record<string, string> = {
   equals: "é",
   contains: "contém",
   starts_with: "começa com",
@@ -53,9 +45,9 @@ function RuleRow({ rule, onDelete, onToggle }: { rule: ClassificationRule; onDel
     <div className={cn("flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors", rule.active ? "border-border bg-card" : "border-border/50 bg-muted/20 opacity-60")}>
       <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/40" />
       <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <Badge variant="outline" className="text-xs">{FIELD_LABELS[rule.field]}</Badge>
-          <span className="text-muted-foreground">{OPERATOR_LABELS[rule.operator]}</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+          <Badge variant="outline" className="text-xs">{FIELD_LABELS[rule.field] ?? rule.field}</Badge>
+          <span className="text-muted-foreground">{OPERATOR_LABELS[rule.operator] ?? rule.operator}</span>
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{rule.value}</code>
           <span className="text-muted-foreground">→</span>
           <Badge className="bg-primary/20 text-primary text-xs">{rule.account} — {SNC_ACCOUNTS.find(a => a.code === rule.account)?.label ?? rule.label}</Badge>
@@ -78,33 +70,39 @@ function RuleRow({ rule, onDelete, onToggle }: { rule: ClassificationRule; onDel
 }
 
 export default function Classifications() {
-  const [rules, setRules] = useState<ClassificationRule[]>([
-    { id: "1", field: "type", operator: "equals", value: "fatura", account: "21", label: "Fornecedores", active: true },
-    { id: "2", field: "type", operator: "equals", value: "fatura-fornecedor", account: "62", label: "FSE", active: true },
-  ]);
+  const { data: rules = [], isLoading, isError } = useClassificationRules();
+  const createRule = useCreateClassificationRule();
+  const updateRule = useUpdateClassificationRule();
+  const deleteRule = useDeleteClassificationRule();
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newRule, setNewRule] = useState<Partial<ClassificationRule>>({
-    field: "supplier_nif", operator: "equals", value: "", account: "62", active: true,
+  const [newRule, setNewRule] = useState<Partial<ClassificationRuleCreate>>({
+    field: "supplier_nif", operator: "equals", value: "", account: "62",
   });
 
   const addRule = () => {
-    if (!newRule.value || !newRule.account) {
+    if (!newRule.value || !newRule.account || !newRule.field || !newRule.operator) {
       toast.error("Preencha todos os campos");
       return;
     }
-    const rule: ClassificationRule = {
-      id: Date.now().toString(),
-      field: newRule.field ?? "supplier_nif",
-      operator: newRule.operator ?? "equals",
-      value: newRule.value,
-      account: newRule.account,
-      label: SNC_ACCOUNTS.find(a => a.code === newRule.account)?.label ?? newRule.account,
-      active: true,
-    };
-    setRules((prev) => [...prev, rule]);
-    setDialogOpen(false);
-    setNewRule({ field: "supplier_nif", operator: "equals", value: "", account: "62", active: true });
-    toast.success("Regra adicionada", { description: "A regra será aplicada a novos documentos importados." });
+    createRule.mutate(
+      {
+        field: newRule.field,
+        operator: newRule.operator,
+        value: newRule.value,
+        account: newRule.account,
+        label: SNC_ACCOUNTS.find(a => a.code === newRule.account)?.label ?? newRule.account,
+        active: true,
+      },
+      {
+        onSuccess: () => {
+          setDialogOpen(false);
+          setNewRule({ field: "supplier_nif", operator: "equals", value: "", account: "62" });
+          toast.success("Regra adicionada", { description: "A regra será aplicada a novos documentos importados." });
+        },
+        onError: () => toast.error("Erro ao criar regra"),
+      }
+    );
   };
 
   return (
@@ -112,25 +110,33 @@ export default function Classifications() {
       title="Classificações"
       subtitle="Regras automáticas de classificação SNC por campo e valor"
       actions={
-        <Button size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-1.5 h-3.5 w-3.5" /> Nova Regra
+        <Button size="sm" className="h-9 text-sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" /> Nova Regra
         </Button>
       }
     >
       <div className="mb-4 flex items-center gap-2 rounded-lg border border-tim-info/20 bg-tim-info/5 px-4 py-3">
         <Zap className="h-4 w-4 shrink-0 text-tim-info" />
-        <p className="text-xs text-muted-foreground">
-          As regras são aplicadas por ordem. A primeira regra que corresponder ao documento é usada para classificação automática.
+        <p className="text-sm text-muted-foreground">
+          As regras são aplicadas por ordem de prioridade. A primeira regra que corresponder ao documento é usada para classificação automática.
         </p>
       </div>
 
-      {rules.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-tim-danger/20 bg-tim-danger/5 py-16">
+          <p className="text-sm text-tim-danger">Erro ao carregar regras de classificação</p>
+        </div>
+      ) : rules.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card py-16">
           <Tags className="h-10 w-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-medium">Sem regras de classificação</p>
-          <p className="mt-1 text-xs text-muted-foreground">Crie regras para classificar documentos automaticamente ao importar</p>
-          <Button size="sm" variant="outline" className="mt-4 h-8 text-xs" onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Criar primeira regra
+          <p className="mt-1 text-sm text-muted-foreground">Crie regras para classificar documentos automaticamente ao importar</p>
+          <Button size="sm" variant="outline" className="mt-4 h-9 text-sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Criar primeira regra
           </Button>
         </div>
       ) : (
@@ -140,10 +146,17 @@ export default function Classifications() {
               key={rule.id}
               rule={rule}
               onDelete={() => {
-                setRules((prev) => prev.filter((r) => r.id !== rule.id));
-                toast.success("Regra eliminada");
+                deleteRule.mutate(rule.id, {
+                  onSuccess: () => toast.success("Regra eliminada"),
+                  onError: () => toast.error("Erro ao eliminar regra"),
+                });
               }}
-              onToggle={() => setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, active: !r.active } : r))}
+              onToggle={() => {
+                updateRule.mutate(
+                  { id: rule.id, patch: { active: !rule.active } },
+                  { onError: () => toast.error("Erro ao atualizar regra") }
+                );
+              }}
             />
           ))}
         </div>
@@ -157,41 +170,44 @@ export default function Classifications() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Campo</label>
-                <Select value={newRule.field} onValueChange={(v) => setNewRule((p) => ({ ...p, field: v as ClassificationRule["field"] }))}>
-                  <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                <label className="text-sm font-medium text-muted-foreground">Campo</label>
+                <Select value={newRule.field} onValueChange={(v) => setNewRule((p) => ({ ...p, field: v }))}>
+                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(FIELD_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>)}
+                    {Object.entries(FIELD_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-sm">{v}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Operador</label>
-                <Select value={newRule.operator} onValueChange={(v) => setNewRule((p) => ({ ...p, operator: v as ClassificationRule["operator"] }))}>
-                  <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                <label className="text-sm font-medium text-muted-foreground">Operador</label>
+                <Select value={newRule.operator} onValueChange={(v) => setNewRule((p) => ({ ...p, operator: v }))}>
+                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(OPERATOR_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>)}
+                    {Object.entries(OPERATOR_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-sm">{v}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Valor</label>
-              <Input className="mt-1 h-8 text-xs" placeholder="ex: 500000001" value={newRule.value} onChange={(e) => setNewRule((p) => ({ ...p, value: e.target.value }))} />
+              <label className="text-sm font-medium text-muted-foreground">Valor</label>
+              <Input className="mt-1 h-9 text-sm" placeholder="ex: 500000001" value={newRule.value ?? ""} onChange={(e) => setNewRule((p) => ({ ...p, value: e.target.value }))} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Conta SNC</label>
+              <label className="text-sm font-medium text-muted-foreground">Conta SNC</label>
               <Select value={newRule.account} onValueChange={(v) => setNewRule((p) => ({ ...p, account: v }))}>
-                <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {SNC_ACCOUNTS.map((a) => <SelectItem key={a.code} value={a.code} className="text-xs">{a.code} — {a.label}</SelectItem>)}
+                  {SNC_ACCOUNTS.map((a) => <SelectItem key={a.code} value={a.code} className="text-sm">{a.code} — {a.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button size="sm" className="h-8 text-xs" onClick={addRule}>Adicionar Regra</Button>
+            <Button variant="outline" size="sm" className="h-9 text-sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" className="h-9 text-sm" onClick={addRule} disabled={createRule.isPending}>
+              {createRule.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Adicionar Regra
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
