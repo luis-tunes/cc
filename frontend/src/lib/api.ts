@@ -858,3 +858,29 @@ export function getExportReconciliationsCSVUrl(): string {
 export function getExportAssetsCSVUrl(): string {
   return `${BASE}/export/assets/csv`;
 }
+
+// ── AI Assistant ─────────────────────────────────────────────────────
+
+export interface QuickPrompt {
+  id: string;
+  label: string;
+  prompt: string;
+  category: "fiscal" | "operacional" | "análise" | "comunicação";
+}
+
+export interface ChatResponse {
+  question: string;
+  intent: string;
+  answer: string;
+}
+
+export async function fetchAssistantPrompts(): Promise<QuickPrompt[]> {
+  return request<QuickPrompt[]>("/assistant/prompts");
+}
+
+export async function sendAssistantMessage(question: string): Promise<ChatResponse> {
+  return request<ChatResponse>("/assistant/chat", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+}
