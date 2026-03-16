@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn
 from app.parse import ingest_document, validate_nif
-from app.reconcile import reconcile_all
+from app.reconcile import reconcile_all, suggest_matches
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +352,7 @@ async def list_reconciliations(
     with get_conn() as conn:
         rows = conn.execute(
             f"""SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence,
+                      r.status as reconciliation_status,
                       d.supplier_nif, d.total, d.date as doc_date,
                       b.description, b.amount, b.date as tx_date
                FROM reconciliations r
@@ -362,6 +363,483 @@ async def list_reconciliations(
             params,
         ).fetchall()
     return rows
+
+
+class ReconciliationPatch(BaseModel):
+    status: Optional[str] = None
+
+VALID_RECON_STATUSES = {"pendente", "aprovado", "rejeitado", "a_rever"}
+
+@router.patch("/reconciliations/{recon_id}")
+async def patch_reconciliation(recon_id: int, patch: ReconciliationPatch, auth: AuthInfo = Depends(require_auth)):
+    if patch.status and patch.status not in VALID_RECON_STATUSES:
+        raise HTTPException(status_code=422, detail=f"invalid status: {patch.status}")
+    tid = auth.tenant_id or ""
+    updates = patch.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="no fields to update")
+    set_parts = []
+    params: list = []
+    for k, v in updates.items():
+        set_parts.append(f"{k} = %s")
+        params.append(v)
+    params.extend([recon_id, tid])
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE reconciliations SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, status",
+            params,
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="reconciliation not found")
+    return row
+
+
+@router.get("/reconciliations/{doc_id}/suggestions")
+async def reconciliation_suggestions(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id if auth else None
+    return suggest_matches(doc_id, tid)
+
+# --- Movement Classification ---
+
+@router.get("/bank-transactions/enrich")
+async def enrich_movements(
+    limit: int = Query(default=100, le=1000),
+    offset: int = 0,
+    auth: AuthInfo = Depends(require_auth),
+):
+    """List bank transactions with classification and entity detection."""
+    from app.classify_movements import classify_movement, detect_entity
+    tid = auth.tenant_id or ""
+    clauses: list[str] = []
+    params: list = []
+    if tid:
+        clauses.append("tenant_id = %s")
+        params.append(tid)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    params.extend([limit, offset])
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT id, date, description, amount FROM bank_transactions {where} ORDER BY date DESC LIMIT %s OFFSET %s",
+            params,
+        ).fetchall()
+    results = []
+    for tx in rows:
+        cls = classify_movement(tx["description"], tid)
+        entity = detect_entity(tx["description"], tid)
+        results.append({
+            **dict(tx),
+            "category": cls["category"] if cls else None,
+            "snc_account": cls["snc_account"] if cls else None,
+            "entity_nif": (cls["entity_nif"] if cls and cls.get("entity_nif") else None)
+                         or (entity["nif"] if entity else None),
+            "entity_name": entity["name"] if entity else None,
+            "classified": cls is not None,
+        })
+    return results
+
+
+@router.get("/bank-transactions/duplicates")
+async def list_duplicates(auth: AuthInfo = Depends(require_auth)):
+    from app.classify_movements import find_duplicates
+    tid = auth.tenant_id if auth else None
+    return find_duplicates(tid)
+
+
+# --- Movement Rules CRUD ---
+
+class MovementRuleOut(BaseModel):
+    id: int
+    name: str
+    pattern: str
+    category: str
+    snc_account: str
+    entity_nif: str | None = None
+    priority: int
+    active: bool
+
+class MovementRuleCreate(BaseModel):
+    name: str = ""
+    pattern: str
+    category: str = ""
+    snc_account: str = ""
+    entity_nif: str | None = None
+    priority: int = 0
+    active: bool = True
+
+class MovementRulePatch(BaseModel):
+    name: Optional[str] = None
+    pattern: Optional[str] = None
+    category: Optional[str] = None
+    snc_account: Optional[str] = None
+    entity_nif: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
+
+@router.get("/movement-rules", response_model=list[MovementRuleOut])
+async def list_movement_rules(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT id, name, pattern, category, snc_account, entity_nif, priority, active FROM movement_rules WHERE tenant_id = %s ORDER BY priority ASC, id ASC",
+            (tid,),
+        ).fetchall()
+
+@router.post("/movement-rules", response_model=MovementRuleOut, status_code=201)
+async def create_movement_rule(body: MovementRuleCreate, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            """INSERT INTO movement_rules (tenant_id, name, pattern, category, snc_account, entity_nif, priority, active)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id, name, pattern, category, snc_account, entity_nif, priority, active""",
+            (tid, body.name, body.pattern, body.category, body.snc_account, body.entity_nif, body.priority, body.active),
+        ).fetchone()
+        conn.commit()
+    return row
+
+@router.patch("/movement-rules/{rule_id}", response_model=MovementRuleOut)
+async def update_movement_rule(rule_id: int, patch: MovementRulePatch, auth: AuthInfo = Depends(require_auth)):
+    updates = patch.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="no fields to update")
+    tid = auth.tenant_id or ""
+    set_parts = []
+    params: list = []
+    for k, v in updates.items():
+        set_parts.append(f"{k} = %s")
+        params.append(v)
+    params.extend([rule_id, tid])
+    with get_conn() as conn:
+        row = conn.execute(
+            f"UPDATE movement_rules SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, name, pattern, category, snc_account, entity_nif, priority, active",
+            params,
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return row
+
+@router.delete("/movement-rules/{rule_id}", status_code=204)
+async def delete_movement_rule(rule_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            "DELETE FROM movement_rules WHERE id = %s AND tenant_id = %s RETURNING id",
+            (rule_id, tid),
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="rule not found")
+
+
+# --- Alerts ---
+
+class AlertOut(BaseModel):
+    id: int
+    type: str
+    severity: str
+    title: str
+    description: str
+    action_url: str | None = None
+    read: bool
+    created_at: datetime.datetime | None = None
+
+@router.get("/alerts", response_model=list[AlertOut])
+async def list_alerts(
+    unread_only: bool = Query(default=False),
+    auth: AuthInfo = Depends(require_auth),
+):
+    tid = auth.tenant_id or ""
+    clauses = ["tenant_id = %s"]
+    params: list = [tid]
+    if unread_only:
+        clauses.append("read = false")
+    where = "WHERE " + " AND ".join(clauses)
+    with get_conn() as conn:
+        return conn.execute(
+            f"SELECT id, type, severity, title, description, action_url, read, created_at FROM alerts {where} ORDER BY created_at DESC LIMIT 100",
+            params,
+        ).fetchall()
+
+@router.patch("/alerts/{alert_id}")
+async def patch_alert(alert_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Mark an alert as read."""
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            "UPDATE alerts SET read = true WHERE id = %s AND tenant_id = %s RETURNING id",
+            (alert_id, tid),
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="alert not found")
+    return {"id": alert_id, "read": True}
+
+@router.post("/alerts/generate")
+async def generate_alerts(auth: AuthInfo = Depends(require_auth)):
+    """Run the alerts engine to generate new compliance alerts."""
+    from app.alerts import generate_compliance_alerts
+    tid = auth.tenant_id or ""
+    count = generate_compliance_alerts(tid)
+    return {"generated": count}
+
+
+# --- Assets ---
+
+class AssetOut(BaseModel):
+    id: int
+    name: str
+    category: str
+    acquisition_date: datetime.date
+    acquisition_cost: Decimal
+    useful_life_years: int
+    depreciation_method: str
+    current_value: Decimal
+    status: str
+    supplier: str | None = None
+    invoice_ref: str | None = None
+    notes: str | None = None
+    created_at: datetime.datetime | None = None
+
+class AssetCreate(BaseModel):
+    name: str
+    category: str = "equipamento"
+    acquisition_date: datetime.date
+    acquisition_cost: Decimal
+    useful_life_years: int = 5
+    depreciation_method: str = "linha-reta"
+    status: str = "ativo"
+    supplier: str | None = None
+    invoice_ref: str | None = None
+    notes: str | None = None
+
+class AssetPatch(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    acquisition_date: Optional[datetime.date] = None
+    acquisition_cost: Optional[Decimal] = None
+    useful_life_years: Optional[int] = None
+    depreciation_method: Optional[str] = None
+    status: Optional[str] = None
+    supplier: Optional[str] = None
+    invoice_ref: Optional[str] = None
+    notes: Optional[str] = None
+
+VALID_ASSET_CATEGORIES = {"equipamento", "mobiliário", "veículo", "imóvel", "informático", "intangível"}
+VALID_DEPRECIATION_METHODS = {"linha-reta", "quotas-decrescentes", "não-definido"}
+VALID_ASSET_STATUSES = {"ativo", "abatido", "vendido"}
+
+@router.get("/assets", response_model=list[AssetOut])
+async def list_assets(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT id, name, category, acquisition_date, acquisition_cost,
+                      useful_life_years, depreciation_method, current_value,
+                      status, supplier, invoice_ref, notes, created_at
+               FROM assets WHERE tenant_id = %s ORDER BY acquisition_date DESC""",
+            (tid,),
+        ).fetchall()
+    # Compute current_value based on depreciation
+    from app.assets import compute_current_value
+    result = []
+    for r in rows:
+        cv = compute_current_value(r)
+        row_dict = dict(r)
+        row_dict["current_value"] = cv
+        result.append(row_dict)
+    return result
+
+@router.get("/assets/summary")
+async def assets_summary(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    from app.assets import compute_current_value
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT id, name, category, acquisition_date, acquisition_cost,
+                      useful_life_years, depreciation_method, current_value,
+                      status, supplier, invoice_ref, notes, created_at
+               FROM assets WHERE tenant_id = %s""",
+            (tid,),
+        ).fetchall()
+    total_acquisition = sum(r["acquisition_cost"] for r in rows)
+    current_values = [compute_current_value(r) for r in rows]
+    total_current = sum(current_values)
+    total_depreciation = total_acquisition - total_current
+    annual_dep = sum(
+        r["acquisition_cost"] / max(r["useful_life_years"], 1)
+        for r in rows if r["depreciation_method"] != "não-definido" and r["status"] == "ativo"
+    )
+    without_method = sum(1 for r in rows if r["depreciation_method"] == "não-definido")
+    return {
+        "total_assets": len(rows),
+        "total_acquisition_value": float(total_acquisition),
+        "total_current_value": float(total_current),
+        "total_depreciation": float(total_depreciation),
+        "annual_depreciation": float(annual_dep),
+        "without_method": without_method,
+    }
+
+@router.get("/assets/{asset_id}", response_model=AssetOut)
+async def get_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT id, name, category, acquisition_date, acquisition_cost,
+                      useful_life_years, depreciation_method, current_value,
+                      status, supplier, invoice_ref, notes, created_at
+               FROM assets WHERE id = %s AND tenant_id = %s""",
+            (asset_id, tid),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="asset not found")
+    from app.assets import compute_current_value
+    row_dict = dict(row)
+    row_dict["current_value"] = compute_current_value(row)
+    return row_dict
+
+@router.post("/assets", response_model=AssetOut, status_code=201)
+async def create_asset(body: AssetCreate, auth: AuthInfo = Depends(require_auth)):
+    if body.category not in VALID_ASSET_CATEGORIES:
+        raise HTTPException(status_code=422, detail=f"invalid category: {body.category}")
+    if body.depreciation_method not in VALID_DEPRECIATION_METHODS:
+        raise HTTPException(status_code=422, detail=f"invalid method: {body.depreciation_method}")
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            """INSERT INTO assets (tenant_id, name, category, acquisition_date, acquisition_cost,
+                      useful_life_years, depreciation_method, current_value, status, supplier, invoice_ref, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id, name, category, acquisition_date, acquisition_cost,
+                         useful_life_years, depreciation_method, current_value,
+                         status, supplier, invoice_ref, notes, created_at""",
+            (tid, body.name, body.category, body.acquisition_date, body.acquisition_cost,
+             body.useful_life_years, body.depreciation_method, body.acquisition_cost,
+             body.status, body.supplier, body.invoice_ref, body.notes),
+        ).fetchone()
+        conn.commit()
+    return row
+
+@router.patch("/assets/{asset_id}", response_model=AssetOut)
+async def update_asset(asset_id: int, patch: AssetPatch, auth: AuthInfo = Depends(require_auth)):
+    updates = patch.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="no fields to update")
+    if "category" in updates and updates["category"] not in VALID_ASSET_CATEGORIES:
+        raise HTTPException(status_code=422, detail=f"invalid category: {updates['category']}")
+    if "depreciation_method" in updates and updates["depreciation_method"] not in VALID_DEPRECIATION_METHODS:
+        raise HTTPException(status_code=422, detail=f"invalid method: {updates['depreciation_method']}")
+    if "status" in updates and updates["status"] not in VALID_ASSET_STATUSES:
+        raise HTTPException(status_code=422, detail=f"invalid status: {updates['status']}")
+    tid = auth.tenant_id or ""
+    set_parts = []
+    params: list = []
+    for k, v in updates.items():
+        set_parts.append(f"{k} = %s")
+        params.append(v)
+    params.extend([asset_id, tid])
+    with get_conn() as conn:
+        row = conn.execute(
+            f"""UPDATE assets SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s
+                RETURNING id, name, category, acquisition_date, acquisition_cost,
+                          useful_life_years, depreciation_method, current_value,
+                          status, supplier, invoice_ref, notes, created_at""",
+            params,
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="asset not found")
+    return row
+
+@router.delete("/assets/{asset_id}", status_code=204)
+async def delete_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        row = conn.execute(
+            "DELETE FROM assets WHERE id = %s AND tenant_id = %s RETURNING id",
+            (asset_id, tid),
+        ).fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="asset not found")
+
+
+# --- CSV Export (generic) ---
+
+@router.get("/export/bank-transactions/csv")
+async def export_bank_transactions_csv(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, date, description, amount FROM bank_transactions WHERE tenant_id = %s ORDER BY date DESC",
+            (tid,),
+        ).fetchall()
+    output = io.StringIO()
+    writer = csv.DictWriter(output, extrasaction="ignore", fieldnames=["id", "date", "description", "amount"])
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(dict(r))
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=movimentos.csv"},
+    )
+
+@router.get("/export/reconciliations/csv")
+async def export_reconciliations_csv(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    clauses = []
+    params: list = []
+    if tid:
+        clauses.append("r.tenant_id = %s")
+        params.append(tid)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"""SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence, r.status,
+                      d.supplier_nif, d.total, d.date as doc_date,
+                      b.description, b.amount, b.date as tx_date
+               FROM reconciliations r
+               JOIN documents d ON d.id = r.document_id
+               JOIN bank_transactions b ON b.id = r.bank_transaction_id
+               {where} ORDER BY r.created_at DESC""",
+            params,
+        ).fetchall()
+    output = io.StringIO()
+    writer = csv.DictWriter(output, extrasaction="ignore", fieldnames=["id", "document_id", "bank_transaction_id", "match_confidence", "status", "supplier_nif", "total", "doc_date", "description", "amount", "tx_date"])
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(dict(r))
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=reconciliacoes.csv"},
+    )
+
+@router.get("/export/assets/csv")
+async def export_assets_csv(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT id, name, category, acquisition_date, acquisition_cost,
+                      useful_life_years, depreciation_method, current_value, status, supplier, invoice_ref
+               FROM assets WHERE tenant_id = %s ORDER BY acquisition_date DESC""",
+            (tid,),
+        ).fetchall()
+    output = io.StringIO()
+    writer = csv.DictWriter(output, extrasaction="ignore", fieldnames=["id", "name", "category", "acquisition_date", "acquisition_cost", "useful_life_years", "depreciation_method", "current_value", "status", "supplier", "invoice_ref"])
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(dict(r))
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ativos.csv"},
+    )
 
 # --- Dashboard ---
 
