@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUser, useClerk } from "@clerk/react";
 import { useNavigate } from "react-router-dom";
 import { TrialBanner } from "@/components/billing/TrialBanner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AppTopbarProps {
   title?: string;
@@ -17,6 +18,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
     .split(" ")
@@ -31,7 +33,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
       <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
         {/* Left */}
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="text-muted-foreground" />
+          {!isMobile && <SidebarTrigger className="text-muted-foreground" />}
           {title && (
             <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           )}
@@ -56,7 +58,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground"
+            className="h-9 w-9 text-muted-foreground md:h-8 md:w-8"
             onClick={openCommand}
           >
             <Search className="h-4 w-4" />
@@ -84,7 +86,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="h-9 w-9 text-muted-foreground hover:text-destructive md:h-8 md:w-8"
             onClick={() => signOut()}
             title="Terminar sessão"
           >
