@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { TrialGate } from "@/components/billing/TrialGate";
+import { UpgradeGate } from "@/components/billing/UpgradeGate";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Loader2 } from "lucide-react";
@@ -83,22 +84,22 @@ export default function App() {
             <Route path="/caixa-entrada" element={<InboxPage />} />
             <Route path="/documentos" element={<Documents />} />
             <Route path="/movimentos" element={<BankMovements />} />
-            <Route path="/reconciliacao" element={<Reconciliation />} />
+            <Route path="/reconciliacao" element={<UpgradeGate title="Reconciliação" subtitle="Correspondência entre documentos e movimentos bancários"><Reconciliation /></UpgradeGate>} />
             <Route path="/inventario" element={<Inventory />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/produtos" element={<Products />} />
             <Route path="/marmitas" element={<Products />} />
             <Route path="/lista-compras" element={<ShoppingList />} />
             <Route path="/classificacoes" element={<Classifications />} />
-            <Route path="/auto-classificacao" element={<AutoClassification />} />
-            <Route path="/centro-fiscal" element={<TaxCenter />} />
-            <Route path="/obrigacoes" element={<Obligations />} />
-            <Route path="/ativos" element={<Assets />} />
-            <Route path="/relatorios" element={<Reports />} />
-            <Route path="/assistente" element={<AiAssistant />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/previsoes" element={<Forecasts />} />
-            <Route path="/otimizacao" element={<CostOptimization />} />
+            <Route path="/auto-classificacao" element={<UpgradeGate title="Auto-Classificação" subtitle="Classificação automática de documentos"><AutoClassification /></UpgradeGate>} />
+            <Route path="/centro-fiscal" element={<UpgradeGate title="Centro Fiscal" subtitle="IVA, IRC e obrigações fiscais"><TaxCenter /></UpgradeGate>} />
+            <Route path="/obrigacoes" element={<UpgradeGate title="Obrigações Fiscais" subtitle="Calendário de prazos"><Obligations /></UpgradeGate>} />
+            <Route path="/ativos" element={<UpgradeGate title="Ativos Fixos" subtitle="Gestão de imobilizado e depreciações"><Assets /></UpgradeGate>} />
+            <Route path="/relatorios" element={<UpgradeGate title="Relatórios" subtitle="Demonstração de resultados e análise"><Reports /></UpgradeGate>} />
+            <Route path="/assistente" element={<UpgradeGate title="Assistente IA" subtitle="Consultas em linguagem natural"><AiAssistant /></UpgradeGate>} />
+            <Route path="/insights" element={<UpgradeGate title="Insights" subtitle="Análises financeiras"><Insights /></UpgradeGate>} />
+            <Route path="/previsoes" element={<UpgradeGate title="Previsões" subtitle="Projeções de cash flow"><Forecasts /></UpgradeGate>} />
+            <Route path="/otimizacao" element={<UpgradeGate title="Otimização de Custos" subtitle="Análise de despesas"><CostOptimization /></UpgradeGate>} />
             <Route path="/entidade" element={<EntityProfile />} />
             <Route path="/integracoes" element={<IntegrationsPage />} />
             <Route path="/definicoes" element={<SettingsPage />} />

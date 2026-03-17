@@ -32,6 +32,8 @@ export interface NavItem {
   path: string;
   icon: LucideIcon;
   status: RouteStatus;
+  /** Requires paid plan — locked during free trial */
+  proOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -47,8 +49,8 @@ export const navigation: NavGroup[] = [
       { title: "Caixa de Entrada", path: "/caixa-entrada", icon: Inbox, status: "active" },
       { title: "Documentos", path: "/documentos", icon: FileText, status: "active" },
       { title: "Movimentos", path: "/movimentos", icon: Landmark, status: "active" },
-      { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active" },
-      { title: "Auto-Classificação", path: "/auto-classificacao", icon: Brain, status: "active" },
+      { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active", proOnly: true },
+      { title: "Auto-Classificação", path: "/auto-classificacao", icon: Brain, status: "active", proOnly: true },
       { title: "Classificações", path: "/classificacoes", icon: Tags, status: "active" },
       { title: "Atividade", path: "/atividade", icon: Activity, status: "active" },
     ],
@@ -60,13 +62,13 @@ export const navigation: NavGroup[] = [
       { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active" },
       { title: "Produtos", path: "/produtos", icon: UtensilsCrossed, status: "active" },
       { title: "Lista de Compras", path: "/lista-compras", icon: ShoppingCart, status: "active" },
-      { title: "Ativos", path: "/ativos", icon: Lock, status: "active" },
-      { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active" },
-      { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active" },
-      { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "active" },
-      { title: "Insights", path: "/insights", icon: Lightbulb, status: "active" },
-      { title: "Previsões", path: "/previsoes", icon: TrendingUp, status: "active" },
-      { title: "Otimização de Custos", path: "/otimizacao", icon: Scissors, status: "active" },
+      { title: "Ativos", path: "/ativos", icon: Lock, status: "active", proOnly: true },
+      { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active", proOnly: true },
+      { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active", proOnly: true },
+      { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "active", proOnly: true },
+      { title: "Insights", path: "/insights", icon: Lightbulb, status: "active", proOnly: true },
+      { title: "Previsões", path: "/previsoes", icon: TrendingUp, status: "active", proOnly: true },
+      { title: "Otimização de Custos", path: "/otimizacao", icon: Scissors, status: "active", proOnly: true },
     ],
   },
   {
@@ -74,7 +76,7 @@ export const navigation: NavGroup[] = [
     items: [
       { title: "Entidade", path: "/entidade", icon: Building2, status: "active" },
       { title: "Integrações", path: "/integracoes", icon: Plug, status: "active" },
-      { title: "Assistente IA", path: "/assistente", icon: Bot, status: "active" },
+      { title: "Assistente IA", path: "/assistente", icon: Bot, status: "active", proOnly: true },
       { title: "Definições", path: "/definicoes", icon: Settings, status: "active" },
     ],
   },

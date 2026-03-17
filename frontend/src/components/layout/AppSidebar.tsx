@@ -18,14 +18,16 @@ import {
 import { cn } from "@/lib/utils";
 import { useUser, OrganizationSwitcher } from "@clerk/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Lock } from "lucide-react";
+import { Lock, Crown } from "lucide-react";
 import { sidebarOrgSwitcherAppearance } from "@/lib/clerk-appearance";
+import { useIsTrial } from "@/hooks/use-trial";
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user } = useUser();
+  const isTrial = useIsTrial();
 
   const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
     .split(" ")
@@ -60,6 +62,7 @@ export function AppSidebar() {
                 {group.items.map((item) => {
                   const active = location.pathname === item.path;
                   const isComingSoon = item.status === "coming-soon";
+                  const isLocked = isTrial && item.proOnly;
                   return (
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton asChild>
@@ -70,7 +73,8 @@ export function AppSidebar() {
                             "relative hover:bg-sidebar-accent",
                             active &&
                               "bg-sidebar-accent text-primary font-medium",
-                            isComingSoon && "opacity-50"
+                            isComingSoon && "opacity-50",
+                            isLocked && "opacity-60"
                           )}
                           activeClassName="bg-sidebar-accent text-primary font-medium"
                         >
@@ -83,6 +87,9 @@ export function AppSidebar() {
                               {item.title}
                               {isComingSoon && (
                                 <Lock className="h-2.5 w-2.5 text-muted-foreground" />
+                              )}
+                              {isLocked && (
+                                <Crown className="h-2.5 w-2.5 text-primary/60" />
                               )}
                             </span>
                           )}
