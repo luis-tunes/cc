@@ -168,9 +168,17 @@ class FakeConn:
             return self._handle_ingredients(sql, params)
 
         # ── Reconciliations ──
-        # Only route here if the primary FROM is reconciliations, not when it
-        # appears only in a subquery (e.g. "NOT IN (SELECT ... FROM reconciliations)")
-        if "from reconciliations" in sql_lower and "not in" not in sql_lower:
+        # Only route here if reconciliations is the primary table.
+        # Exclude cases where it appears only in a subquery of a document query
+        # (e.g. correlated subquery in SELECT column list or RETURNING clause).
+        _recon_is_primary = (
+            "from reconciliations" in sql_lower
+            and "not in" not in sql_lower
+            and "from documents" not in sql_lower
+            and not sql_lower.startswith("update documents")
+            and not sql_lower.startswith("delete from documents")
+        )
+        if _recon_is_primary:
             return self._handle_reconciliations(sql, params)
         if "into reconciliations" in sql_lower:
             return self._handle_reconciliations(sql, params)
@@ -222,6 +230,7 @@ class FakeConn:
                 "notes": None,
                 "snc_account": None,
                 "classification_source": None,
+                "reconciliation_status": None,
             }
             if params:
                 # Upload route: ('','',0,0,'outro',filename,status,tid) — 8 params
@@ -298,6 +307,21 @@ class FakeConn:
             if "not in (select document_id from reconciliations)" in sql_lower:
                 rec_doc_ids = {r["document_id"] for r in _tables["reconciliations"]}
                 docs = [d for d in docs if d["id"] not in rec_doc_ids]
+            # Populate reconciliation_status from the reconciliations table when the
+            # query requests it (correlated subquery or LATERAL join in the SELECT column list)
+            if "reconciliation_status" in sql_lower:
+                recon_by_doc = {}
+                for r in _tables["reconciliations"]:
+                    if r["document_id"] not in recon_by_doc:
+                        recon_by_doc[r["document_id"]] = r
+                result = []
+                for d in docs:
+                    row = dict(d)
+                    if "reconciliation_status" not in row or row["reconciliation_status"] is None:
+                        recon = recon_by_doc.get(row["id"])
+                        row["reconciliation_status"] = recon["status"] if recon else None
+                    result.append(row)
+                return FakeCursor(result)
             return FakeCursor(docs)
         if sql_lower.startswith("delete"):
             if params:

@@ -125,6 +125,7 @@ export interface Document {
   created_at: string | null;
   snc_account: string | null;
   classification_source: string | null;
+  reconciliation_status?: string | null;
 }
 
 export interface DocumentPatch {

@@ -49,6 +49,7 @@ class DocumentOut(BaseModel):
     notes: str | None = None
     snc_account: str | None = None
     classification_source: str | None = None
+    reconciliation_status: str | None = None
 
 class DocumentPatch(BaseModel):
     status: Optional[str] = None
@@ -224,7 +225,17 @@ async def list_documents(
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source FROM documents {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            f"""SELECT d.id, d.supplier_nif, d.client_nif, d.total, d.vat, d.date, d.type,
+                       d.filename, d.raw_text, d.status, d.paperless_id, d.created_at,
+                       d.notes, d.snc_account, d.classification_source,
+                       r.status AS reconciliation_status
+                FROM documents d
+                LEFT JOIN LATERAL (
+                    SELECT status FROM reconciliations
+                    WHERE document_id = d.id
+                    ORDER BY created_at DESC LIMIT 1
+                ) r ON TRUE
+                {where} ORDER BY d.created_at DESC LIMIT %s OFFSET %s""",
             params,
         ).fetchall()
     return rows
@@ -317,7 +328,12 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     where = "WHERE " + " AND ".join(clauses)
     with get_conn() as conn:
         row = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source FROM documents {where}",
+            f"""SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text,
+                       status, paperless_id, created_at, notes, snc_account, classification_source,
+                       (SELECT r.status FROM reconciliations r
+                        WHERE r.document_id = id
+                        ORDER BY r.created_at DESC LIMIT 1) AS reconciliation_status
+                FROM documents {where}""",
             params,
         ).fetchone()
     if not row:
@@ -342,7 +358,13 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
     where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"UPDATE documents SET {', '.join(set_parts)} WHERE {where} RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status, paperless_id, created_at, notes, snc_account, classification_source",
+            f"""UPDATE documents SET {', '.join(set_parts)} WHERE {where}
+                RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename,
+                          raw_text, status, paperless_id, created_at, notes, snc_account,
+                          classification_source,
+                          (SELECT r.status FROM reconciliations r
+                           WHERE r.document_id = id
+                           ORDER BY r.created_at DESC LIMIT 1) AS reconciliation_status""",
             params,
         ).fetchone()
         conn.commit()
