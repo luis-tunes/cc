@@ -4,14 +4,36 @@ import {
   createClassificationRule,
   patchClassificationRule,
   deleteClassificationRule,
+  fetchClassificationStats,
+  runAutoClassify,
   type ClassificationRule,
   type ClassificationRuleCreate,
+  type ClassificationStats,
 } from "@/lib/api";
 
 export function useClassificationRules() {
   return useQuery<ClassificationRule[]>({
     queryKey: ["classification-rules"],
     queryFn: fetchClassificationRules,
+  });
+}
+
+export function useClassificationStats() {
+  return useQuery<ClassificationStats>({
+    queryKey: ["classification-stats"],
+    queryFn: fetchClassificationStats,
+  });
+}
+
+export function useAutoClassify() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: runAutoClassify,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["classification-stats"] });
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
+    },
   });
 }
 

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.auth import AuthInfo, optional_auth, require_auth
-from app.db import get_conn
+from app.db import get_conn, log_activity
 from app.parse import ingest_document, validate_nif
 from app.reconcile import reconcile_all, suggest_matches
 from app.cache import cache_get, cache_set, cache_invalidate
@@ -115,6 +115,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
                     "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'pendente ocr',%s) RETURNING id",
                     (file.filename, tid),
                 ).fetchone()
+                log_activity(conn, tid or "", "document", row["id"], "uploaded", file.filename)
                 conn.commit()
                 local_id = row["id"]
         except Exception:
@@ -228,6 +229,86 @@ async def list_documents(
         ).fetchall()
     return rows
 
+
+@router.post("/documents/auto-classify")
+async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
+    """Run classification rules against all unclassified documents for the tenant."""
+    from app.classify import classify_document
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        docs = conn.execute(
+            """SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status
+               FROM documents
+               WHERE tenant_id = %s AND (snc_account IS NULL OR snc_account = '')
+               AND status != 'arquivado'""",
+            (tid,),
+        ).fetchall()
+
+    classified = 0
+    skipped = 0
+    for doc in docs:
+        result = classify_document(dict(doc), tid)
+        if result:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE documents SET snc_account = %s, classification_source = %s WHERE id = %s AND tenant_id = %s",
+                    (result["account"], result["source"], doc["id"], tid),
+                )
+                log_activity(conn, tid, "document", doc["id"], "auto_classified",
+                             f"Conta {result['account']} via regra")
+                conn.commit()
+            classified += 1
+        else:
+            skipped += 1
+
+    with get_conn() as conn:
+        total_classified = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE tenant_id = %s AND snc_account IS NOT NULL AND snc_account != ''",
+            (tid,),
+        ).fetchone()["n"]
+        total_unclassified = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE tenant_id = %s AND (snc_account IS NULL OR snc_account = '') AND status != 'arquivado'",
+            (tid,),
+        ).fetchone()["n"]
+
+    return {
+        "classified_now": classified,
+        "skipped": skipped,
+        "total_processed": len(docs),
+        "total_classified": total_classified,
+        "total_unclassified": total_unclassified,
+    }
+
+
+@router.get("/documents/classification-stats")
+async def classification_stats(auth: AuthInfo = Depends(require_auth)):
+    """Return classification coverage statistics for the tenant."""
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE tenant_id = %s AND status != 'arquivado'",
+            (tid,),
+        ).fetchone()["n"]
+        classified = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE tenant_id = %s AND snc_account IS NOT NULL AND snc_account != '' AND status != 'arquivado'",
+            (tid,),
+        ).fetchone()["n"]
+        by_account = conn.execute(
+            """SELECT snc_account AS account, COUNT(*) AS count
+               FROM documents
+               WHERE tenant_id = %s AND snc_account IS NOT NULL AND snc_account != ''
+               GROUP BY snc_account ORDER BY count DESC LIMIT 10""",
+            (tid,),
+        ).fetchall()
+    return {
+        "total": total,
+        "classified": classified,
+        "unclassified": total - classified,
+        "coverage_pct": round((classified / total * 100), 1) if total > 0 else 0.0,
+        "by_account": [dict(r) for r in by_account],
+    }
+
+
 @router.get("/documents/{doc_id}", response_model=DocumentOut)
 async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     clauses = ["id = %s"]
@@ -336,6 +417,10 @@ async def list_bank_transactions(
 async def run_reconciliation(auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id if auth else None
     matches = reconcile_all(tid)
+    if tid and matches:
+        with get_conn() as conn:
+            log_activity(conn, tid, "reconciliation", None, "run", f"{len(matches)} correspondências")
+            conn.commit()
     return {"matched": len(matches), "matches": matches}
 
 @router.get("/reconciliations")
@@ -2215,6 +2300,32 @@ async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(requ
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")
+
+
+# --- Activity Log ---
+
+class ActivityEntry(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: int | None
+    action: str
+    detail: str
+    created_at: datetime.datetime
+
+
+@router.get("/activity", response_model=list[ActivityEntry])
+async def list_activity(
+    limit: int = Query(50, ge=1, le=200),
+    auth: AuthInfo = Depends(require_auth),
+):
+    """Return recent audit log entries for the tenant."""
+    tid = auth.tenant_id or ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, entity_type, entity_id, action, detail, created_at FROM audit_log WHERE tenant_id = %s ORDER BY created_at DESC LIMIT %s",
+            (tid, limit),
+        ).fetchall()
+    return rows
 
 
 # --- AI Assistant ---

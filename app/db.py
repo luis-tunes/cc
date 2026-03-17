@@ -308,6 +308,22 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_movement_rules_tenant ON movement_rules(tenant_id);
         """)
 
+        # ── Audit Log ─────────────────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                entity_type VARCHAR(32) NOT NULL,
+                entity_id   INTEGER,
+                action      VARCHAR(32) NOT NULL,
+                detail      TEXT NOT NULL DEFAULT '',
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_log_tenant ON audit_log(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(tenant_id, created_at DESC);
+        """)
+
         # ── Unique constraints (safe to run repeatedly) ───────────────
         conn.execute("""
             DO $$ BEGIN
@@ -323,3 +339,18 @@ def close_pool():
     if _pool is not None:
         _pool.close()
         _pool = None
+
+
+def log_activity(
+    conn,
+    tenant_id: str,
+    entity_type: str,
+    entity_id: int | None,
+    action: str,
+    detail: str = "",
+) -> None:
+    """Insert an audit log entry (call inside an open connection context)."""
+    conn.execute(
+        "INSERT INTO audit_log (tenant_id, entity_type, entity_id, action, detail) VALUES (%s, %s, %s, %s, %s)",
+        (tenant_id, entity_type, entity_id, action, detail),
+    )
