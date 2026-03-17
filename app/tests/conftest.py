@@ -323,6 +323,27 @@ class FakeConn:
             _tables["bank_transactions"].append(tx)
             return FakeCursor([tx])
         if sql_lower.startswith("select"):
+            # Self-JOIN for find_duplicates
+            if "join bank_transactions" in sql_lower and "a.id < b.id" in sql_lower:
+                tid = params[2] if len(params) >= 3 else None
+                amt_tol = float(params[0]) if params else 0.01
+                date_tol = int(params[1]) if len(params) >= 2 else 3
+                txs = [t for t in _tables["bank_transactions"] if t.get("tenant_id") == tid]
+                results = []
+                for i, a in enumerate(txs):
+                    for b in txs[i+1:]:
+                        if a["id"] >= b["id"]:
+                            continue
+                        a_date = a["date"] if isinstance(a["date"], date) else date.fromisoformat(str(a["date"]))
+                        b_date = b["date"] if isinstance(b["date"], date) else date.fromisoformat(str(b["date"]))
+                        if abs(float(a["amount"] - b["amount"])) < amt_tol and abs((a_date - b_date).days) <= date_tol:
+                            results.append({
+                                "id_a": a["id"], "id_b": b["id"],
+                                "amount": a["amount"],
+                                "date_a": a_date, "date_b": b_date,
+                                "desc_a": a["description"], "desc_b": b["description"],
+                            })
+                return FakeCursor(results)
             txs = list(_tables["bank_transactions"])
             # Exclude already reconciled
             if "not in (select bank_transaction_id from reconciliations)" in sql_lower:

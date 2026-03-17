@@ -5,6 +5,7 @@ import datetime
 import json
 import sys
 from decimal import Decimal
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -45,7 +46,7 @@ def _post_tx(client=None, amount="100.00", tenant="t1", date="2024-06-01", desc=
     c._seq["bank_transactions"] += 1
     tx = {
         "id": c._seq["bank_transactions"],
-        "date": date,
+        "date": datetime.date.fromisoformat(date),
         "description": desc,
         "amount": Decimal(str(amount)),
         "tenant_id": tenant,
@@ -545,3 +546,364 @@ class TestCSVExport:
         assert r.status_code == 200
         assert "text/csv" in r.headers.get("content-type", "")
         assert b"name" in r.content
+
+    def test_export_reconciliations_csv_with_data(self, client):
+        doc = _post_doc(client)
+        tx = _post_tx(client, amount="100.00", date="2024-06-01")
+        _create_reconciliation(doc.json()["id"], tx["id"])
+        r = client.get("/api/export/reconciliations/csv", headers=_T1)
+        assert r.status_code == 200
+        assert "text/csv" in r.headers.get("content-type", "")
+        assert b"document_id" in r.content or len(r.content) > 10
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.6 Document preview & thumbnail (Paperless proxy)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDocumentPreviewThumbnail:
+    def _seed_doc_with_paperless(self, paperless_id=42, filename="fatura.pdf"):
+        """Insert a document with a paperless_id directly into the in-memory table."""
+        c = _conftest()
+        c._seq["documents"] += 1
+        doc = {
+            "id": c._seq["documents"],
+            "tenant_id": "t1",
+            "supplier_nif": "",
+            "client_nif": "",
+            "total": Decimal("0"),
+            "vat": Decimal("0"),
+            "date": None,
+            "type": "outro",
+            "filename": filename,
+            "raw_text": None,
+            "status": "pendente",
+            "paperless_id": paperless_id,
+            "created_at": "2025-01-01T00:00:00+00:00",
+            "notes": None,
+            "snc_account": None,
+            "classification_source": None,
+        }
+        c._tables["documents"].append(doc)
+        return doc
+
+    @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes.httpx.Client")
+    def test_preview_success(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=10, filename="inv.pdf")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"%PDF-fake-content"
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 200
+        assert r.content == b"%PDF-fake-content"
+        assert "application/pdf" in r.headers.get("content-type", "")
+
+    def test_preview_doc_not_found(self, client):
+        r = client.get("/api/documents/99999/preview", headers=_T1)
+        assert r.status_code == 404
+
+    def test_preview_no_paperless_id(self, client):
+        doc = _post_doc(client)
+        doc_id = doc.json()["id"]
+        r = client.get(f"/api/documents/{doc_id}/preview", headers=_T1)
+        assert r.status_code == 404
+
+    @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes.httpx.Client")
+    def test_preview_paperless_error(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=10)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 502
+
+    @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes.httpx.Client")
+    def test_preview_paperless_unreachable(self, mock_client_cls, client):
+        import httpx
+        doc = self._seed_doc_with_paperless(paperless_id=10)
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.side_effect = httpx.ConnectError("connection refused")
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 502
+
+    @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes.httpx.Client")
+    def test_thumbnail_success(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=20)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"\x89PNG-thumb"
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/thumbnail", headers=_T1)
+        assert r.status_code == 200
+        assert r.content == b"\x89PNG-thumb"
+        assert "image/webp" in r.headers.get("content-type", "")
+        assert "max-age" in r.headers.get("cache-control", "")
+
+    def test_thumbnail_doc_not_found(self, client):
+        r = client.get("/api/documents/99999/thumbnail", headers=_T1)
+        assert r.status_code == 404
+
+    def test_thumbnail_no_paperless_id(self, client):
+        doc = _post_doc(client)
+        doc_id = doc.json()["id"]
+        r = client.get(f"/api/documents/{doc_id}/thumbnail", headers=_T1)
+        assert r.status_code == 404
+
+    @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes.httpx.Client")
+    def test_thumbnail_paperless_error(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=20)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/thumbnail", headers=_T1)
+        assert r.status_code == 502
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.7 Reconciliation suggestions
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestReconciliationSuggestions:
+    def _seed_doc(self, total="150.00", doc_date="2024-06-01"):
+        c = _conftest()
+        c._seq["documents"] += 1
+        doc = {
+            "id": c._seq["documents"],
+            "tenant_id": "t1",
+            "supplier_nif": "123456789",
+            "client_nif": "",
+            "total": Decimal(total),
+            "vat": Decimal("0"),
+            "date": datetime.date.fromisoformat(doc_date),
+            "type": "fatura",
+            "filename": "test.pdf",
+            "raw_text": None,
+            "status": "pendente",
+            "paperless_id": None,
+            "created_at": "2025-01-01T00:00:00+00:00",
+            "notes": None,
+            "snc_account": None,
+            "classification_source": None,
+        }
+        c._tables["documents"].append(doc)
+        return doc
+
+    def test_suggestions_no_match(self, client):
+        doc = self._seed_doc(total="999.99", doc_date="2020-01-01")
+        r = client.get(f"/api/reconciliations/{doc['id']}/suggestions", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_suggestions_with_match(self, client):
+        doc = self._seed_doc(total="150.00", doc_date="2024-06-01")
+        _post_tx(amount="150.00", date="2024-06-03", desc="PAGAMENTO FATURA")
+        r = client.get(f"/api/reconciliations/{doc['id']}/suggestions", headers=_T1)
+        assert r.status_code == 200
+        suggestions = r.json()
+        assert len(suggestions) >= 1
+        assert suggestions[0]["confidence"] > 50
+
+    def test_suggestions_sorted_by_confidence(self, client):
+        doc = self._seed_doc(total="200.00", doc_date="2024-06-01")
+        _post_tx(amount="200.00", date="2024-06-02", desc="CLOSE MATCH")
+        _post_tx(amount="180.00", date="2024-06-20", desc="FAR MATCH")
+        r = client.get(f"/api/reconciliations/{doc['id']}/suggestions", headers=_T1)
+        assert r.status_code == 200
+        suggestions = r.json()
+        assert len(suggestions) >= 2
+        assert suggestions[0]["confidence"] >= suggestions[1]["confidence"]
+
+    def test_suggestions_doc_not_found(self, client):
+        r = client.get("/api/reconciliations/99999/suggestions", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.8 Bank transaction enrichment
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBankTransactionEnrich:
+    def test_enrich_empty(self, client):
+        r = client.get("/api/bank-transactions/enrich", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_enrich_with_rule_match(self, client):
+        c = _conftest()
+        _post_tx(amount="55.00", date="2024-06-01", desc="EDP COMERCIAL FATURA")
+        c._seq["movement_rules"] += 1
+        c._tables["movement_rules"].append({
+            "id": c._seq["movement_rules"],
+            "tenant_id": "t1",
+            "name": "EDP",
+            "pattern": "edp comercial",
+            "category": "utilities",
+            "snc_account": "62211",
+            "entity_nif": "501905480",
+            "priority": 10,
+            "active": True,
+        })
+        r = client.get("/api/bank-transactions/enrich", headers=_T1)
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) >= 1
+        enriched = data[0]
+        assert enriched["classified"] is True
+        assert enriched["category"] == "utilities"
+
+    def test_enrich_no_match(self, client):
+        _post_tx(amount="10.00", date="2024-06-01", desc="RANDOM PAYMENT")
+        r = client.get("/api/bank-transactions/enrich", headers=_T1)
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) >= 1
+        assert data[0]["classified"] is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.9 Bank transaction duplicates
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBankTransactionDuplicates:
+    def test_duplicates_empty(self, client):
+        r = client.get("/api/bank-transactions/duplicates", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_duplicates_found(self, client):
+        _post_tx(amount="100.00", date="2024-06-01", desc="Pagamento A")
+        _post_tx(amount="100.00", date="2024-06-02", desc="Pagamento B")
+        r = client.get("/api/bank-transactions/duplicates", headers=_T1)
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) >= 1
+        assert data[0]["amount"] == 100.0 or str(data[0]["amount"]) == "100.00"
+
+    def test_duplicates_no_false_positives(self, client):
+        _post_tx(amount="100.00", date="2024-06-01", desc="Pagamento A")
+        _post_tx(amount="500.00", date="2024-12-01", desc="Pagamento B")
+        r = client.get("/api/bank-transactions/duplicates", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.10 Movement rule PATCH
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestMovementRulePatch:
+    def _create_rule(self, client):
+        r = client.post(
+            "/api/movement-rules",
+            json={
+                "name": "Original",
+                "pattern": "original pattern",
+                "category": "other",
+                "snc_account": "60000",
+                "priority": 5,
+                "active": True,
+            },
+            headers=_T1,
+        )
+        assert r.status_code == 201
+        return r.json()
+
+    def test_patch_success(self, client):
+        rule = self._create_rule(client)
+        r = client.patch(
+            f"/api/movement-rules/{rule['id']}",
+            json={"name": "Updated", "category": "utilities"},
+            headers=_T1,
+        )
+        assert r.status_code == 200
+        assert r.json()["name"] == "Updated"
+        assert r.json()["category"] == "utilities"
+        # Unchanged fields remain
+        assert r.json()["pattern"] == "original pattern"
+
+    def test_patch_single_field(self, client):
+        rule = self._create_rule(client)
+        r = client.patch(
+            f"/api/movement-rules/{rule['id']}",
+            json={"active": False},
+            headers=_T1,
+        )
+        assert r.status_code == 200
+        assert r.json()["active"] is False
+
+    def test_patch_not_found(self, client):
+        r = client.patch(
+            "/api/movement-rules/9999",
+            json={"name": "No"},
+            headers=_T1,
+        )
+        assert r.status_code == 404
+
+    def test_patch_empty_body_422(self, client):
+        rule = self._create_rule(client)
+        r = client.patch(
+            f"/api/movement-rules/{rule['id']}",
+            json={},
+            headers=_T1,
+        )
+        assert r.status_code == 422
+
+    def test_patch_tenant_isolation(self, client):
+        rule = self._create_rule(client)
+        r = client.patch(
+            f"/api/movement-rules/{rule['id']}",
+            json={"name": "Hacked"},
+            headers=_T2,
+        )
+        assert r.status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.11 Document GET by ID (happy path)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDocumentGetById:
+    def test_get_document_success(self, client):
+        resp = _post_doc(client)
+        doc_id = resp.json()["id"]
+        r = client.get(f"/api/documents/{doc_id}", headers=_T1)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["id"] == doc_id
+        assert "filename" in data
+        assert "status" in data
+
+    def test_get_document_not_found(self, client):
+        r = client.get("/api/documents/99999", headers=_T1)
+        assert r.status_code == 404
