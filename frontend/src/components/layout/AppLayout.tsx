@@ -25,12 +25,12 @@ export function AppLayout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         {!isMobile && <AppSidebar />}
-        <div className="flex flex-1 flex-col">
+        <main className="flex flex-1 flex-col">
           <AppTopbar title={pageTitle} />
           <div className={isMobile ? "pb-16" : ""}>
             <Outlet />
           </div>
-        </div>
+        </main>
       </div>
       {isMobile && <MobileNav />}
       <CommandMenu />

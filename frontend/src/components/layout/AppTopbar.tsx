@@ -1,6 +1,6 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Search, Building2, CalendarDays } from "lucide-react";
+import { Search, Building2, CalendarDays, LogOut } from "lucide-react";
 import { useCommandMenu } from "@/components/shared/CommandMenu";
 import { QuickAddButton } from "@/components/global/QuickAddButton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -36,7 +36,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
         <div className="flex items-center gap-3">
           {!isMobile && <SidebarTrigger className="text-muted-foreground" />}
           {title && (
-            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+            <span className="text-lg font-semibold text-foreground">{title}</span>
           )}
         </div>
 
@@ -97,7 +97,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
             title="Terminar sessão"
             aria-label="Terminar sessão"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>

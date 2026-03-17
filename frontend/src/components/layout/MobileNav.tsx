@@ -24,7 +24,7 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-end justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-end justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
         {MOBILE_TABS.map((tab) => {
           const active = location.pathname === tab.path;
           return (
