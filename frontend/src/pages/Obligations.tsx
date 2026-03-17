@@ -3,7 +3,8 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { useObligations } from "@/hooks/use-tax";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { CalendarCheck, AlertTriangle, Clock, CheckCircle2, ChevronRight } from "lucide-react";
+import { CalendarCheck, AlertTriangle, Clock, CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { Obligation } from "@/lib/api";
 
 const STATUS_CONFIG = {
@@ -83,7 +84,7 @@ export default function Obligations() {
             key={s}
             onClick={() => setFilter(s)}
             className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               filter === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
             )}
           >
@@ -96,14 +97,11 @@ export default function Obligations() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">A carregar obrigações…</div>
+        <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin" />A carregar obrigações…</div>
       ) : (
         <div className="space-y-6">
           {groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card py-16">
-              <CheckCircle2 className="h-10 w-10 text-tim-success" />
-              <p className="mt-3 text-sm font-medium">Nenhuma obrigação nesta categoria</p>
-            </div>
+            <EmptyState icon={CheckCircle2} title="Nenhuma obrigação nesta categoria" description="Todas as obrigações estão em dia." />
           ) : (
             groups.map((group) => (
               <div key={group.status}>

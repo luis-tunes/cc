@@ -35,7 +35,7 @@ export default function PricingPage() {
             {isTrialing && (
               <button
                 onClick={() => navigate("/painel")}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
                 Continuar para o painel
                 <ArrowRight className="h-3 w-3" />
@@ -146,7 +146,7 @@ export default function PricingPage() {
                         disabled={isCurrent || checkout.isPending}
                         onClick={() => checkout.mutate(plan.id)}
                         className={cn(
-                          "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all",
+                          "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           isCurrent
                             ? "bg-muted text-muted-foreground cursor-default"
                             : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30"

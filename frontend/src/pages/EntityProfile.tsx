@@ -96,7 +96,7 @@ export default function EntityProfile() {
               key={step.id}
               onClick={() => setActiveStep(step.id)}
               className={cn(
-                "flex-1 rounded-md px-3 py-2 text-left transition-colors",
+                "flex-1 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 activeStep === step.id ? "bg-primary/10 border border-primary/30" : "hover:bg-accent/50",
                 step.id < activeStep && "opacity-60"
               )}
@@ -165,7 +165,7 @@ export default function EntityProfile() {
                       key={cat.value}
                       onClick={() => update("entityCategory", cat.value)}
                       className={cn(
-                        "rounded-md border px-3 py-2.5 text-left transition-all",
+                        "rounded-md border px-3 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         data.entityCategory === cat.value
                           ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
                           : "hover:bg-accent/50"

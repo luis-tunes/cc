@@ -4,8 +4,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, Info, BarChart3 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -82,7 +83,7 @@ export default function Forecasts() {
         </div>
         <div className="p-4">
           {chartData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Sem dados históricos para projetar</div>
+            <EmptyState icon={BarChart3} title="Sem dados históricos para projetar" description="Processe faturas para gerar previsões." />
           ) : (
             <ResponsiveContainer width="100%" height={256}>
               <AreaChart data={chartData}>

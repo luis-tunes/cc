@@ -9,6 +9,9 @@ import {
 } from "recharts";
 import { AlertTriangle, AlertCircle, Info, TrendingUp, Receipt, CheckCircle2 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -94,9 +97,9 @@ export default function TaxCenter() {
               </div>
               <div className="p-4">
                 {loadingIva ? (
-                  <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">A carregar…</div>
+                  <div className="space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-44 w-full rounded-lg" /><Skeleton className="h-4 w-1/2" /></div>
                 ) : ivaPeriods.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-muted-foreground text-sm">Sem dados fiscais — processe faturas para ver resultados</div>
+                  <EmptyState icon={Receipt} title="Sem dados fiscais" description="Processe faturas para ver os resultados de IVA." />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={ivaChartData} barGap={4}>
@@ -146,7 +149,7 @@ export default function TaxCenter() {
           <TabsContent value="irc" className="mt-4">
             <div className="rounded-lg border bg-card p-6">
               {loadingIrc ? (
-                <div className="text-sm text-muted-foreground">A calcular…</div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />A calcular…</div>
               ) : irc ? (
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -174,7 +177,7 @@ export default function TaxCenter() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Sem dados suficientes para estimar IRC.</p>
+                <EmptyState icon={Receipt} title="Sem dados suficientes" description="Processe faturas para estimar o IRC." />
               )}
             </div>
           </TabsContent>
@@ -182,7 +185,7 @@ export default function TaxCenter() {
           {/* Auditoria tab */}
           <TabsContent value="auditoria" className="mt-4">
             {loadingAudit ? (
-              <div className="text-sm text-muted-foreground">A analisar…</div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />A analisar…</div>
             ) : auditData && auditData.flags.length > 0 ? (
               <div className="space-y-3">
                 {auditData.flags.map((flag) => {

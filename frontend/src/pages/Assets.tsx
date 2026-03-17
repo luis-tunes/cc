@@ -37,6 +37,7 @@ import { useAssets, useAssetsSummary, useCreateAsset, useDeleteAsset, type Asset
 import { getExportAssetsCSVUrl, type AssetCreate } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { Loader2 } from "lucide-react";
 
 const CATEGORIES = [
   { value: "equipamento", label: "Equipamento" },
@@ -251,7 +252,7 @@ export default function Assets() {
       )}
 
       {isLoading ? (
-        <div className="py-20 text-center text-sm text-muted-foreground">A carregar ativos…</div>
+        <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />A carregar ativos…</div>
       ) : assets.length === 0 ? (
         <EmptyState
           icon={Package}
@@ -335,7 +336,8 @@ export default function Assets() {
                     <TableCell>
                       <button
                         onClick={() => deleteAssetMutation.mutate(asset.id)}
-                        className="p-1 text-muted-foreground hover:text-tim-danger transition-colors"
+                        className="p-1 text-muted-foreground hover:text-tim-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                        aria-label="Eliminar ativo"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

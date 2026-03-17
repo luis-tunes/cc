@@ -119,7 +119,8 @@ export default function Suppliers() {
               placeholder="Pesquisar fornecedor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-64"
+              className="h-8 w-full sm:w-64"
+              aria-label="Pesquisar fornecedor"
             />
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="h-8 w-40">

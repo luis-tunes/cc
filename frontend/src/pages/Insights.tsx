@@ -6,8 +6,9 @@ import {
   PieChart, Pie, Cell, BarChart, Bar,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -75,7 +76,7 @@ export default function Insights() {
           </div>
           <div className="p-4">
             {cashFlowData.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Sem dados suficientes</div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes" description="Processe faturas para ver a evolução do resultado." />
             ) : (
               <ResponsiveContainer width="100%" height={192}>
                 <AreaChart data={cashFlowData}>
@@ -103,7 +104,7 @@ export default function Insights() {
           </div>
           <div className="p-4">
             {supplierData.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Sem fornecedores com gastos registados</div>
+              <EmptyState icon={PieChartIcon} title="Sem fornecedores com gastos registados" description="Os dados aparecerão após processar faturas." />
             ) : (
               <ResponsiveContainer width="100%" height={192}>
                 <PieChart>

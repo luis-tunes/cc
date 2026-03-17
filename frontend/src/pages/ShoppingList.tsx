@@ -125,7 +125,8 @@ export default function ShoppingList() {
           placeholder="Pesquisar ingrediente ou fornecedor…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-72"
+          className="h-8 w-full sm:w-72"
+          aria-label="Pesquisar ingrediente"
         />
         <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
           <SelectTrigger className="h-8 w-32">

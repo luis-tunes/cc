@@ -120,7 +120,8 @@ export default function Products() {
               placeholder="Pesquisar produto…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-64"
+              className="h-8 w-full sm:w-64"
+              aria-label="Pesquisar produto"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-8 w-32">

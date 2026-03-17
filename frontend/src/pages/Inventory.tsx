@@ -170,6 +170,7 @@ export default function Inventory() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 w-48"
+              aria-label="Pesquisar ingredientes"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-8 w-36">

@@ -56,12 +56,14 @@ function RuleRow({ rule, onDelete, onToggle }: { rule: ClassificationRule; onDel
       <div className="flex items-center gap-2">
         <button
           onClick={onToggle}
-          className={cn("h-5 w-9 rounded-full transition-colors", rule.active ? "bg-primary" : "bg-muted")}
+          className={cn("h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", rule.active ? "bg-primary" : "bg-muted")}
+          role="switch"
+          aria-checked={rule.active}
           title={rule.active ? "Desativar" : "Ativar"}
         >
           <span className={cn("block h-4 w-4 rounded-full bg-background shadow transition-transform mx-0.5", rule.active ? "translate-x-4" : "translate-x-0")} />
         </button>
-        <button onClick={onDelete} className="text-muted-foreground hover:text-tim-danger transition-colors">
+        <button onClick={onDelete} className="text-muted-foreground hover:text-tim-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded" aria-label="Eliminar regra">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>

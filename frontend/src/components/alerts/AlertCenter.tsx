@@ -11,6 +11,7 @@ import {
   ArrowRight,
   CheckCircle2,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -136,7 +137,7 @@ export function AlertCenter({ className }: { className?: string }) {
 
       <div className="p-3 space-y-4">
         {isLoading && (
-          <div className="py-6 text-center text-xs text-muted-foreground">A carregar alertas…</div>
+          <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />A carregar alertas…</div>
         )}
         {sections.map(({ key, label }) => {
           const items = grouped[key];

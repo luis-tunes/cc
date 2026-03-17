@@ -4,8 +4,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { TrendingDown, TrendingUp, Lightbulb, AlertTriangle, Truck } from "lucide-react";
+import { TrendingDown, TrendingUp, Lightbulb, AlertTriangle, Truck, BarChart3 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -128,7 +129,7 @@ export default function CostOptimization() {
           </div>
           <div className="p-4">
             {chartData.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Sem dados suficientes</div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes" description="Processe faturas para ver a análise de custos." />
             ) : (
               <ResponsiveContainer width="100%" height={192}>
                 <BarChart data={chartData} barGap={2}>
@@ -150,10 +151,7 @@ export default function CostOptimization() {
             <h3 className="text-sm font-semibold">Principais fornecedores por gasto</h3>
           </div>
           {suppliers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2 text-sm text-muted-foreground">
-              <Truck className="h-8 w-8 text-muted-foreground/30" />
-              Sem fornecedores com gastos registados
-            </div>
+            <EmptyState icon={Truck} title="Sem fornecedores com gastos registados" description="Os fornecedores aparecerão aqui após processar faturas." />
           ) : (
             <div className="divide-y">
               {suppliers.map((s, i) => {

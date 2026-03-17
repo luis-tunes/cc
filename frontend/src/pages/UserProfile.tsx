@@ -113,6 +113,7 @@ export default function UserProfile() {
                 <button
                   onClick={() => fileRef.current?.click()}
                   className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground transition-transform hover:scale-105"
+                  aria-label="Alterar foto de perfil"
                 >
                   {uploadAvatar.isPending ? (
                     <Loader2 className="h-3 w-3 animate-spin" />

@@ -92,12 +92,12 @@ export default function AiAssistant() {
                 onClick={() => handlePrompt(p.prompt)}
                 disabled={isPending}
                 className={cn(
-                  "text-xs px-3 py-1.5 rounded-full border font-medium transition-opacity",
+                  "text-xs px-3 py-1.5 rounded-full border font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   "hover:opacity-80 disabled:opacity-40",
                   categoryColors[p.category] ?? "bg-muted text-foreground border-border"
                 )}
               >
-                <Sparkles className="inline h-3 w-3 mr-1 opacity-70" />
+                <Sparkles className="inline h-3.5 w-3.5 mr-1 opacity-70" />
                 {p.label}
               </button>
             ))}
@@ -133,10 +133,10 @@ export default function AiAssistant() {
             className="resize-none min-h-[44px] max-h-32 text-sm"
             rows={1}
           />
-          <Button onClick={handleSend} disabled={!input.trim() || isPending} size="icon" className="h-11 w-11 shrink-0">
+          <Button onClick={handleSend} disabled={!input.trim() || isPending} size="icon" className="h-11 w-11 shrink-0" aria-label="Enviar mensagem">
             <Send className="h-4 w-4" />
           </Button>
-          <Button onClick={clearMessages} variant="outline" size="icon" className="h-11 w-11 shrink-0" title="Limpar conversa">
+          <Button onClick={clearMessages} variant="outline" size="icon" className="h-11 w-11 shrink-0" title="Limpar conversa" aria-label="Limpar conversa">
             <RotateCcw className="h-4 w-4" />
           </Button>
         </div>

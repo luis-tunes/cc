@@ -9,8 +9,10 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { downloadWithAuth } from "@/lib/api";
-import { TrendingUp, TrendingDown, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, Download, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -94,7 +96,7 @@ export default function Reports() {
               {loadingPl ? (
                 <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">A carregar…</div>
               ) : barData.length === 0 ? (
-                <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">Sem documentos em {year}</div>
+                <EmptyState icon={BarChart3} title={`Sem documentos em ${year}`} description="Processe faturas para gerar o relatório." />
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={barData} barGap={4}>
@@ -167,9 +169,9 @@ export default function Reports() {
               </div>
               <div className="p-4">
                 {loadingSuppliers ? (
-                  <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">A carregar…</div>
+                  <div className="space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-44 w-full rounded-lg" /><Skeleton className="h-4 w-1/2" /></div>
                 ) : supplierPieData.length === 0 ? (
-                  <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                  <EmptyState icon={PieChartIcon} title="Sem dados" description="Processe faturas para ver a distribuição por fornecedor." />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
@@ -200,7 +202,7 @@ export default function Reports() {
                   </div>
                 ))}
                 {topSuppliers.length === 0 && !loadingSuppliers && (
-                  <div className="py-8 text-center text-sm text-muted-foreground">Sem dados</div>
+                  <div className="py-8 text-center text-sm text-muted-foreground">Sem fornecedores registados</div>
                 )}
               </div>
             </div>
