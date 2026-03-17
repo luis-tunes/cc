@@ -99,7 +99,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
                     <stop offset="95%" stopColor="hsl(220, 10%, 55%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 14%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 90%)" />
                 <XAxis
                   dataKey="mes"
                   tick={{ fontSize: 11, fill: "hsl(220, 10%, 55%)" }}
@@ -144,7 +144,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
           <div className="mt-3 h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 14%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 90%)" />
                 <XAxis
                   dataKey="mes"
                   tick={{ fontSize: 11, fill: "hsl(220, 10%, 55%)" }}

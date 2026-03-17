@@ -5,6 +5,9 @@ import {
   Image,
   Files,
   Landmark,
+  Truck,
+  Package,
+  UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
 
@@ -12,11 +15,12 @@ export interface QuickAction {
   id: string;
   label: string;
   icon: LucideIcon;
-  group: "documentos" | "financeiro";
+  group: "documentos" | "financeiro" | "negocio";
   shortcut?: string;
   disabled?: boolean;
   badge?: string;
   uploadPreset?: string;
+  navigateTo?: string;
 }
 
 export const ALL_ACTIONS: QuickAction[] = [
@@ -28,6 +32,10 @@ export const ALL_ACTIONS: QuickAction[] = [
   { id: "multipla", label: "Importação múltipla", icon: Files, group: "documentos", uploadPreset: undefined },
   // Financeiro
   { id: "csv", label: "Importar CSV bancário", icon: Landmark, group: "financeiro", uploadPreset: undefined },
+  // Negócio
+  { id: "fornecedor", label: "Novo fornecedor", icon: Truck, group: "negocio", navigateTo: "/fornecedores" },
+  { id: "ingrediente", label: "Novo ingrediente", icon: Package, group: "negocio", navigateTo: "/inventario" },
+  { id: "produto", label: "Novo produto", icon: UtensilsCrossed, group: "negocio", navigateTo: "/produtos" },
 ];
 
 export interface PageContext {
@@ -70,4 +78,5 @@ export function getPageContext(pathname: string): PageContext {
 export const GROUP_LABELS: Record<string, string> = {
   documentos: "Documentos",
   financeiro: "Financeiro",
+  negocio: "Negócio",
 };

@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { downloadWithAuth } from "@/lib/api";
 import { TrendingUp, TrendingDown, Download } from "lucide-react";
 
 function fmt(n: number) {
@@ -51,7 +52,7 @@ export default function Reports() {
               </button>
             ))}
           </div>
-          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => window.open("/api/export/csv")}>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => downloadWithAuth("/export/csv", "relatorio.csv")}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> Exportar CSV
           </Button>
         </div>

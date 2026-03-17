@@ -154,7 +154,9 @@ export interface Reconciliation {
   reconciliation_status?: string;
   supplier_nif?: string;
   total?: number;
+  doc_vat?: number;
   doc_date?: string;
+  doc_filename?: string;
   description?: string;
   amount?: number;
   tx_date?: string;
@@ -214,6 +216,18 @@ export async function uploadDocument(file: File): Promise<{ status: string; file
   const form = new FormData();
   form.append("file", file);
   return requestFormData("/documents/upload", form);
+}
+
+export async function deleteDocument(id: number): Promise<void> {
+  await request<void>(`/documents/${id}`, { method: "DELETE" });
+}
+
+export function documentPreviewUrl(id: number): string {
+  return `${BASE}/documents/${id}/preview`;
+}
+
+export function documentThumbnailUrl(id: number): string {
+  return `${BASE}/documents/${id}/thumbnail`;
 }
 
 // ── Bank Transactions ────────────────────────────────────────────────
@@ -282,6 +296,27 @@ export async function fetchMonthlyData(): Promise<MonthlyData[]> {
 
 export function getExportCSVUrl(): string {
   return `${BASE}/export/csv`;
+}
+
+export async function downloadWithAuth(path: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = await getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${BASE}${path}`, { headers });
+  if (!res.ok) {
+    throw new Error(`Export failed: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Billing ──────────────────────────────────────────────────────────

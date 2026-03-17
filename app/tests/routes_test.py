@@ -186,6 +186,35 @@ def test_create_and_patch_document(mock_client_cls):
     assert r.json()["status"] == "classificado"
 
 
+@patch("app.routes.httpx.Client")
+def test_delete_document(mock_client_cls):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
+
+    r = client.post(
+        "/api/documents/upload",
+        files={"file": ("delete-me.pdf", b"%PDF-1", "application/pdf")},
+    )
+    assert r.status_code == 200
+    doc_id = r.json()["id"]
+
+    r = client.delete(f"/api/documents/{doc_id}")
+    assert r.status_code == 204
+
+    r = client.get(f"/api/documents/{doc_id}")
+    assert r.status_code == 404
+
+
+def test_delete_document_not_found():
+    r = client.delete("/api/documents/999999")
+    assert r.status_code == 404
+
+
 # ── Bank Transactions ─────────────────────────────────────────────────
 
 def test_list_bank_transactions():

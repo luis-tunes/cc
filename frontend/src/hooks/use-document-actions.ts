@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { patchDocument } from "@/lib/api";
+import { patchDocument, deleteDocument } from "@/lib/api";
 import { toast } from "sonner";
 
 export interface DocumentActions {
@@ -10,6 +10,7 @@ export interface DocumentActions {
   onArchive: (id: string) => void;
   onAcceptAiSuggestion: (id: string) => void;
   onAddNote: (id: string, note: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export function useDocumentActions(refetch: () => void) {
@@ -22,6 +23,19 @@ export function useDocumentActions(refetch: () => void) {
     },
     onError: (err: Error) => {
       toast.error(`Erro: ${err.message}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return deleteDocument(Number(id));
+    },
+    onSuccess: () => {
+      refetch();
+      toast.success("Documento eliminado");
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao eliminar: ${err.message}`);
     },
   });
 
@@ -70,6 +84,9 @@ export function useDocumentActions(refetch: () => void) {
     onAddNote: (id, note) => {
       mutation.mutate({ id, patch: { notes: note } });
       toast.success("Nota guardada");
+    },
+    onDelete: (id) => {
+      deleteMutation.mutate(id);
     },
   };
 

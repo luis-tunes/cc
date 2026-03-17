@@ -67,8 +67,9 @@ def get_seq():
 
 class FakeCursor:
     """Returned by conn.execute(); holds fetchone/fetchall results."""
-    def __init__(self, rows: list[dict]):
+    def __init__(self, rows: list[dict], rowcount: int | None = None):
         self._rows = rows
+        self.rowcount = rowcount if rowcount is not None else len(rows)
 
     def fetchone(self):
         return self._rows[0] if self._rows else None
@@ -174,6 +175,8 @@ class FakeConn:
         if "into reconciliations" in sql_lower:
             return self._handle_reconciliations(sql, params)
         if "update reconciliations" in sql_lower:
+            return self._handle_reconciliations(sql, params)
+        if "delete from reconciliations" in sql_lower:
             return self._handle_reconciliations(sql, params)
 
         # ── Bank transactions ──
@@ -296,6 +299,11 @@ class FakeConn:
                 rec_doc_ids = {r["document_id"] for r in _tables["reconciliations"]}
                 docs = [d for d in docs if d["id"] not in rec_doc_ids]
             return FakeCursor(docs)
+        if sql_lower.startswith("delete"):
+            if params:
+                doc_id = params[0]
+                _tables["documents"] = [d for d in _tables["documents"] if d["id"] != doc_id]
+            return FakeCursor([])
         return FakeCursor([])
 
     # ────── Bank transactions ──────
@@ -368,7 +376,35 @@ class FakeConn:
             if "tenant_id = %s" in sql_lower and params:
                 tid = params[-1] if params else None
                 rows = [r for r in rows if r.get("tenant_id") == tid]
+            # Simulate JOIN with documents and bank_transactions
+            if "join documents" in sql_lower or "join bank_transactions" in sql_lower:
+                joined = []
+                for r in rows:
+                    doc = next((d for d in _tables["documents"] if d["id"] == r["document_id"]), None)
+                    tx = next((t for t in _tables["bank_transactions"] if t["id"] == r["bank_transaction_id"]), None)
+                    row = {
+                        "id": r["id"],
+                        "document_id": r["document_id"],
+                        "bank_transaction_id": r["bank_transaction_id"],
+                        "match_confidence": r["match_confidence"],
+                        "reconciliation_status": r.get("status", "pendente"),
+                        "supplier_nif": doc["supplier_nif"] if doc else "",
+                        "total": doc["total"] if doc else Decimal("0"),
+                        "doc_vat": doc["vat"] if doc else Decimal("0"),
+                        "doc_date": str(doc["date"]) if doc and doc.get("date") else None,
+                        "doc_filename": doc.get("filename") if doc else None,
+                        "description": tx["description"] if tx else "",
+                        "amount": tx["amount"] if tx else Decimal("0"),
+                        "tx_date": str(tx["date"]) if tx and tx.get("date") else None,
+                    }
+                    joined.append(row)
+                return FakeCursor(joined)
             return FakeCursor(rows)
+        if sql_lower.startswith("delete"):
+            if "document_id" in sql_lower and params:
+                doc_id = params[0]
+                _tables["reconciliations"] = [r for r in _tables["reconciliations"] if r["document_id"] != doc_id]
+            return FakeCursor([])
         return FakeCursor([])
 
     # ────── Tenant settings ──────

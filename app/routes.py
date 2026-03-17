@@ -350,6 +350,109 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
         raise HTTPException(status_code=404, detail="document not found")
     return row
 
+
+@router.delete("/documents/{doc_id}", status_code=204)
+async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    wheres = ["id = %s"]
+    params: list = [doc_id]
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
+    with get_conn() as conn:
+        row = conn.execute(f"SELECT id, paperless_id FROM documents WHERE {where}", params).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="document not found")
+        conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
+        conn.execute(f"DELETE FROM documents WHERE {where}", params)
+        log_activity(conn, (auth.tenant_id if auth else "") or "", "document", doc_id, "deleted", None)
+        conn.commit()
+    return None
+
+
+@router.get("/documents/{doc_id}/preview")
+async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Proxy the document file from Paperless-ngx for preview."""
+    wheres = ["id = %s"]
+    params: list = [doc_id]
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT paperless_id, filename FROM documents WHERE {where}", params
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    paperless_id = row["paperless_id"]
+    filename = row["filename"] or "document"
+    ext = os.path.splitext(filename.lower())[1]
+    content_type = MIME_MAP.get(ext, "application/pdf")
+
+    if not paperless_id or not PAPERLESS_TOKEN:
+        raise HTTPException(status_code=404, detail="no preview available")
+
+    headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
+    try:
+        with httpx.Client() as client:
+            r = client.get(
+                f"{PAPERLESS_URL}/api/documents/{paperless_id}/download/",
+                headers=headers,
+                timeout=30,
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail="failed to fetch from OCR service")
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="OCR service unavailable")
+
+    return StreamingResponse(
+        io.BytesIO(r.content),
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@router.get("/documents/{doc_id}/thumbnail")
+async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Proxy the document thumbnail from Paperless-ngx."""
+    wheres = ["id = %s"]
+    params: list = [doc_id]
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT paperless_id FROM documents WHERE {where}", params
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    paperless_id = row["paperless_id"]
+    if not paperless_id or not PAPERLESS_TOKEN:
+        raise HTTPException(status_code=404, detail="no thumbnail available")
+
+    headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
+    try:
+        with httpx.Client() as client:
+            r = client.get(
+                f"{PAPERLESS_URL}/api/documents/{paperless_id}/thumb/",
+                headers=headers,
+                timeout=15,
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail="failed to fetch thumbnail")
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="OCR service unavailable")
+
+    return StreamingResponse(
+        io.BytesIO(r.content),
+        media_type="image/webp",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
 # --- Bank Transactions ---
 
 @router.post("/bank-transactions/upload")
@@ -440,7 +543,8 @@ async def list_reconciliations(
         rows = conn.execute(
             f"""SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence,
                       r.status as reconciliation_status,
-                      d.supplier_nif, d.total, d.date as doc_date,
+                      d.supplier_nif, d.total, d.vat as doc_vat, d.date as doc_date,
+                      d.filename as doc_filename,
                       b.description, b.amount, b.date as tx_date
                FROM reconciliations r
                JOIN documents d ON d.id = r.document_id

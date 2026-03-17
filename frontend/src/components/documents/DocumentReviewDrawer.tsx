@@ -32,9 +32,11 @@ import {
   ThumbsDown,
   RotateCcw,
   MessageSquare,
+  Trash2,
 } from "lucide-react";
 import type { DocumentRecord, ExtractedField } from "@/lib/documents-data";
 import { documentTypeLabels, type DocumentType } from "@/lib/documents-data";
+import { documentThumbnailUrl, documentPreviewUrl } from "@/lib/api";
 
 // SNC account options for reclassification
 const SNC_ACCOUNTS = [
@@ -58,6 +60,7 @@ export interface DocumentActions {
   onArchive: (id: string) => void;
   onAcceptAiSuggestion: (id: string) => void;
   onAddNote: (id: string, note: string) => void;
+  onDelete: (id: string) => void;
 }
 
 interface DocumentReviewDrawerProps {
@@ -80,6 +83,8 @@ export function DocumentReviewDrawer({
   const [showReject, setShowReject] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showNote, setShowNote] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
 
   if (!document) return null;
 
@@ -92,10 +97,12 @@ export function DocumentReviewDrawer({
     setShowReclassify(false);
     setShowReject(false);
     setShowNote(false);
+    setShowDeleteConfirm(false);
     setSelectedAccount("");
     setSelectedDocType("");
     setRejectReason("");
     setNoteText("");
+    setPreviewError(false);
   };
 
   const handleApprove = () => {
@@ -118,6 +125,12 @@ export function DocumentReviewDrawer({
   const handleArchive = () => {
     actions.onArchive(document.id);
     resetPanels();
+  };
+
+  const handleDelete = () => {
+    actions.onDelete(document.id);
+    resetPanels();
+    onClose();
   };
 
   const handleAddNote = () => {
@@ -151,12 +164,33 @@ export function DocumentReviewDrawer({
         </SheetHeader>
 
         <div className="space-y-0 divide-y">
-          {/* File preview placeholder */}
-          <div className="flex items-center justify-center bg-muted/30 py-20 px-5">
-            <div className="text-center">
-              <FileIcon className="mx-auto h-12 w-12 text-muted-foreground/40" />
-              <p className="mt-2 text-xs text-muted-foreground">Pré-visualização do documento</p>
-            </div>
+          {/* File preview */}
+          <div className="bg-muted/30">
+            {!previewError ? (
+              <div className="relative">
+                <img
+                  src={documentThumbnailUrl(Number(document.id))}
+                  alt={document.fileName}
+                  className="w-full max-h-[300px] object-contain"
+                  onError={() => setPreviewError(true)}
+                />
+                <a
+                  href={documentPreviewUrl(Number(document.id))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-2 right-2 rounded-md bg-background/80 px-2 py-1 text-xs font-medium text-foreground shadow hover:bg-background transition-colors"
+                >
+                  <Eye className="mr-1 inline-block h-3 w-3" /> Abrir original
+                </a>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-20 px-5">
+                <div className="text-center">
+                  <FileIcon className="mx-auto h-12 w-12 text-muted-foreground/40" />
+                  <p className="mt-2 text-xs text-muted-foreground">Pré-visualização indisponível</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Extraction confidence banner */}
@@ -395,6 +429,29 @@ export function DocumentReviewDrawer({
             </div>
           )}
 
+          {/* Delete confirmation */}
+          {showDeleteConfirm && (
+            <div className="px-5 py-4 bg-tim-danger/[0.03]">
+              <SectionTitle>Eliminar Documento</SectionTitle>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Tem a certeza que quer eliminar este documento? Esta ação não pode ser desfeita.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-tim-danger/30 text-tim-danger hover:bg-tim-danger/10"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" /> Confirmar eliminação
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Actions footer */}
           <div className="sticky bottom-0 flex items-center gap-2 border-t bg-card px-5 py-3">
             {!isApproved && !isArchived && (
@@ -408,7 +465,7 @@ export function DocumentReviewDrawer({
                 size="sm"
                 variant="outline"
                 className="h-9 text-sm"
-                onClick={() => { setShowReclassify(!showReclassify); setShowReject(false); }}
+                onClick={() => { setShowReclassify(!showReclassify); setShowReject(false); setShowDeleteConfirm(false); }}
               >
                 <Tags className="mr-1.5 h-4 w-4" />
                 Reclassificar
@@ -419,7 +476,7 @@ export function DocumentReviewDrawer({
                 size="sm"
                 variant="outline"
                 className="h-9 text-sm text-tim-danger border-tim-danger/20 hover:bg-tim-danger/5"
-                onClick={() => { setShowReject(!showReject); setShowReclassify(false); }}
+                onClick={() => { setShowReject(!showReject); setShowReclassify(false); setShowDeleteConfirm(false); }}
               >
                 <ThumbsDown className="mr-1.5 h-4 w-4" />
                 Rejeitar
@@ -447,6 +504,15 @@ export function DocumentReviewDrawer({
                   Restaurar
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-9 text-sm text-tim-danger"
+                onClick={() => { setShowDeleteConfirm(!showDeleteConfirm); setShowReclassify(false); setShowReject(false); }}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Eliminar
+              </Button>
             </div>
           </div>
         </div>

@@ -13,19 +13,38 @@ function toPair(r: Reconciliation): ReconciliationPair {
   const status = r.reconciliation_status === "aprovado" ? "approved"
     : r.reconciliation_status === "rejeitado" || r.reconciliation_status === "a_rever" ? "exception"
     : "auto-matched";
+
+  const docDate = r.doc_date ? new Date(r.doc_date) : null;
+  const txDate = r.tx_date ? new Date(r.tx_date) : null;
+  const dateDelta = docDate && txDate
+    ? Math.abs(Math.round((docDate.getTime() - txDate.getTime()) / 86400000))
+    : 0;
+
+  const confidence = Math.round((r.match_confidence ?? 0.95) * 100);
+  const amountDelta = r.total && r.amount ? Math.abs(Number(r.total) - Math.abs(Number(r.amount))) : 0;
+
+  let reasoning = "Correspondência automática por montante e data.";
+  if (amountDelta < 0.01 && dateDelta <= 1) {
+    reasoning = "Montante e data coincidem exatamente.";
+  } else if (amountDelta < 0.01) {
+    reasoning = `Montante exato, ${dateDelta} dias de diferença.`;
+  } else if (dateDelta <= 1) {
+    reasoning = `Data coincide, diferença de €${amountDelta.toFixed(2)} no montante.`;
+  }
+
   return {
     id: String(r.id),
     status,
-    confidence: Math.round((r.match_confidence ?? 0.95) * 100),
-    reasoning: "Correspondência automática por montante e data.",
-    amountDelta: r.total && r.amount ? Math.abs(Number(r.total) - Math.abs(Number(r.amount))) : 0,
-    dateDelta: 0,
+    confidence,
+    reasoning,
+    amountDelta,
+    dateDelta,
     document: r.supplier_nif ? {
       id: String(r.document_id),
-      fileName: `documento-${r.document_id}.pdf`,
+      fileName: r.doc_filename || `documento-${r.document_id}.pdf`,
       supplier: r.supplier_nif,
       amount: Number(r.total ?? 0),
-      vat: 0,
+      vat: Number(r.doc_vat ?? 0),
       date: r.doc_date ?? "",
       type: "Fatura",
       extractionConfidence: 85,

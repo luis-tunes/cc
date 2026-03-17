@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ export function QuickAddButton() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadPreset, setUploadPreset] = useState<string | undefined>();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const ctx = useMemo(() => getPageContext(location.pathname), [location.pathname]);
 
@@ -53,11 +54,12 @@ export function QuickAddButton() {
 
   const handleAction = (action: QuickAction) => {
     if (action.disabled) return;
-    // Upload-related actions
-    if (action.group === "documentos" || action.id === "csv") {
+    if (action.navigateTo) {
+      setMenuOpen(false);
+      navigate(action.navigateTo);
+    } else if (action.group === "documentos" || action.id === "csv") {
       openUpload(action.uploadPreset);
     } else {
-      // Non-upload actions — close menu (placeholder)
       setMenuOpen(false);
     }
   };

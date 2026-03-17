@@ -18,6 +18,7 @@ import {
 import { type DocumentRecord } from "@/lib/documents-data";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
+import { downloadWithAuth } from "@/lib/api";
 import { toast } from "sonner";
 import { TableSkeleton, KpiSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -100,7 +101,29 @@ export default function Documents() {
     setDrawerOpen(true);
   }, []);
 
-  const bulkAction = (action: string) => {
+  const bulkApprove = useCallback(() => {
+    const ids = [...selectedIds];
+    for (const id of ids) {
+      actions.onApprove(id);
+    }
+    toast.success(`${ids.length} documentos aprovados`);
+    setSelectedIds(new Set());
+  }, [selectedIds, actions]);
+
+  const bulkArchive = useCallback(() => {
+    const ids = [...selectedIds];
+    for (const id of ids) {
+      actions.onArchive(id);
+    }
+    toast.success(`${ids.length} documentos arquivados`);
+    setSelectedIds(new Set());
+  }, [selectedIds, actions]);
+
+  const bulkExport = useCallback(() => {
+    downloadWithAuth("/export/csv", "documentos.csv");
+  }, []);
+
+  const bulkStub = (action: string) => {
     toast.success(`${action}: ${selectedIds.size} documentos`);
     setSelectedIds(new Set());
   };
@@ -176,12 +199,12 @@ export default function Documents() {
         <BulkActionsBar
           selectedCount={selectedIds.size}
           pendingHighConfidence={pendingHighConfidence}
-          onApprove={() => bulkAction("Aprovados")}
+          onApprove={bulkApprove}
           onApproveAll={handleApproveAll}
-          onClassify={() => bulkAction("Classificados")}
-          onFlag={() => bulkAction("Sinalizados")}
-          onExport={() => bulkAction("Exportados")}
-          onArchive={() => bulkAction("Arquivados")}
+          onClassify={() => bulkStub("Classificados")}
+          onFlag={() => bulkStub("Sinalizados")}
+          onExport={bulkExport}
+          onArchive={bulkArchive}
           onClear={() => setSelectedIds(new Set())}
         />
 
