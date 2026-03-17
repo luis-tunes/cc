@@ -7,6 +7,9 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  // E2E testing bypass — compile-time constant, tree-shaken in production
+  if (import.meta.env.VITE_E2E_TEST) return <>{children}</>;
+
   const { isSignedIn, isLoaded } = useAuth();
 
   if (!isLoaded) {

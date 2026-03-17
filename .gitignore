@@ -12,3 +12,4 @@ mcp/node_modules/
 *.tsbuildinfo
 docker-compose.override.yml
 .coverage
+.vite/

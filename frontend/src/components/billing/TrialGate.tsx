@@ -13,6 +13,9 @@ interface TrialGateProps {
  * plans, renders children normally.
  */
 export function TrialGate({ children }: TrialGateProps) {
+  // E2E testing bypass — compile-time constant, tree-shaken in production
+  if (import.meta.env.VITE_E2E_TEST) return <>{children}</>;
+
   const { data: billing, isLoading, isError } = useBillingStatus();
   const [timedOut, setTimedOut] = useState(false);
 
