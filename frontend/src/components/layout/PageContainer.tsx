@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { usePageTitle } from "@/hooks/use-page-title";
 import type { ReactNode } from "react";
 
 interface PageContainerProps {
@@ -16,6 +17,7 @@ export function PageContainer({
   children,
   className,
 }: PageContainerProps) {
+  usePageTitle(title);
   return (
     <div className={cn("flex-1 overflow-auto", className)}>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
