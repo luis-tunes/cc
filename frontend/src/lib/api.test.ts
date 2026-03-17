@@ -26,6 +26,19 @@ import {
   createIngredient,
   createSupplier,
   deleteIngredient,
+  deleteDocument,
+  documentPreviewUrl,
+  documentThumbnailUrl,
+  downloadWithAuth,
+  runReconciliation,
+  patchReconciliation,
+  fetchReconciliationSuggestions,
+  uploadBankCSV,
+  fetchMonthlyData,
+  getExportCSVUrl,
+  createCheckoutSession,
+  fetchEntity,
+  saveEntity,
   fetchBillingPlans,
   fetchBillingStatus,
   setTokenProvider,
@@ -276,5 +289,164 @@ describe("API client", () => {
     await fetchDocuments();
     const opts = mockFetch.mock.calls[0][1];
     expect(opts.headers["Authorization"]).toBeUndefined();
+  });
+
+  // ── Delete Document ────────────────────────────────────────────
+
+  it("deleteDocument sends DELETE to correct endpoint", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      json: () => Promise.resolve(undefined),
+      text: () => Promise.resolve(""),
+    });
+    await deleteDocument(42);
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/documents/42");
+    expect(opts.method).toBe("DELETE");
+  });
+
+  // ── Document Preview/Thumbnail URLs ────────────────────────────
+
+  it("documentPreviewUrl returns correct path", () => {
+    expect(documentPreviewUrl(7)).toBe("/api/documents/7/preview");
+  });
+
+  it("documentThumbnailUrl returns correct path", () => {
+    expect(documentThumbnailUrl(99)).toBe("/api/documents/99/thumbnail");
+  });
+
+  // ── Export CSV URL ─────────────────────────────────────────────
+
+  it("getExportCSVUrl returns correct path", () => {
+    expect(getExportCSVUrl()).toBe("/api/export/csv");
+  });
+
+  // ── downloadWithAuth ───────────────────────────────────────────
+
+  it("downloadWithAuth fetches and triggers download", async () => {
+    setTokenProvider(() => Promise.resolve("dl-token"));
+    const fakeBlob = new Blob(["csv-data"], { type: "text/csv" });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    // Mock URL.createObjectURL and document.createElement
+    const revokeUrl = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: revokeUrl });
+    const clickFn = vi.fn();
+    const removeFn = vi.fn();
+    const origCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "a") {
+        const el = origCreateElement("a");
+        el.click = clickFn;
+        el.remove = removeFn;
+        return el;
+      }
+      return origCreateElement(tag);
+    });
+
+    await downloadWithAuth("/export/csv", "test.csv");
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/export/csv");
+    expect(opts.headers["Authorization"]).toBe("Bearer dl-token");
+    expect(clickFn).toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith("blob:fake");
+
+    vi.restoreAllMocks();
+    setTokenProvider(() => Promise.resolve(null));
+  });
+
+  it("downloadWithAuth throws on non-ok response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+    await expect(downloadWithAuth("/export/csv", "f.csv")).rejects.toThrow("Export failed");
+  });
+
+  // ── Reconciliation ─────────────────────────────────────────────
+
+  it("runReconciliation sends POST to /reconcile", async () => {
+    mockResponse({ matched: 3, matches: [] });
+    const result = await runReconciliation();
+    expect(result.matched).toBe(3);
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/reconcile");
+    expect(opts.method).toBe("POST");
+  });
+
+  it("patchReconciliation sends PATCH with status", async () => {
+    mockResponse({ id: 5, status: "aprovado" });
+    const result = await patchReconciliation(5, { status: "aprovado" });
+    expect(result.status).toBe("aprovado");
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/reconciliations/5");
+    expect(opts.method).toBe("PATCH");
+  });
+
+  it("fetchReconciliationSuggestions calls correct endpoint", async () => {
+    mockResponse([{ bank_transaction_id: 1, confidence: 85 }]);
+    const result = await fetchReconciliationSuggestions(10);
+    expect(result).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledWith("/api/reconciliations/10/suggestions", expect.any(Object));
+  });
+
+  // ── Bank CSV Upload ────────────────────────────────────────────
+
+  it("uploadBankCSV sends FormData via POST", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ imported: 5 }),
+      text: () => Promise.resolve('{"imported": 5}'),
+    });
+    const file = new File(["csv-data"], "bank.csv", { type: "text/csv" });
+    const result = await uploadBankCSV(file);
+    expect(result.imported).toBe(5);
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/bank-transactions/upload");
+    expect(opts.method).toBe("POST");
+    expect(opts.body).toBeInstanceOf(FormData);
+  });
+
+  // ── Monthly Data ───────────────────────────────────────────────
+
+  it("fetchMonthlyData calls /dashboard/monthly", async () => {
+    mockResponse([{ month: "2026-01", doc_count: 3 }]);
+    const result = await fetchMonthlyData();
+    expect(result).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledWith("/api/dashboard/monthly", expect.any(Object));
+  });
+
+  // ── Checkout ───────────────────────────────────────────────────
+
+  it("createCheckoutSession sends POST with plan_id", async () => {
+    mockResponse({ checkout_url: "https://stripe.com/checkout/xyz" });
+    const result = await createCheckoutSession("pro");
+    expect(result.checkout_url).toContain("stripe.com");
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toContain("plan_id=pro");
+    expect(opts.method).toBe("POST");
+  });
+
+  // ── Entity ─────────────────────────────────────────────────────
+
+  it("fetchEntity calls /entity", async () => {
+    mockResponse({ legalName: "Empresa" });
+    const result = await fetchEntity();
+    expect(result.legalName).toBe("Empresa");
+    expect(mockFetch).toHaveBeenCalledWith("/api/entity", expect.any(Object));
+  });
+
+  it("saveEntity sends PUT with data", async () => {
+    mockResponse({ legalName: "Nova Empresa" });
+    await saveEntity({ legalName: "Nova Empresa", nif: "999999999" });
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/entity");
+    expect(opts.method).toBe("PUT");
+    expect(JSON.parse(opts.body)).toEqual({ legalName: "Nova Empresa", nif: "999999999" });
   });
 });

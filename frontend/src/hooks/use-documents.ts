@@ -4,10 +4,8 @@ import { type DocumentRecord, type DocumentType } from "@/lib/documents-data";
 
 /**
  * Map a backend Document to the frontend DocumentRecord shape.
- * The frontend expects richer fields than the backend currently stores,
- * so we synthesize some values from what we have.
  */
-function toDocumentRecord(doc: Document): DocumentRecord {
+export function toDocumentRecord(doc: Document): DocumentRecord {
   const typeMap: Record<string, DocumentType> = {
     fatura: "fatura",
     recibo: "recibo",
