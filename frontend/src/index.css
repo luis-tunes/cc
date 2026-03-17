@@ -139,26 +139,89 @@
   }
 }
 
-/* Clerk component overrides */
+/* Clerk component overrides — TIM brand integration */
 .cl-card {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+
+.cl-formFieldInput {
+  background: hsl(var(--muted)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.cl-formFieldInput::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.cl-formButtonPrimary {
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.cl-formButtonPrimary:hover {
+  opacity: 0.9;
+}
+
+.cl-socialButtonsBlockButton {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background: hsl(var(--muted)) !important;
+}
+
+.cl-dividerLine {
+  background: hsl(var(--border)) !important;
+}
+
+.cl-dividerText {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.cl-headerTitle {
+  color: hsl(var(--foreground)) !important;
+}
+
+.cl-headerSubtitle {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.cl-formFieldLabel {
+  color: hsl(var(--foreground)) !important;
+}
+
+.cl-footerActionLink {
+  color: hsl(var(--primary)) !important;
+}
+
+.cl-otpCodeFieldInput {
+  background: hsl(var(--muted)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.cl-organizationSwitcherPopoverCard,
+.cl-userButtonPopoverCard {
   background: hsl(var(--card)) !important;
   border-color: hsl(var(--border)) !important;
 }
 
-.dark .cl-card {
-  color: hsl(var(--card-foreground)) !important;
-}
-
 .dark .cl-formFieldInput,
-.dark .cl-formButtonPrimary {
+.dark .cl-formButtonPrimary,
+.dark .cl-otpCodeFieldInput {
   color-scheme: dark;
 }
 
-/* Hide Clerk "Secured by" branding & "Development mode" badge */
+/* Hide Clerk "Secured by" branding & dev badges */
 .cl-footer,
 .cl-footerAction,
-.cl-internal-b3fm6y,
+.cl-badge,
 [data-clerk-component] a[href*="clerk.com"],
-.cl-internal-1dauvt6 {
+[class*="cl-internal"] {
   display: none !important;
 }

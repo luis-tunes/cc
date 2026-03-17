@@ -1,40 +1,24 @@
 import { SignIn } from "@clerk/react";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 
 export default function SignInPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-6 w-full max-w-sm px-4">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight text-primary">TIM</h1>
           <p className="mt-1 text-sm text-muted-foreground">Time is Money</p>
+          <p className="mt-3 text-xs text-muted-foreground/80">Contabilidade inteligente para o seu negócio</p>
         </div>
         <SignIn
           routing="path"
           path="/auth/sign-in"
           signUpUrl="/auth/sign-up"
-          appearance={{
-            layout: {
-              socialButtonsPlacement: "top",
-              showOptionalFields: false,
-            },
-            elements: {
-              rootBox: "mx-auto",
-              card: "bg-card border-border shadow-lg",
-              headerTitle: "text-foreground",
-              headerSubtitle: "text-muted-foreground",
-              formFieldLabel: "text-foreground",
-              formFieldInput: "bg-muted border-border text-foreground",
-              footerActionLink: "text-primary hover:text-primary/80",
-              formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90",
-              footer: "hidden",
-              footerAction: "hidden",
-              badge: "hidden",
-              dividerLine: "bg-border",
-              dividerText: "text-muted-foreground",
-              internal: "hidden",
-            },
-          }}
+          appearance={clerkAppearance}
         />
+        <p className="text-xs text-muted-foreground/60 text-center">
+          Dados encriptados · Sem compromisso · Suporte em português
+        </p>
       </div>
     </div>
   );

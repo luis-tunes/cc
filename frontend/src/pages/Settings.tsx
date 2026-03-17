@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, Loader2, Clock, ArrowRight, User, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { orgProfileAppearance } from "@/lib/clerk-appearance";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -113,25 +114,7 @@ export default function SettingsPage() {
               Gerir membros, convidar utilizadores e configurar permissões.
             </p>
             <OrganizationProfile
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  card: "bg-transparent shadow-none border-0 p-0",
-                  navbar: "hidden",
-                  pageScrollBox: "p-0",
-                  headerTitle: "text-foreground text-sm",
-                  headerSubtitle: "text-muted-foreground text-xs",
-                  profileSectionTitle: "text-xs font-semibold text-foreground uppercase tracking-wider",
-                  profileSectionContent: "text-sm",
-                  profileSectionPrimaryButton: "text-xs text-primary hover:text-primary/80",
-                  formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 text-xs",
-                  formFieldLabel: "text-xs text-muted-foreground",
-                  formFieldInput: "bg-background border-border text-foreground text-sm",
-                  membersPageInviteButton: "bg-primary text-primary-foreground hover:bg-primary/90 text-xs",
-                  tableHead: "text-xs uppercase tracking-wider text-muted-foreground",
-                  badge: "text-xs",
-                },
-              }}
+              appearance={orgProfileAppearance}
             />
           </div>
         </div>

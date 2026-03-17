@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useUser, OrganizationSwitcher } from "@clerk/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Lock } from "lucide-react";
+import { sidebarOrgSwitcherAppearance } from "@/lib/clerk-appearance";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -103,13 +104,7 @@ export function AppSidebar() {
               hidePersonal={false}
               afterCreateOrganizationUrl="/painel"
               afterSelectOrganizationUrl="/painel"
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  organizationSwitcherTrigger:
-                    "w-full justify-between rounded-md border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-1.5 text-xs text-foreground hover:bg-sidebar-accent",
-                },
-              }}
+              appearance={sidebarOrgSwitcherAppearance}
             />
           </div>
         )}

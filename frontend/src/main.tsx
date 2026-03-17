@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import App from "./App";
 import { AuthSync } from "@/components/auth/AuthSync";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -23,7 +24,7 @@ const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <ClerkProvider publishableKey={CLERK_KEY}>
+      <ClerkProvider publishableKey={CLERK_KEY} appearance={clerkAppearance}>
         <AuthSync />
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>

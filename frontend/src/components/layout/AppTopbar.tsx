@@ -61,6 +61,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
             size="icon"
             className="h-9 w-9 text-muted-foreground md:h-8 md:w-8"
             onClick={openCommand}
+            aria-label="Pesquisar"
           >
             <Search className="h-4 w-4" />
           </Button>
@@ -78,6 +79,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
             onClick={() => navigate("/perfil")}
             className="shrink-0 rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40"
             title="O meu perfil"
+            aria-label="O meu perfil"
           >
             <Avatar className="h-8 w-8">
               <AvatarImage src={user?.imageUrl} />
@@ -93,6 +95,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
             className="h-9 w-9 text-muted-foreground hover:text-destructive md:h-8 md:w-8"
             onClick={() => signOut()}
             title="Terminar sessão"
+            aria-label="Terminar sessão"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </Button>
