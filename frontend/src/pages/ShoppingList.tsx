@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { ShoppingListTable } from "@/components/shopping/ShoppingListTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import type { ShoppingListItem } from "@/lib/api";
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function ShoppingList() {
-  const { data: items = [], isLoading } = useShoppingList();
+  const { data: items = [], isLoading, isError, refetch } = useShoppingList();
   const createEvent = useCreateStockEvent();
 
   const [search, setSearch] = useState("");
@@ -94,6 +95,14 @@ export default function ShoppingList() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageContainer title="Lista de Compras" subtitle="Ingredientes por repor">
+        <ErrorState onRetry={refetch} />
       </PageContainer>
     );
   }

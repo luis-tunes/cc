@@ -7,11 +7,11 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import { AlertTriangle, AlertCircle, Info, TrendingUp, Receipt, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, AlertCircle, Info, TrendingUp, Receipt, CheckCircle2, Loader2 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -24,7 +24,7 @@ const SEVERITY_MAP = {
 } as const;
 
 export default function TaxCenter() {
-  const { data: ivaPeriods = [], isLoading: loadingIva } = useIvaPeriods();
+  const { data: ivaPeriods = [], isLoading: loadingIva, isError, refetch } = useIvaPeriods();
   const { data: irc, isLoading: loadingIrc } = useIrcEstimate();
   const { data: auditData, isLoading: loadingAudit } = useAuditFlags();
 
@@ -36,6 +36,14 @@ export default function TaxCenter() {
     dedutivel: p.vat_deductible,
     devido: p.vat_due,
   }));
+
+  if (isError) {
+    return (
+      <PageContainer title="Centro Fiscal" subtitle="IVA, IRC, obrigações fiscais e auditoria">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

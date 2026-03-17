@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CalendarCheck, AlertTriangle, Clock, CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import type { Obligation } from "@/lib/api";
 
 const STATUS_CONFIG = {
@@ -55,7 +56,7 @@ function ObligationRow({ ob }: { ob: Obligation }) {
 }
 
 export default function Obligations() {
-  const { data: obligations = [], isLoading } = useObligations();
+  const { data: obligations = [], isLoading, isError, refetch } = useObligations();
   const [filter, setFilter] = useState<"all" | "overdue" | "urgent" | "upcoming" | "future">("all");
 
   const counts = obligations.reduce((acc, ob) => {
@@ -71,6 +72,14 @@ export default function Obligations() {
     { title: "Próximos (≤30 dias)", status: "upcoming", items: filtered.filter((o) => o.status === "upcoming") },
     { title: "Futuros", status: "future", items: filtered.filter((o) => o.status === "future") },
   ].filter((g) => g.items.length > 0) as { title: string; status: Obligation["status"]; items: Obligation[] }[];
+
+  if (isError) {
+    return (
+      <PageContainer title="Obrigações Fiscais" subtitle="Calendário de prazos e obrigações declarativas em Portugal">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

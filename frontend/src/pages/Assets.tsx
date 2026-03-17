@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -206,13 +207,21 @@ function AddAssetDialog({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 export default function Assets() {
-  const { data: assets = [], isLoading } = useAssets();
+  const { data: assets = [], isLoading, isError, refetch } = useAssets();
   const { data: summary } = useAssetsSummary();
   const deleteAssetMutation = useDeleteAsset();
   const isMobile = useIsMobile();
   const [showAdd, setShowAdd] = useState(false);
 
   const activeAssets = assets.filter((a) => a.status === "ativo");
+
+  if (isError) {
+    return (
+      <PageContainer title="Ativos Fixos" subtitle="Gestão de imobilizado e depreciações">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

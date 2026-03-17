@@ -1,6 +1,5 @@
 import { PageContainer } from "@/components/layout/PageContainer";
-import { usePlReport, useTopSuppliers } from "@/hooks/use-tax";
-import { useAuditFlags } from "@/hooks/use-tax";
+import { usePlReport, useTopSuppliers, useAuditFlags } from "@/hooks/use-tax";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar,
@@ -9,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -18,7 +18,7 @@ function fmt(n: number) {
 
 export default function Insights() {
   const colors = useChartColors();
-  const { data: pl } = usePlReport();
+  const { data: pl, isError, refetch } = usePlReport();
   const { data: topSuppliers = [] } = useTopSuppliers(8);
   const { data: auditData } = useAuditFlags();
 
@@ -36,6 +36,14 @@ export default function Insights() {
     : 0;
 
   const profitableMonths = cashFlowData.filter((m) => m.resultado > 0).length;
+
+  if (isError) {
+    return (
+      <PageContainer title="Insights" subtitle="Análises financeiras e deteção de anomalias">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer title="Insights" subtitle="Análises financeiras e deteção de anomalias">

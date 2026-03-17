@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Info, BarChart3 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -15,7 +16,7 @@ function fmt(n: number) {
 }
 
 export default function Forecasts() {
-  const { data: pl } = usePlReport();
+  const { data: pl, isError, refetch } = usePlReport();
 
   const colors = useChartColors();
 
@@ -47,6 +48,14 @@ export default function Forecasts() {
 
   const totalProjectedReceitas = projections.reduce((s, m) => s + m.receitas, 0);
   const totalProjectedResultado = projections.reduce((s, m) => s + m.resultado, 0);
+
+  if (isError) {
+    return (
+      <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">

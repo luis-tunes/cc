@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { SupplierTable } from "@/components/suppliers/SupplierTable";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
 import { PriceHistoryPanel } from "@/components/suppliers/PriceHistoryPanel";
@@ -16,7 +17,7 @@ import { useSuppliers, useDeleteSupplier } from "@/hooks/use-inventory";
 import type { Supplier } from "@/lib/api";
 
 export default function Suppliers() {
-  const { data: suppliers = [], isLoading } = useSuppliers();
+  const { data: suppliers = [], isLoading, isError, refetch } = useSuppliers();
   const deleteSup = useDeleteSupplier();
 
   const [search, setSearch] = useState("");
@@ -80,6 +81,14 @@ export default function Suppliers() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageContainer title="Fornecedores" subtitle="Gestão de fornecedores e preços">
+        <ErrorState onRetry={refetch} />
       </PageContainer>
     );
   }

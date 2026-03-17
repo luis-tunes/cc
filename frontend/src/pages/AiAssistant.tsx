@@ -82,7 +82,7 @@ export default function AiAssistant() {
       title="Assistente IA"
       subtitle="Consulte os seus dados contabilísticos em linguagem natural"
     >
-      <div className="flex flex-col h-[calc(100vh-12rem)] max-w-3xl mx-auto gap-4">
+      <div className="flex flex-col h-[calc(100dvh-12rem)] max-w-3xl mx-auto gap-4">
         {/* Quick prompts */}
         {prompts.length > 0 && (
           <div className="flex flex-wrap gap-2">

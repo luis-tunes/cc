@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { usePlReport, useTopSuppliers } from "@/hooks/use-tax";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ const YEAR = new Date().getFullYear();
 export default function Reports() {
   const colors = useChartColors();
   const [year, setYear] = useState(YEAR);
-  const { data: pl, isLoading: loadingPl } = usePlReport(year);
+  const { data: pl, isLoading: loadingPl, isError, refetch } = usePlReport(year);
   const { data: topSuppliers = [], isLoading: loadingSuppliers } = useTopSuppliers(10);
 
   const barData = pl?.months ?? [];
@@ -35,6 +36,14 @@ export default function Reports() {
     name: s.supplier_nif,
     value: s.total_spend,
   }));
+
+  if (isError) {
+    return (
+      <PageContainer title="Relatórios" subtitle="Demonstração de resultados, IVA e análise de fornecedores">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

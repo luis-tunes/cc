@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { TrendingDown, TrendingUp, Lightbulb, AlertTriangle, Truck, BarChart3 } from "lucide-react";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -18,7 +19,7 @@ function pct(part: number, total: number) {
 }
 
 export default function CostOptimization() {
-  const { data: pl } = usePlReport();
+  const { data: pl, isError, refetch } = usePlReport();
   const { data: suppliers = [] } = useTopSuppliers(10);
 
   const colors = useChartColors();
@@ -66,6 +67,14 @@ export default function CostOptimization() {
     gastos: m.gastos,
     receitas: m.receitas,
   }));
+
+  if (isError) {
+    return (
+      <PageContainer title="Otimização de Custos" subtitle="Análise de despesas e oportunidades de poupança">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

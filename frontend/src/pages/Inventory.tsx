@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { IngredientTable } from "@/components/inventory/IngredientTable";
 import { StockEventList } from "@/components/inventory/StockEventList";
 import { AddIngredientDialog } from "@/components/inventory/AddIngredientDialog";
@@ -35,7 +36,7 @@ function classifyCategory(cat: string): "materia-prima" | "consumivel" {
 }
 
 export default function Inventory() {
-  const { data: ingredients = [], isLoading: loadingIng } = useIngredients();
+  const { data: ingredients = [], isLoading: loadingIng, isError, refetch } = useIngredients();
   const { data: events = [], isLoading: loadingEv } = useStockEvents({ limit: 50 });
   const { data: stats } = useInventoryStats();
   const { data: suppliers = [] } = useSuppliers();
@@ -95,6 +96,14 @@ export default function Inventory() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageContainer title="Inventário" subtitle="Gestão de stock">
+        <ErrorState onRetry={refetch} />
       </PageContainer>
     );
   }

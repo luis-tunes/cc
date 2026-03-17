@@ -5,6 +5,7 @@ import { MovementFiltersBar, type MovementFilters } from "@/components/movements
 import { MovementLedger } from "@/components/movements/MovementLedger";
 import { MovementDetailDrawer } from "@/components/movements/MovementDetailDrawer";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Upload, Landmark } from "lucide-react";
 import { type BankMovement } from "@/lib/movements-data";
@@ -27,7 +28,7 @@ function toMovement(tx: { id: number; date: string; description: string; amount:
 }
 
 export default function BankMovements() {
-  const { data: rawTransactions = [], isLoading } = useBankTransactions();
+  const { data: rawTransactions = [], isLoading, isError, refetch } = useBankTransactions();
   const uploadCSV = useUploadBankCSV();
 
   const movements = useMemo(() => rawTransactions.map(toMovement), [rawTransactions]);
@@ -95,6 +96,14 @@ export default function BankMovements() {
   }, []);
 
   const isEmpty = movements.length === 0 && !isLoading;
+
+  if (isError) {
+    return (
+      <PageContainer title="Movimentos Bancários" subtitle="Importação, classificação e reconciliação de transações">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

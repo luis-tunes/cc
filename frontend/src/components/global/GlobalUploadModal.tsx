@@ -85,7 +85,6 @@ export function GlobalUploadModal({
 
         onDocumentProcessed?.(result);
       } catch (err: any) {
-        console.error("Upload error:", err);
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uf.id

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { ProductTable } from "@/components/products/ProductTable";
 import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { ProduceDialog } from "@/components/products/ProduceDialog";
@@ -19,7 +20,7 @@ import type { Product } from "@/lib/api";
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function Products() {
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading, isError, refetch } = useProducts();
   const deleteProd = useDeleteProduct();
   const { data: productionEvents = [] } = useStockEvents({ event_type: "saída", limit: 100 });
 
@@ -83,6 +84,14 @@ export default function Products() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageContainer title="Produto Acabado" subtitle="Produtos, receitas e custos">
+        <ErrorState onRetry={refetch} />
       </PageContainer>
     );
   }

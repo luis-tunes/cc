@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Zap, Tags, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -46,7 +47,7 @@ function ruleDisplayLabel(rule: ClassificationRule): string {
 }
 
 export default function AutoClassification() {
-  const { data: stats, isLoading } = useClassificationStats();
+  const { data: stats, isLoading, isError, refetch } = useClassificationStats();
   const { data: rules = [] } = useClassificationRules();
   const autoClassify = useAutoClassify();
   const navigate = useNavigate();
@@ -78,6 +79,14 @@ export default function AutoClassification() {
 
   const coveragePct = stats?.coverage_pct ?? 0;
   const activeRules = rules.filter((r) => r.active).length;
+
+  if (isError) {
+    return (
+      <PageContainer title="Auto-Classificação" subtitle="Classificação automática de documentos por regras SNC">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

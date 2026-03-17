@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ReconciliationCommandBar } from "@/components/reconciliation/ReconciliationCommandBar";
 import { MatchCard } from "@/components/reconciliation/MatchCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { GitMerge, CheckCircle2, PartyPopper } from "lucide-react";
 import { type ReconciliationPair } from "@/lib/reconciliation-data";
 import { useReconciliations, useRunReconciliation, usePatchReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
@@ -59,7 +60,7 @@ function toPair(r: Reconciliation): ReconciliationPair {
 }
 
 export default function Reconciliation() {
-  const { data: rawReconciliations = [], isLoading } = useReconciliations();
+  const { data: rawReconciliations = [], isLoading, isError, refetch } = useReconciliations();
   const runRecon = useRunReconciliation();
   const patchRecon = usePatchReconciliation();
 
@@ -127,6 +128,14 @@ export default function Reconciliation() {
   }, [filtered, activeFilter]);
 
   const isEmpty = pairs.length === 0 && !isLoading;
+
+  if (isError) {
+    return (
+      <PageContainer title="Reconciliação" subtitle="Correspondência entre documentos e movimentos bancários">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

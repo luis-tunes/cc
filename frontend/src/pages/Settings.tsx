@@ -1,6 +1,7 @@
 import { useUser, OrganizationProfile } from "@clerk/react";
 import { useBillingStatus } from "@/hooks/use-billing";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, Loader2, Clock, ArrowRight, User, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,12 +9,20 @@ import { orgProfileAppearance } from "@/lib/clerk-appearance";
 
 export default function SettingsPage() {
   const { user } = useUser();
-  const { data: billing, isLoading: billingLoading } = useBillingStatus();
+  const { data: billing, isLoading: billingLoading, isError, refetch } = useBillingStatus();
   const navigate = useNavigate();
   const isLoading = billingLoading;
   const currentPlan = billing?.plan ?? "none";
   const isTrial = billing?.status === "trialing";
   const daysLeft = billing?.trial_days_left ?? 0;
+
+  if (isError) {
+    return (
+      <PageContainer title="Definições" subtitle="Conta, subscrição e gestão da organização">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer title="Definições" subtitle="Conta, subscrição e gestão da organização">

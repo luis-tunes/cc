@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,7 @@ import {
 import { toast } from "sonner";
 
 export default function EntityProfile() {
-  const { data: savedData, isLoading } = useEntity();
+  const { data: savedData, isLoading, isError, refetch } = useEntity();
   const { mutate: save, isPending: isSaving } = useSaveEntity();
   const [data, setData] = useState<EntityData>(defaultEntityData);
   const [activeStep, setActiveStep] = useState(1);
@@ -63,6 +64,14 @@ export default function EntityProfile() {
         <div className="flex justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      </PageContainer>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageContainer title="Perfil da Entidade" subtitle="Configuração da empresa">
+        <ErrorState onRetry={refetch} />
       </PageContainer>
     );
   }
