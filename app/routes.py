@@ -1054,7 +1054,7 @@ async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
             f"SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations){' AND tenant_id = %s' if tp else ''}",
             tp,
         ).fetchone()
-        pending = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status = 'pendente'{' AND tenant_id = %s' if tp else ''}", tp).fetchone()
+        pending = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('pendente','pendente ocr','a processar'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
         classified = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
     result = {
         "documents": {"count": docs["count"], "total": str(docs["total"])},

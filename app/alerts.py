@@ -27,6 +27,20 @@ def generate_compliance_alerts(tenant_id: str) -> int:
     """Generate compliance alerts. Returns count of new alerts created."""
     count = 0
     with get_conn() as conn:
+        # Check if tenant has any data at all — if not, skip everything
+        doc_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM documents WHERE tenant_id = %s",
+            (tenant_id,),
+        ).fetchone()
+        if not doc_count or doc_count["cnt"] == 0:
+            # Fresh tenant with no documents — no alerts to generate
+            conn.execute(
+                "DELETE FROM alerts WHERE tenant_id = %s AND read = false",
+                (tenant_id,),
+            )
+            conn.commit()
+            return 0
+
         # Clear old unread generated alerts to regenerate fresh
         conn.execute(
             "DELETE FROM alerts WHERE tenant_id = %s AND read = false",

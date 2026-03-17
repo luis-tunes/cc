@@ -16,6 +16,7 @@ export function toDocumentRecord(doc: Document): DocumentRecord {
 
   const statusMap: Record<string, DocumentRecord["classificationStatus"]> = {
     pendente: "pendente",
+    "pendente ocr": "pendente",
     "a processar": "pendente",
     extraído: "extraído",
     classificado: "classificado",
