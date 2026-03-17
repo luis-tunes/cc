@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { patchDocument, deleteDocument } from "@/lib/api";
+import { patchDocument, deleteDocument, bulkDeleteDocuments } from "@/lib/api";
 import { toast } from "sonner";
 
 export interface DocumentActions {
@@ -11,6 +11,7 @@ export interface DocumentActions {
   onAcceptAiSuggestion: (id: string) => void;
   onAddNote: (id: string, note: string) => void;
   onDelete: (id: string) => void;
+  onBulkDelete: (ids: string[]) => void;
 }
 
 export function useDocumentActions(refetch: () => void) {
@@ -33,6 +34,19 @@ export function useDocumentActions(refetch: () => void) {
     onSuccess: () => {
       refetch();
       toast.success("Documento eliminado");
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao eliminar: ${err.message}`);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return bulkDeleteDocuments(ids.map(Number));
+    },
+    onSuccess: () => {
+      refetch();
+      toast.success("Documentos eliminados");
     },
     onError: (err: Error) => {
       toast.error(`Erro ao eliminar: ${err.message}`);
@@ -87,6 +101,9 @@ export function useDocumentActions(refetch: () => void) {
     },
     onDelete: (id) => {
       deleteMutation.mutate(id);
+    },
+    onBulkDelete: (ids) => {
+      bulkDeleteMutation.mutate(ids);
     },
   };
 

@@ -6,6 +6,8 @@ import { DocumentList } from "@/components/documents/DocumentList";
 import { BulkActionsBar } from "@/components/documents/BulkActionsBar";
 import { DocumentReviewDrawer } from "@/components/documents/DocumentReviewDrawer";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
 import { type DocumentRecord, type UploadingFile } from "@/lib/documents-data";
@@ -15,7 +17,7 @@ import { useDocumentActions } from "@/hooks/use-document-actions";
 import { toast } from "sonner";
 
 export default function InboxPage() {
-  const { documents: allDocuments, refetch } = useDocuments();
+  const { documents: allDocuments, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
   const [uploadQueue, setUploadQueue] = useState<UploadingFile[]>([]);
   const [showIntake, setShowIntake] = useState(false);
@@ -170,15 +172,17 @@ export default function InboxPage() {
         </Button>
       }
     >
-      {isEmpty && showIntake && (
+      {error ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
+        <TableSkeleton rows={4} cols={4} />
+      ) : isEmpty && showIntake ? (
         <IntakeZone
           uploadQueue={uploadQueue}
           onUpload={handleUpload}
           onDismiss={handleDismissUpload}
         />
-      )}
-
-      {isEmpty && !showIntake ? (
+      ) : isEmpty && !showIntake ? (
         /* First-use empty state */
         <EmptyState
           icon={FileText}
@@ -214,6 +218,7 @@ export default function InboxPage() {
             onFlag={() => bulkAction("Sinalizar")}
             onExport={() => bulkAction("Exportar")}
             onArchive={() => bulkAction("Arquivar")}
+            onDelete={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); }}
             onClear={() => setSelectedIds(new Set())}
           />
 
@@ -225,6 +230,7 @@ export default function InboxPage() {
               onToggleSelect={toggleSelect}
               onToggleAll={toggleAll}
               onOpenDocument={openDocument}
+              onDelete={actions.onDelete}
             />
           ) : (
             <EmptyState

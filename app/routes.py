@@ -370,6 +370,34 @@ async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     return None
 
 
+class BulkDeletePayload(BaseModel):
+    ids: list[int]
+
+
+@router.post("/documents/bulk-delete", status_code=204)
+async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Depends(require_auth)):
+    if not payload.ids:
+        return None
+    if len(payload.ids) > 500:
+        raise HTTPException(status_code=400, detail="max 500 documents per request")
+    tenant_id = (auth.tenant_id if auth else "") or ""
+    with get_conn() as conn:
+        for doc_id in payload.ids:
+            wheres = ["id = %s"]
+            params: list = [doc_id]
+            if tenant_id:
+                wheres.append("tenant_id = %s")
+                params.append(tenant_id)
+            where = " AND ".join(wheres)
+            row = conn.execute(f"SELECT id FROM documents WHERE {where}", params).fetchone()
+            if row:
+                conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
+                conn.execute(f"DELETE FROM documents WHERE {where}", params)
+                log_activity(conn, tenant_id, "document", doc_id, "deleted", None)
+        conn.commit()
+    return None
+
+
 @router.get("/documents/{doc_id}/preview")
 async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Proxy the document file from Paperless-ngx for preview."""

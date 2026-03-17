@@ -7,6 +7,7 @@ import {
   Download,
   Archive,
   CheckCheck,
+  Trash2,
 } from "lucide-react";
 
 interface BulkActionsBarProps {
@@ -18,6 +19,7 @@ interface BulkActionsBarProps {
   onFlag: () => void;
   onExport: () => void;
   onArchive: () => void;
+  onDelete?: () => void;
   onClear: () => void;
   className?: string;
 }
@@ -31,6 +33,7 @@ export function BulkActionsBar({
   onFlag,
   onExport,
   onArchive,
+  onDelete,
   onClear,
   className,
 }: BulkActionsBarProps) {
@@ -82,6 +85,12 @@ export function BulkActionsBar({
             <Archive className="mr-1 h-3.5 w-3.5" />
             Arquivar
           </Button>
+          {onDelete && (
+            <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive/10" onClick={onDelete}>
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Eliminar
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

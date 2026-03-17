@@ -205,6 +205,7 @@ export default function Documents() {
           onFlag={() => bulkStub("Sinalizados")}
           onExport={bulkExport}
           onArchive={bulkArchive}
+          onDelete={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); }}
           onClear={() => setSelectedIds(new Set())}
         />
 
@@ -220,6 +221,7 @@ export default function Documents() {
             onToggleSelect={handleToggleSelect}
             onToggleAll={handleToggleAll}
             onOpenDocument={handleOpenDocument}
+            onDelete={actions.onDelete}
           />
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 py-16">

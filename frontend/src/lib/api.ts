@@ -222,6 +222,13 @@ export async function deleteDocument(id: number): Promise<void> {
   await request<void>(`/documents/${id}`, { method: "DELETE" });
 }
 
+export async function bulkDeleteDocuments(ids: number[]): Promise<void> {
+  await request<void>("/documents/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export function documentPreviewUrl(id: number): string {
   return `${BASE}/documents/${id}/preview`;
 }

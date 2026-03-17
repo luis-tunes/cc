@@ -17,11 +17,14 @@ import {
   Upload,
   Plug,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface DocumentListProps {
   documents: DocumentRecord[];
@@ -29,6 +32,7 @@ interface DocumentListProps {
   onToggleSelect: (id: string) => void;
   onToggleAll: () => void;
   onOpenDocument: (doc: DocumentRecord) => void;
+  onDelete?: (id: string) => void;
   className?: string;
 }
 
@@ -44,6 +48,7 @@ export function DocumentList({
   onToggleSelect,
   onToggleAll,
   onOpenDocument,
+  onDelete,
   className,
 }: DocumentListProps) {
   const allSelected =
@@ -92,6 +97,15 @@ export function DocumentList({
               </div>
               {doc.needsReview && (
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" />
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(doc.id); }}
+                  className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label="Eliminar documento"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               )}
             </div>
           );
@@ -202,6 +216,17 @@ export function DocumentList({
                 <TableCell>
                   {doc.needsReview && (
                     <AlertTriangle className="h-4 w-4 text-tim-warning" />
+                  )}
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  {onDelete && (
+                    <button
+                      onClick={() => onDelete(doc.id)}
+                      className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
+                      aria-label="Eliminar documento"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   )}
                 </TableCell>
               </TableRow>
