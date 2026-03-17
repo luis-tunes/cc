@@ -884,3 +884,44 @@ export async function sendAssistantMessage(question: string): Promise<ChatRespon
     body: JSON.stringify({ question }),
   });
 }
+
+// ── Auto-Classification ──────────────────────────────────────────────
+
+export interface AutoClassifyResult {
+  classified_now: number;
+  skipped: number;
+  total_processed: number;
+  total_classified: number;
+  total_unclassified: number;
+}
+
+export interface ClassificationStats {
+  total: number;
+  classified: number;
+  unclassified: number;
+  coverage_pct: number;
+  by_account: { account: string; count: number }[];
+}
+
+export async function runAutoClassify(): Promise<AutoClassifyResult> {
+  return request<AutoClassifyResult>("/documents/auto-classify", { method: "POST" });
+}
+
+export async function fetchClassificationStats(): Promise<ClassificationStats> {
+  return request<ClassificationStats>("/documents/classification-stats");
+}
+
+// ── Activity Log ─────────────────────────────────────────────────────
+
+export interface ActivityEntry {
+  id: number;
+  entity_type: string;
+  entity_id: number | null;
+  action: string;
+  detail: string;
+  created_at: string;
+}
+
+export async function fetchActivity(limit = 50): Promise<ActivityEntry[]> {
+  return request<ActivityEntry[]>(`/activity?limit=${limit}`);
+}

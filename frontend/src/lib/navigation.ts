@@ -20,6 +20,8 @@ import {
   Plug,
   Settings,
   Lock,
+  Brain,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +48,8 @@ export const navigation: NavGroup[] = [
       { title: "Documentos", path: "/documentos", icon: FileText, status: "active" },
       { title: "Movimentos", path: "/movimentos", icon: Landmark, status: "active" },
       { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active" },
+      { title: "Auto-Classificação", path: "/auto-classificacao", icon: Brain, status: "active" },
+      { title: "Atividade", path: "/atividade", icon: Activity, status: "active" },
     ],
   },
   {
@@ -57,12 +61,14 @@ export const navigation: NavGroup[] = [
       { title: "Lista de Compras", path: "/lista-compras", icon: ShoppingCart, status: "active" },
       { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active" },
       { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "active" },
+      { title: "Otimização de Custos", path: "/otimizacao", icon: Scissors, status: "active" },
     ],
   },
   {
     label: "Definições",
     items: [
       { title: "Entidade", path: "/entidade", icon: Building2, status: "active" },
+      { title: "Integrações", path: "/integracoes", icon: Plug, status: "active" },
       { title: "Definições", path: "/definicoes", icon: Settings, status: "active" },
     ],
   },

@@ -407,3 +407,48 @@ def test_top_suppliers_limit():
     r = client.get("/api/reports/top-suppliers?limit=3")
     assert r.status_code == 200
     assert len(r.json()) <= 3
+
+
+# ── Auto-Classification ───────────────────────────────────────────────
+
+def test_auto_classify_returns_stats():
+    r = client.post("/api/documents/auto-classify")
+    assert r.status_code == 200
+    data = r.json()
+    assert "classified_now" in data
+    assert "skipped" in data
+    assert "total_processed" in data
+    assert "total_classified" in data
+    assert "total_unclassified" in data
+    assert isinstance(data["classified_now"], int)
+
+
+def test_classification_stats():
+    r = client.get("/api/documents/classification-stats")
+    assert r.status_code == 200
+    data = r.json()
+    assert "total" in data
+    assert "classified" in data
+    assert "unclassified" in data
+    assert "coverage_pct" in data
+    assert "by_account" in data
+    assert isinstance(data["by_account"], list)
+
+
+# ── Activity Log ─────────────────────────────────────────────────────
+
+def test_activity_list():
+    r = client.get("/api/activity")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+
+
+def test_activity_list_limit():
+    r = client.get("/api/activity?limit=5")
+    assert r.status_code == 200
+
+
+def test_activity_list_limit_too_large():
+    r = client.get("/api/activity?limit=999")
+    assert r.status_code == 422
