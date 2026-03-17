@@ -17,11 +17,11 @@ import {
   TrendingUp,
   Scissors,
   Building2,
-  Plug,
   Settings,
   Lock,
   Brain,
   Activity,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +52,7 @@ export const navigation: NavGroup[] = [
       { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active", proOnly: true },
       { title: "Auto-Classificação", path: "/auto-classificacao", icon: Brain, status: "active", proOnly: true },
       { title: "Classificações", path: "/classificacoes", icon: Tags, status: "active" },
+      { title: "Assistente IA", path: "/assistente", icon: Bot, status: "active", proOnly: true },
       { title: "Atividade", path: "/atividade", icon: Activity, status: "active" },
     ],
   },
@@ -75,8 +76,7 @@ export const navigation: NavGroup[] = [
     label: "Definições",
     items: [
       { title: "Entidade", path: "/entidade", icon: Building2, status: "active" },
-      { title: "Integrações", path: "/integracoes", icon: Plug, status: "active" },
-      { title: "Assistente IA", path: "/assistente", icon: Bot, status: "active", proOnly: true },
+      { title: "Guia", path: "/guia", icon: BookOpen, status: "active" },
       { title: "Definições", path: "/definicoes", icon: Settings, status: "active" },
     ],
   },

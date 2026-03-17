@@ -44,7 +44,7 @@ describe("navigation config", () => {
     const paths = navigation[2].items.map((i) => i.path);
     expect(paths).toContain("/entidade");
     expect(paths).toContain("/definicoes");
-    expect(paths).toContain("/integracoes");
+    expect(paths).toContain("/guia");
   });
 
   it("total nav items count is reasonable", () => {

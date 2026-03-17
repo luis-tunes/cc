@@ -33,8 +33,8 @@ const Suppliers = lazy(() => import("@/pages/Suppliers"));
 const Products = lazy(() => import("@/pages/Products"));
 const ShoppingList = lazy(() => import("@/pages/ShoppingList"));
 const EntityProfile = lazy(() => import("@/pages/EntityProfile"));
-const IntegrationsPage = lazy(() => import("@/pages/Integrations"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
+const GuidePage = lazy(() => import("@/pages/Guide"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
 const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
@@ -88,7 +88,7 @@ export default function App() {
             <Route path="/inventario" element={<Inventory />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/produtos" element={<Products />} />
-            <Route path="/marmitas" element={<Products />} />
+            <Route path="/marmitas" element={<Navigate to="/produtos" replace />} />
             <Route path="/lista-compras" element={<ShoppingList />} />
             <Route path="/classificacoes" element={<Classifications />} />
             <Route path="/auto-classificacao" element={<UpgradeGate title="Auto-Classificação" subtitle="Classificação automática de documentos"><AutoClassification /></UpgradeGate>} />
@@ -101,8 +101,8 @@ export default function App() {
             <Route path="/previsoes" element={<UpgradeGate title="Previsões" subtitle="Projeções de cash flow"><Forecasts /></UpgradeGate>} />
             <Route path="/otimizacao" element={<UpgradeGate title="Otimização de Custos" subtitle="Análise de despesas"><CostOptimization /></UpgradeGate>} />
             <Route path="/entidade" element={<EntityProfile />} />
-            <Route path="/integracoes" element={<IntegrationsPage />} />
             <Route path="/definicoes" element={<SettingsPage />} />
+            <Route path="/guia" element={<GuidePage />} />
             <Route path="/perfil" element={<UserProfile />} />
           </Route>
 
