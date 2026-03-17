@@ -1,11 +1,12 @@
 # TIM reverse proxy
 # ─────────────────────────────────────────────────────────
-# HTTP mode (no domain): set DOMAIN=:80 in .env
-# HTTPS mode (with domain): set DOMAIN=tim.pt in .env
-#
-# Caddy auto-provisions Let's Encrypt certs when DOMAIN is a real hostname.
+# Bare IP:  set DOMAIN=:443 in .env (default — self-signed cert)
+# Real domain: set DOMAIN=tim.pt  in .env (auto Let's Encrypt)
+#   and remove "tls internal" below so Caddy provisions a real cert.
 
-{$DOMAIN::80} {
+{$DOMAIN::443} {
+	tls internal
+
 	# API + webhook → FastAPI backend
 	handle /api/* {
 		reverse_proxy app:8080
@@ -21,4 +22,9 @@
 	handle {
 		reverse_proxy app:8080
 	}
+}
+
+# Redirect HTTP → HTTPS
+http:// {
+	redir https://{host}{uri} permanent
 }
