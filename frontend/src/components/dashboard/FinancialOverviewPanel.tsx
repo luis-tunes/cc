@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { useMonthlyData } from "@/hooks/use-dashboard";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import {
   AreaChart,
   Area,
@@ -33,6 +34,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function FinancialOverviewPanel({ className }: { className?: string }) {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("mes");
   const { data: rawMonthly } = useMonthlyData();
+  const colors = useChartColors();
 
   const chartData = useMemo(() => {
     if (!rawMonthly || rawMonthly.length === 0) return [];
@@ -91,23 +93,23 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(40, 80%, 55%)" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(40, 80%, 55%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={colors.gold} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={colors.gold} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gradGastos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(220, 10%, 55%)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(220, 10%, 55%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={colors.muted} stopOpacity={0.15} />
+                    <stop offset="95%" stopColor={colors.muted} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 90%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
                 <XAxis
                   dataKey="mes"
-                  tick={{ fontSize: 11, fill: "hsl(220, 10%, 55%)" }}
+                  tick={{ fontSize: 11, fill: colors.tick }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(220, 10%, 55%)" }}
+                  tick={{ fontSize: 10, fill: colors.tick }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`}
@@ -118,7 +120,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
                   type="monotone"
                   dataKey="receita"
                   name="Receita"
-                  stroke="hsl(40, 80%, 55%)"
+                  stroke={colors.gold}
                   strokeWidth={2}
                   fill="url(#gradReceita)"
                 />
@@ -126,7 +128,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
                   type="monotone"
                   dataKey="gastos"
                   name="Gastos"
-                  stroke="hsl(220, 10%, 55%)"
+                  stroke={colors.muted}
                   strokeWidth={1.5}
                   fill="url(#gradGastos)"
                   strokeDasharray="4 2"
@@ -144,15 +146,15 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
           <div className="mt-3 h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 90%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
                 <XAxis
                   dataKey="mes"
-                  tick={{ fontSize: 11, fill: "hsl(220, 10%, 55%)" }}
+                  tick={{ fontSize: 11, fill: colors.tick }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(220, 10%, 55%)" }}
+                  tick={{ fontSize: 10, fill: colors.tick }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`}
@@ -162,7 +164,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
                 <Bar
                   dataKey="resultado"
                   name="Resultado"
-                  fill="hsl(145, 50%, 42%)"
+                  fill={colors.success}
                   radius={[3, 3, 0, 0]}
                   maxBarSize={32}
                 />

@@ -7,14 +7,16 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb } from "lucide-react";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-const PIE_COLORS = ["hsl(40,80%,55%)","hsl(145,50%,42%)","hsl(210,60%,50%)","hsl(30,70%,50%)","hsl(0,65%,50%)","hsl(270,60%,55%)","hsl(180,50%,45%)","hsl(320,60%,55%)"];
+
 
 export default function Insights() {
+  const colors = useChartColors();
   const { data: pl } = usePlReport();
   const { data: topSuppliers = [] } = useTopSuppliers(8);
   const { data: auditData } = useAuditFlags();
@@ -79,15 +81,15 @@ export default function Insights() {
                 <AreaChart data={cashFlowData}>
                   <defs>
                     <linearGradient id="gradResult" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(40,80%,55%)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="hsl(40,80%,55%)" stopOpacity={0} />
+                      <stop offset="5%" stopColor={colors.gold} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={colors.gold} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,14%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
-                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(40,80%,55%)" strokeWidth={2} fill="url(#gradResult)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: colors.tick }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
+                  <Area type="monotone" dataKey="resultado" name="Resultado" stroke={colors.gold} strokeWidth={2} fill="url(#gradResult)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -106,9 +108,9 @@ export default function Insights() {
               <ResponsiveContainer width="100%" height={192}>
                 <PieChart>
                   <Pie data={supplierData} cx="50%" cy="50%" outerRadius={72} innerRadius={36} dataKey="value" nameKey="name">
-                    {supplierData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    {supplierData.map((_, i) => <Cell key={i} fill={colors.pie[i % colors.pie.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
+                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -117,7 +119,7 @@ export default function Insights() {
           <div className="border-t divide-y">
             {supplierData.slice(0, 5).map((s, i) => (
               <div key={s.name} className="flex items-center gap-2 px-4 py-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colors.pie[i % colors.pie.length] }} />
                 <span className="flex-1 truncate text-xs text-muted-foreground">{s.name}</span>
                 <span className="text-xs font-medium">{fmt(s.value)}</span>
               </div>

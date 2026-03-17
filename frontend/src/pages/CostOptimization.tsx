@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { TrendingDown, TrendingUp, Lightbulb, AlertTriangle, Truck } from "lucide-react";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -19,6 +20,7 @@ export default function CostOptimization() {
   const { data: pl } = usePlReport();
   const { data: suppliers = [] } = useTopSuppliers(10);
 
+  const colors = useChartColors();
   const months = pl?.months ?? [];
   const totals = pl?.totals;
 
@@ -130,12 +132,12 @@ export default function CostOptimization() {
             ) : (
               <ResponsiveContainer width="100%" height={192}>
                 <BarChart data={chartData} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,90%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} width={44} />
-                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
-                  <Bar dataKey="receitas" name="Receitas" fill="hsl(145,50%,45%)" radius={[2, 2, 0, 0]} maxBarSize={24} />
-                  <Bar dataKey="gastos" name="Gastos" fill="hsl(0,65%,55%)" radius={[2, 2, 0, 0]} maxBarSize={24} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: colors.tick }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} width={44} />
+                  <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
+                  <Bar dataKey="receitas" name="Receitas" fill={colors.success} radius={[2, 2, 0, 0]} maxBarSize={24} />
+                  <Bar dataKey="gastos" name="Gastos" fill={colors.danger} radius={[2, 2, 0, 0]} maxBarSize={24} />
                 </BarChart>
               </ResponsiveContainer>
             )}

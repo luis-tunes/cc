@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Building2, CalendarDays } from "lucide-react";
 import { useCommandMenu } from "@/components/shared/CommandMenu";
 import { QuickAddButton } from "@/components/global/QuickAddButton";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUser, useClerk } from "@clerk/react";
 import { useNavigate } from "react-router-dom";
@@ -63,6 +64,9 @@ export function AppTopbar({ title }: AppTopbarProps) {
           >
             <Search className="h-4 w-4" />
           </Button>
+
+          {/* Theme */}
+          <ThemeToggle />
 
           {/* Separator */}
           <div className="mx-1 h-5 w-px bg-border" />

@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Info } from "lucide-react";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -14,6 +15,8 @@ function fmt(n: number) {
 
 export default function Forecasts() {
   const { data: pl } = usePlReport();
+
+  const colors = useChartColors();
 
   // Simple linear projection: average of last 3 months + trend
   const historical = pl?.months ?? [];
@@ -72,9 +75,9 @@ export default function Forecasts() {
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h3 className="text-sm font-semibold">Histórico + Projeção 6 meses</h3>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(145,50%,42%)" }} /> Receitas</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: "hsl(0,65%,50%)" }} /> Gastos</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded border-2 border-dashed" style={{ borderColor: "hsl(40,80%,55%)", background: "transparent" }} /> Projeção</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: colors.success }} /> Receitas</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded" style={{ background: colors.danger }} /> Gastos</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-4 rounded border-2 border-dashed" style={{ borderColor: colors.gold, background: "transparent" }} /> Projeção</span>
           </div>
         </div>
         <div className="p-4">
@@ -85,17 +88,17 @@ export default function Forecasts() {
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(145,50%,42%)" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(145,50%,42%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={colors.success} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={colors.success} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,14%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,55%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
-                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "hsl(220,18%,9%)", border: "1px solid hsl(220,12%,16%)", borderRadius: 6, fontSize: 12 }} />
-                <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(145,50%,42%)" strokeWidth={2} fill="url(#gradR)" />
-                <Area type="monotone" dataKey="gastos" name="Gastos" stroke="hsl(0,65%,50%)" strokeWidth={1.5} fill="none" />
-                <Area type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(40,80%,55%)" strokeWidth={2} fill="none" strokeDasharray="6 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: colors.tick }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
+                <Area type="monotone" dataKey="receitas" name="Receitas" stroke={colors.success} strokeWidth={2} fill="url(#gradR)" />
+                <Area type="monotone" dataKey="gastos" name="Gastos" stroke={colors.danger} strokeWidth={1.5} fill="none" />
+                <Area type="monotone" dataKey="resultado" name="Resultado" stroke={colors.gold} strokeWidth={2} fill="none" strokeDasharray="6 3" />
               </AreaChart>
             </ResponsiveContainer>
           )}

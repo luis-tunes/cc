@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import App from "./App";
 import { AuthSync } from "@/components/auth/AuthSync";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -21,25 +22,23 @@ const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={CLERK_KEY}>
-      <AuthSync />
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-          <Toaster
-            position="bottom-right"
-            theme="light"
-            toastOptions={{
-              style: {
-                background: "hsl(0 0% 100%)",
-                border: "1px solid hsl(220 12% 90%)",
-                color: "hsl(220 10% 15%)",
-              },
-            }}
-          />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </ClerkProvider>
+    <ThemeProvider>
+      <ClerkProvider publishableKey={CLERK_KEY}>
+        <AuthSync />
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <App />
+            <Toaster
+              position="bottom-right"
+              theme="system"
+              toastOptions={{
+                className: "bg-card text-card-foreground border-border",
+              }}
+            />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ClerkProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 

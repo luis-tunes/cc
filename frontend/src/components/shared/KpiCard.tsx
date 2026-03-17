@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
+import { useChartColors } from "@/hooks/use-chart-colors";
 
 interface KpiCardProps {
   label: string;
@@ -29,6 +30,7 @@ export function KpiCard({
   className,
   sparkline,
 }: KpiCardProps) {
+  const chartColors = useChartColors();
   const borderClass = {
     default: accent ? "border-primary/30 shadow-[0_0_15px_-3px_hsl(var(--tim-gold)/0.12)]" : "",
     warning: "border-tim-warning/30",
@@ -36,10 +38,10 @@ export function KpiCard({
   };
 
   const sparkColor =
-    variant === "warning" ? "hsl(38,92%,50%)" :
-    variant === "danger"  ? "hsl(0,65%,50%)" :
-    accent                ? "hsl(40,80%,55%)" :
-                            "hsl(220,10%,55%)";
+    variant === "warning" ? chartColors.warning :
+    variant === "danger"  ? chartColors.danger :
+    accent                ? chartColors.gold :
+                            chartColors.muted;
 
   const sparkData = sparkline?.map((v) => ({ v }));
 

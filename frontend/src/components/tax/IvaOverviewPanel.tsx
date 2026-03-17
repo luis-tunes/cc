@@ -5,8 +5,10 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Receipt } from "lucide-react";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 
 export function IvaOverviewPanel({ className }: { className?: string }) {
+  const colors = useChartColors();
   const [selectedPeriod, setSelectedPeriod] = useState(vatPeriods[0].period);
   const period = vatPeriods.find((p) => p.period === selectedPeriod) ?? vatPeriods[0];
 
@@ -73,23 +75,23 @@ export function IvaOverviewPanel({ className }: { className?: string }) {
               <AreaChart data={vatTrend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="colCollected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(40 80% 55%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(40 80% 55%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={colors.gold} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={colors.gold} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colDeductible" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(210 60% 50%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(210 60% 50%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={colors.info} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={colors.info} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 12% 16%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(220 10% 55%)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(220 10% 55%)" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `€${v / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `€${v / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(220 18% 9%)", border: "1px solid hsl(220 12% 16%)", borderRadius: 8, fontSize: 11 }}
+                  contentStyle={tooltipStyle(colors)}
                   formatter={((value: any, name: any) => [fmt(value as number), name === "collected" ? "Liquidado" : "Dedutível"]) as any}
                 />
-                <Area type="monotone" dataKey="collected" stroke="hsl(40 80% 55%)" fill="url(#colCollected)" strokeWidth={1.5} />
-                <Area type="monotone" dataKey="deductible" stroke="hsl(210 60% 50%)" fill="url(#colDeductible)" strokeWidth={1.5} />
+                <Area type="monotone" dataKey="collected" stroke={colors.gold} fill="url(#colCollected)" strokeWidth={1.5} />
+                <Area type="monotone" dataKey="deductible" stroke={colors.info} fill="url(#colDeductible)" strokeWidth={1.5} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { downloadWithAuth } from "@/lib/api";
 import { TrendingUp, TrendingDown, Download } from "lucide-react";
+import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -17,9 +18,10 @@ function fmt(n: number) {
 
 const YEAR = new Date().getFullYear();
 
-const PIE_COLORS = ["hsl(40,80%,55%)", "hsl(145,50%,42%)", "hsl(210,60%,50%)", "hsl(30,70%,50%)", "hsl(0,65%,50%)", "hsl(270,60%,55%)", "hsl(180,50%,45%)", "hsl(320,60%,55%)"];
+
 
 export default function Reports() {
+  const colors = useChartColors();
   const [year, setYear] = useState(YEAR);
   const { data: pl, isLoading: loadingPl } = usePlReport(year);
   const { data: topSuppliers = [], isLoading: loadingSuppliers } = useTopSuppliers(10);
@@ -96,13 +98,13 @@ export default function Reports() {
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={barData} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,12%,90%)" />
-                    <XAxis dataKey="month_label" tick={{ fontSize: 11, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "hsl(220,10%,45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
-                    <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
-                    <Bar dataKey="receitas" name="Receitas" fill="hsl(145,50%,42%)" radius={[3,3,0,0]} maxBarSize={28} />
-                    <Bar dataKey="gastos" name="Gastos" fill="hsl(0,65%,50%)" radius={[3,3,0,0]} maxBarSize={28} />
-                    <Bar dataKey="resultado" name="Resultado" fill="hsl(40,80%,55%)" radius={[3,3,0,0]} maxBarSize={28} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                    <XAxis dataKey="month_label" tick={{ fontSize: 11, fill: colors.tick }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.tick }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} width={44} />
+                    <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
+                    <Bar dataKey="receitas" name="Receitas" fill={colors.success} radius={[3,3,0,0]} maxBarSize={28} />
+                    <Bar dataKey="gastos" name="Gastos" fill={colors.danger} radius={[3,3,0,0]} maxBarSize={28} />
+                    <Bar dataKey="resultado" name="Resultado" fill={colors.gold} radius={[3,3,0,0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -172,9 +174,9 @@ export default function Reports() {
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie data={supplierPieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
-                        {supplierPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        {supplierPieData.map((_, i) => <Cell key={i} fill={colors.pie[i % colors.pie.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ background: "#fff", border: "1px solid hsl(220,12%,88%)", borderRadius: 6, fontSize: 12 }} />
+                      <Tooltip formatter={(v) => fmt(v as number)} contentStyle={tooltipStyle(colors)} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                     </PieChart>
                   </ResponsiveContainer>

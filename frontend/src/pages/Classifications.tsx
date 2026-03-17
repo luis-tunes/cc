@@ -59,7 +59,7 @@ function RuleRow({ rule, onDelete, onToggle }: { rule: ClassificationRule; onDel
           className={cn("h-5 w-9 rounded-full transition-colors", rule.active ? "bg-primary" : "bg-muted")}
           title={rule.active ? "Desativar" : "Ativar"}
         >
-          <span className={cn("block h-4 w-4 rounded-full bg-white shadow transition-transform mx-0.5", rule.active ? "translate-x-4" : "translate-x-0")} />
+          <span className={cn("block h-4 w-4 rounded-full bg-background shadow transition-transform mx-0.5", rule.active ? "translate-x-4" : "translate-x-0")} />
         </button>
         <button onClick={onDelete} className="text-muted-foreground hover:text-tim-danger transition-colors">
           <Trash2 className="h-4 w-4" />

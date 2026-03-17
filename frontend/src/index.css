@@ -51,6 +51,54 @@
     --chart-4: 30 85% 48%;
     --chart-5: 0 72% 48%;
   }
+
+  .dark {
+    --background: 220 15% 8%;
+    --foreground: 210 10% 92%;
+    --card: 220 14% 11%;
+    --card-foreground: 210 10% 92%;
+    --popover: 220 14% 11%;
+    --popover-foreground: 210 10% 92%;
+    --primary: 40 75% 52%;
+    --primary-foreground: 220 15% 8%;
+    --secondary: 220 12% 18%;
+    --secondary-foreground: 210 10% 85%;
+    --muted: 220 12% 16%;
+    --muted-foreground: 220 8% 55%;
+    --accent: 220 12% 16%;
+    --accent-foreground: 210 10% 92%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 12% 20%;
+    --input: 220 12% 20%;
+    --ring: 40 75% 52%;
+
+    --sidebar-background: 220 15% 7%;
+    --sidebar-foreground: 220 8% 55%;
+    --sidebar-primary: 40 75% 52%;
+    --sidebar-primary-foreground: 220 15% 8%;
+    --sidebar-accent: 220 12% 14%;
+    --sidebar-accent-foreground: 210 10% 92%;
+    --sidebar-border: 220 12% 18%;
+    --sidebar-ring: 40 75% 52%;
+
+    --tim-gold: 40 75% 52%;
+    --tim-gold-muted: 40 40% 35%;
+    --tim-success: 152 50% 42%;
+    --tim-success-foreground: 0 0% 100%;
+    --tim-danger: 0 65% 55%;
+    --tim-danger-foreground: 0 0% 100%;
+    --tim-warning: 30 80% 52%;
+    --tim-warning-foreground: 0 0% 100%;
+    --tim-info: 210 65% 55%;
+    --tim-info-foreground: 0 0% 100%;
+
+    --chart-1: 40 75% 52%;
+    --chart-2: 152 50% 42%;
+    --chart-3: 210 65% 55%;
+    --chart-4: 30 80% 52%;
+    --chart-5: 0 65% 55%;
+  }
 }
 
 @layer base {
@@ -60,6 +108,10 @@
 
   html {
     color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -87,10 +139,19 @@
   }
 }
 
-/* Clerk component overrides for light theme */
+/* Clerk component overrides */
 .cl-card {
   background: hsl(var(--card)) !important;
   border-color: hsl(var(--border)) !important;
+}
+
+.dark .cl-card {
+  color: hsl(var(--card-foreground)) !important;
+}
+
+.dark .cl-formFieldInput,
+.dark .cl-formButtonPrimary {
+  color-scheme: dark;
 }
 
 /* Hide Clerk "Secured by" branding & "Development mode" badge */
