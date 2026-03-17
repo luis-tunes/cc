@@ -1,7 +1,12 @@
 import { SignUp } from "@clerk/react";
+import { Navigate } from "react-router-dom";
 import { clerkAppearance } from "@/lib/clerk-appearance";
 
 export default function SignUpPage() {
+  if (import.meta.env.VITE_AUTH_DISABLED === "1") {
+    return <Navigate to="/painel" replace />;
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 w-full max-w-sm px-4">

@@ -2,15 +2,17 @@ import { useAuth } from "@clerk/react";
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
+const AUTH_BYPASS =
+  import.meta.env.VITE_AUTH_DISABLED === "1" || !!import.meta.env.VITE_E2E_TEST;
+
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  // E2E testing bypass — compile-time constant, tree-shaken in production
-  if (import.meta.env.VITE_E2E_TEST) return <>{children}</>;
-
   const { isSignedIn, isLoaded } = useAuth();
+
+  if (AUTH_BYPASS) return <>{children}</>;
 
   if (!isLoaded) {
     return (
