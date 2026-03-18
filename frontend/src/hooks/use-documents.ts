@@ -25,7 +25,7 @@ export function toDocumentRecord(doc: Document): DocumentRecord {
     arquivado: "arquivado",
   };
 
-  const hasReconciliation = false; // TODO: backend should return this flag
+  const hasReconciliation = !!doc.reconciliation_status;
 
   const fileName = doc.filename || `documento-${doc.id}.pdf`;
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
