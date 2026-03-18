@@ -46,7 +46,6 @@ export const clerkAppearance = {
     dividerText: "text-muted-foreground text-xs",
     otpCodeFieldInput: "border-border bg-muted text-foreground",
     formResendCodeLink: "text-primary hover:text-primary/80",
-    internal: "hidden",
     userButtonPopoverCard: "bg-card border-border shadow-lg",
     userButtonPopoverActionButton: "text-foreground hover:bg-muted",
     userButtonPopoverActionButtonText: "text-sm",

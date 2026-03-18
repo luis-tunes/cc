@@ -221,7 +221,6 @@
 .cl-footer,
 .cl-footerAction,
 .cl-badge,
-[data-clerk-component] a[href*="clerk.com"],
-[class*="cl-internal"] {
+[data-clerk-component] a[href*="clerk.com"] {
   display: none !important;
 }
