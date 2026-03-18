@@ -180,15 +180,17 @@ export default function Documents() {
           }}
         >
           <div className="flex items-center justify-between gap-3">
-            <TabsList className="h-8 bg-secondary/50">
-              <TabsTrigger value="todos" className="text-xs h-6 px-3">Todos</TabsTrigger>
-              <TabsTrigger value="revisao" className="text-xs h-6 px-3">
-                <AlertTriangle className="mr-1 h-3 w-3" />
-                Revisão ({kpis.pendingReview})
-              </TabsTrigger>
-              <TabsTrigger value="classificados" className="text-xs h-6 px-3">Classificados</TabsTrigger>
-              <TabsTrigger value="reconciliados" className="text-xs h-6 px-3">Reconciliados</TabsTrigger>
-            </TabsList>
+            <div className="min-w-0 overflow-x-auto">
+              <TabsList className="h-8 bg-secondary/50">
+                <TabsTrigger value="todos" className="text-xs h-6 px-3">Todos</TabsTrigger>
+                <TabsTrigger value="revisao" className="text-xs h-6 px-3">
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Revisão ({kpis.pendingReview})
+                </TabsTrigger>
+                <TabsTrigger value="classificados" className="text-xs h-6 px-3">Classificados</TabsTrigger>
+                <TabsTrigger value="reconciliados" className="text-xs h-6 px-3">Reconciliados</TabsTrigger>
+              </TabsList>
+            </div>
           </div>
         </Tabs>
 

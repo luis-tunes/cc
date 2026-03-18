@@ -42,7 +42,7 @@ export function BulkActionsBar({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-lg border bg-card px-4 py-2",
+        "flex flex-wrap items-center gap-2 rounded-lg border bg-card px-4 py-2",
         "shadow-[0_-2px_15px_-3px_hsl(var(--tim-gold)/0.08)]",
         className
       )}

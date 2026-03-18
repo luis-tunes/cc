@@ -67,7 +67,9 @@ export function AppTopbar({ title }: AppTopbarProps) {
           </Button>
 
           {/* Theme */}
-          <ThemeToggle />
+          <div className="hidden md:block">
+            <ThemeToggle />
+          </div>
 
           {/* Separator */}
           <div className="mx-1 h-5 w-px bg-border" />

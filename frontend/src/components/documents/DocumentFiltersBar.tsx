@@ -47,8 +47,8 @@ export function DocumentFiltersBar({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Pesquisar por nome, fornecedor, NIF…"
@@ -62,7 +62,7 @@ export function DocumentFiltersBar({
           value={filters.status}
           onValueChange={(v) => update({ status: v as any })}
         >
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-32 text-xs sm:w-36">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
@@ -81,7 +81,7 @@ export function DocumentFiltersBar({
           value={filters.documentType}
           onValueChange={(v) => update({ documentType: v as any })}
         >
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-32 text-xs sm:w-36">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
