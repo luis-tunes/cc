@@ -1,11 +1,9 @@
 # TIM reverse proxy
 # ─────────────────────────────────────────────────────────
-# Bare IP:  set DOMAIN=:443 in .env (default — self-signed cert)
-# Real domain: set DOMAIN=tim.pt  in .env (auto Let's Encrypt)
-#   and remove "tls internal" below so Caddy provisions a real cert.
+# Dev:  DOMAIN=:80 (HTTP only, via docker-compose default)
+# Prod: DOMAIN=xtim.ai in .env → Caddy auto-provisions Let's Encrypt cert
 
 {$DOMAIN::443} {
-	tls internal
 
 	# API + webhook → FastAPI backend
 	handle /api/* {

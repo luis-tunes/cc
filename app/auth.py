@@ -35,7 +35,7 @@ def _decode_clerk_jwt(token: str) -> dict:
     # The public key can be fetched from JWKS, but for simplicity
     # we use the PEM from CLERK_PEM_PUBLIC_KEY env var, or fall back
     # to HS256 with the secret key (Clerk supports both).
-    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "")
+    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").replace("\\n", "\n")
 
     if pem:
         return jwt.decode(
