@@ -60,8 +60,8 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
         <ConfidenceIndicator value={pair.confidence} size="sm" />
       </div>
 
-      {/* Body: side-by-side */}
-      <div className={cn("grid gap-0", isUnmatched ? "grid-cols-1" : "grid-cols-[1fr_auto_1fr]")}>
+      {/* Body: side-by-side on desktop, stacked on mobile */}
+      <div className={cn("grid gap-0", isUnmatched ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-[1fr_auto_1fr]")}>
         {/* Left: Document */}
         {pair.document ? (
           <div className="p-4">
@@ -96,15 +96,15 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
 
         {/* Center: Match indicator */}
         {!isUnmatched && (
-          <div className="flex flex-col items-center justify-center border-x px-4 py-4">
+          <div className="flex flex-row items-center justify-center gap-3 border-t px-4 py-3 sm:flex-col sm:border-t-0 sm:border-x sm:py-4">
             <div className={cn("rounded-full p-2", pair.confidence >= 80 ? "bg-tim-success/10" : pair.confidence >= 50 ? "bg-tim-warning/10" : "bg-tim-danger/10")}>
               <ArrowLeftRight className={cn("h-4 w-4", pair.confidence >= 80 ? "text-tim-success" : pair.confidence >= 50 ? "text-tim-warning" : "text-tim-danger")} />
             </div>
-            <span className={cn("mt-2 text-lg font-bold font-mono tabular-nums", pair.confidence >= 80 ? "text-tim-success" : pair.confidence >= 50 ? "text-tim-warning" : "text-tim-danger")}>
+            <span className={cn("text-lg font-bold font-mono tabular-nums sm:mt-2", pair.confidence >= 80 ? "text-tim-success" : pair.confidence >= 50 ? "text-tim-warning" : "text-tim-danger")}>
               {pair.confidence}%
             </span>
             {pair.amountDelta === 0 && (
-              <span className="mt-1 text-xs text-tim-success">Valor exato</span>
+              <span className="text-xs text-tim-success sm:mt-1">Valor exato</span>
             )}
             {pair.dateDelta > 0 && (
               <span className={cn("text-xs", pair.dateDelta <= 3 ? "text-muted-foreground" : "text-tim-warning")}>
@@ -116,7 +116,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
 
         {/* Right: Movement */}
         {pair.movement ? (
-          <div className="p-4">
+          <div className="border-t p-4 sm:border-t-0">
             <div className="flex items-center gap-2 mb-2">
               <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -141,7 +141,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-r-lg bg-muted/20 p-6">
+          <div className="flex flex-col items-center justify-center rounded-r-lg bg-muted/20 border-t p-6 sm:border-t-0">
             <Landmark className="h-6 w-6 text-muted-foreground/30" />
             <p className="mt-2 text-xs text-muted-foreground">Sem movimento associado</p>
           </div>

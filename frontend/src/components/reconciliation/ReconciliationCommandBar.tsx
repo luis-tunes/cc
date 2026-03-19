@@ -57,49 +57,51 @@ export function ReconciliationCommandBar({
         </Button>
 
         {/* Divider */}
-        <div className="h-6 w-px bg-border" />
+        <div className="hidden h-6 w-px bg-border sm:block" />
 
         {/* Filter tabs */}
-        <div className="flex rounded-md bg-muted p-0.5">
-          {filters.map((f) => {
-            const count =
-              f.key === "all"
-                ? summary.total
-                : f.key === "pending"
-                ? summary.suggested
-                : f.key === "matched"
-                ? summary.approved + summary.autoMatched
-                : f.key === "exceptions"
-                ? summary.exceptions
-                : summary.unmatched;
+        <div className="min-w-0 overflow-x-auto">
+          <div className="flex rounded-md bg-muted p-0.5">
+            {filters.map((f) => {
+              const count =
+                f.key === "all"
+                  ? summary.total
+                  : f.key === "pending"
+                  ? summary.suggested
+                  : f.key === "matched"
+                  ? summary.approved + summary.autoMatched
+                  : f.key === "exceptions"
+                  ? summary.exceptions
+                  : summary.unmatched;
 
-            return (
-              <button
-                key={f.key}
-                onClick={() => onFilterChange(f.key)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                  activeFilter === f.key
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {f.label}
-                <span
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => onFilterChange(f.key)}
                   className={cn(
-                    "rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
-                    activeFilter === f.key ? "bg-muted text-foreground" : "bg-transparent"
+                    "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+                    activeFilter === f.key
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                  {f.label}
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+                      activeFilter === f.key ? "bg-muted text-foreground" : "bg-transparent"
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Summary strip */}
-        <div className="ml-auto flex items-center gap-4">
+        {/* Summary strip — hidden on mobile */}
+        <div className="ml-auto hidden items-center gap-4 sm:flex">
           <SummaryStat icon={CheckCircle2} value={summary.approved + summary.autoMatched} label="Reconciliados" variant="success" />
           <SummaryStat icon={Clock} value={summary.suggested} label="Pendentes" variant="warning" />
           <SummaryStat icon={AlertTriangle} value={summary.exceptions} label="Exceções" variant="danger" />
@@ -118,6 +120,20 @@ export function ReconciliationCommandBar({
             </div>
             <span className="text-xs font-semibold tabular-nums text-foreground">{pctResolved}%</span>
           </div>
+        </div>
+
+        {/* Compact progress on mobile */}
+        <div className="ml-auto flex items-center gap-2 sm:hidden">
+          <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                pctResolved >= 80 ? "bg-tim-success" : pctResolved >= 50 ? "bg-tim-warning" : "bg-tim-danger"
+              )}
+              style={{ width: `${pctResolved}%` }}
+            />
+          </div>
+          <span className="text-xs font-semibold tabular-nums text-foreground">{pctResolved}%</span>
         </div>
       </div>
     </div>
