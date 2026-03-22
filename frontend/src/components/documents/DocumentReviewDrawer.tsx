@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { fetchClassificationSuggestion } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -85,6 +87,13 @@ export function DocumentReviewDrawer({
   const [showNote, setShowNote] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [previewError, setPreviewError] = useState(false);
+
+  const { data: suggestion } = useQuery({
+    queryKey: ["doc-suggest", document?.id],
+    queryFn: () => fetchClassificationSuggestion(Number(document!.id)),
+    enabled: open && !!document && document.classificationStatus !== "revisto" && document.classificationStatus !== "classificado" && document.classificationStatus !== "arquivado",
+    staleTime: 30_000,
+  });
 
   if (!document) return null;
 
@@ -287,7 +296,7 @@ export function DocumentReviewDrawer({
           )}
 
           {/* AI classification recommendation */}
-          {!isApproved && !isArchived && (
+          {!isApproved && !isArchived && suggestion && (
             <div className="px-5 py-4">
               <div className="rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3">
                 <div className="flex items-center gap-2">
@@ -295,11 +304,18 @@ export function DocumentReviewDrawer({
                   <span className="text-xs font-medium uppercase tracking-widest text-primary">Recomendação IA</span>
                 </div>
                 <p className="mt-2 text-xs text-foreground">
-                  Classificar como <span className="font-semibold text-primary">62 — Fornecimentos e Serviços Externos</span>
+                  Classificar como <span className="font-semibold text-primary">{suggestion.account} — {suggestion.label}</span>
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Baseado em 12 documentos similares do mesmo fornecedor</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{suggestion.reason}</p>
                 <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full bg-tim-success/10 px-2 py-0.5 text-xs font-medium text-tim-success">89% confiança</span>
+                  <span className={cn(
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                    suggestion.confidence >= 70 ? "bg-tim-success/10 text-tim-success" :
+                    suggestion.confidence >= 50 ? "bg-tim-warning/10 text-tim-warning" :
+                    "bg-muted text-muted-foreground"
+                  )}>
+                    {suggestion.confidence}% confiança
+                  </span>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <Button

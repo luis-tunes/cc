@@ -61,6 +61,7 @@ class DocumentPatch(BaseModel):
     date: Optional[datetime.date] = None
     filename: Optional[str] = None
     notes: Optional[str] = None
+    snc_account: Optional[str] = None
 
 class BankTransactionOut(BaseModel):
     id: int
@@ -318,6 +319,104 @@ async def classification_stats(auth: AuthInfo = Depends(require_auth)):
         "coverage_pct": round((classified / total * 100), 1) if total > 0 else 0.0,
         "by_account": [dict(r) for r in by_account],
     }
+
+
+# SNC accounts for content-based suggestion
+_SNC_SUGGEST = {
+    "fatura": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "recibo": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "nota-credito": {"account": "22", "label": "Fornecedores"},
+    "nota-debito": {"account": "21", "label": "Clientes"},
+    "extrato": {"account": "12", "label": "Depósitos à Ordem"},
+}
+
+
+@router.get("/documents/{doc_id}/suggest")
+async def suggest_classification(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Return a classification suggestion for a document."""
+    wheres = ["id = %s"]
+    params: list = [doc_id]
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
+    tid = auth.tenant_id or ""
+
+    with get_conn() as conn:
+        doc = conn.execute(
+            f"SELECT id, supplier_nif, client_nif, total, vat, type, raw_text, snc_account FROM documents WHERE {where}",
+            params,
+        ).fetchone()
+        if not doc:
+            raise HTTPException(status_code=404, detail="document not found")
+
+        # If already classified by a rule, return that
+        if doc["snc_account"]:
+            return {
+                "account": doc["snc_account"],
+                "label": next((s["label"] for s in _SNC_SUGGEST.values() if s["account"] == doc["snc_account"]), doc["snc_account"]),
+                "confidence": 90,
+                "source": "rule",
+                "reason": "Classificado por regra automática",
+            }
+
+        # Try rule-based classification
+        from app.classify import classify_document as _classify
+        doc_data = {
+            "supplier_nif": doc["supplier_nif"],
+            "client_nif": doc["client_nif"],
+            "total": doc["total"],
+            "type": doc["type"],
+            "raw_text": doc["raw_text"],
+        }
+        result = _classify(doc_data, tid)
+        if result:
+            return {
+                "account": result["account"],
+                "label": result["label"] or result["account"],
+                "confidence": 85,
+                "source": "rule",
+                "reason": "Baseado em regras de classificação",
+            }
+
+        # Check similar documents from same supplier
+        if doc["supplier_nif"] and doc["supplier_nif"] != "000000000":
+            similar = conn.execute(
+                """SELECT snc_account, COUNT(*) as cnt
+                   FROM documents
+                   WHERE tenant_id = %s AND supplier_nif = %s
+                     AND snc_account IS NOT NULL AND snc_account != ''
+                   GROUP BY snc_account ORDER BY cnt DESC LIMIT 1""",
+                (tid, doc["supplier_nif"]),
+            ).fetchone()
+            if similar:
+                return {
+                    "account": similar["snc_account"],
+                    "label": next((s["label"] for s in _SNC_SUGGEST.values() if s["account"] == similar["snc_account"]), similar["snc_account"]),
+                    "confidence": 75,
+                    "source": "similar",
+                    "reason": f"Baseado em {similar['cnt']} documento(s) do mesmo fornecedor",
+                }
+
+        # Fallback: suggest based on document type
+        doc_type = doc["type"] or "outro"
+        suggestion = _SNC_SUGGEST.get(doc_type)
+        if suggestion:
+            return {
+                "account": suggestion["account"],
+                "label": suggestion["label"],
+                "confidence": 50,
+                "source": "type",
+                "reason": f"Baseado no tipo de documento ({doc_type})",
+            }
+
+        return {
+            "account": "62",
+            "label": "Fornecimentos e Serviços Externos",
+            "confidence": 30,
+            "source": "default",
+            "reason": "Classificação por omissão — reveja manualmente",
+        }
 
 
 @router.get("/documents/{doc_id}", response_model=DocumentOut)

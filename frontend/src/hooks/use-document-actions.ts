@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { patchDocument, deleteDocument, bulkDeleteDocuments } from "@/lib/api";
+import { patchDocument, deleteDocument, bulkDeleteDocuments, fetchClassificationSuggestion } from "@/lib/api";
 import { toast } from "sonner";
 
 export interface DocumentActions {
@@ -92,8 +92,15 @@ export function useDocumentActions(refetch: () => void) {
       withUndo(id, { status: "arquivado" }, { status: "pendente" }, "Documento arquivado");
     },
     onAcceptAiSuggestion: (id) => {
-      mutation.mutate({ id, patch: { status: "classificado" } });
-      toast.success("Sugestão IA aceite");
+      fetchClassificationSuggestion(Number(id))
+        .then((suggestion) => {
+          mutation.mutate({ id, patch: { status: "classificado", snc_account: suggestion.account } });
+          toast.success("Sugestão IA aceite");
+        })
+        .catch(() => {
+          mutation.mutate({ id, patch: { status: "classificado" } });
+          toast.success("Documento aprovado");
+        });
     },
     onAddNote: (id, note) => {
       mutation.mutate({ id, patch: { notes: note } });

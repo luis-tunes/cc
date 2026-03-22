@@ -206,6 +206,18 @@ export async function fetchDocument(id: number): Promise<Document> {
   return request<Document>(`/documents/${id}`);
 }
 
+export interface ClassificationSuggestion {
+  account: string;
+  label: string;
+  confidence: number;
+  source: string;
+  reason: string;
+}
+
+export async function fetchClassificationSuggestion(docId: number): Promise<ClassificationSuggestion> {
+  return request<ClassificationSuggestion>(`/documents/${docId}/suggest`);
+}
+
 export async function patchDocument(id: number, patch: DocumentPatch): Promise<Document> {
   return request<Document>(`/documents/${id}`, {
     method: "PATCH",

@@ -42,7 +42,17 @@ export function toDocumentRecord(doc: Document): DocumentRecord {
     total: doc.total || undefined,
     vat: doc.vat || undefined,
     date: doc.date || undefined,
-    extractionConfidence: doc.raw_text ? 85 : 50,
+    extractionConfidence: (() => {
+      let score = 0;
+      if (doc.raw_text && doc.raw_text.length > 50) score += 15;
+      if (doc.total && doc.total > 0) score += 30;
+      if (doc.vat && doc.vat > 0) score += 15;
+      if (doc.supplier_nif && doc.supplier_nif !== "000000000" && doc.supplier_nif !== "") score += 15;
+      if (doc.date) score += 10;
+      if (doc.type && doc.type !== "outro") score += 5;
+      if (doc.snc_account) score += 10;
+      return Math.min(score, 100);
+    })(),
     classificationStatus: statusMap[doc.status] || "pendente",
     reconciliationStatus: hasReconciliation ? "reconciliado" : "pendente",
     source: "upload",
