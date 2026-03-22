@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 router = APIRouter()
 
@@ -69,13 +70,16 @@ class BankTransactionOut(BaseModel):
     description: str
     amount: Decimal
 
-class WebhookPayload(BaseModel):
-    document_id: int
-
 # --- Webhook ---
 
+class WebhookRequest(BaseModel):
+    document_id: int
+    secret: str = ""
+
 @router.post("/webhook")
-async def paperless_webhook(payload: WebhookPayload):
+async def paperless_webhook(payload: WebhookRequest):
+    if WEBHOOK_SECRET and payload.secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="invalid webhook secret")
     try:
         doc_id = ingest_document(payload.document_id)
     except ValueError as e:

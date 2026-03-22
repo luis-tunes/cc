@@ -515,10 +515,10 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
         paperless_filename = ""
         paperless_content = ""
 
-    raw_text = extract_text(pdf, paperless_id=paperless_id)
-
-    if len(paperless_content) > len(raw_text):
-        raw_text = paperless_content
+    # Use Paperless content directly (already fetched above), skip duplicate API call
+    raw_text = paperless_content
+    if not raw_text:
+        raw_text = extract_text(pdf, paperless_id=paperless_id)
 
     log.info("ingest: paperless_id=%d filename=%s raw_text_len=%d invoice2data=%s",
              paperless_id, paperless_filename, len(raw_text), bool(data))
@@ -618,14 +618,16 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
                 (paperless_filename,),
             ).fetchone()
 
-            # Fallback: recent upload without filename match (only if we have a filename to try)
-            if not pending:
+            # Fallback: recent upload without filename match (tenant-aware)
+            if not pending and tenant_id:
                 pending = conn.execute(
                     """SELECT id, tenant_id FROM documents
                        WHERE paperless_id IS NULL
                          AND status IN ('pendente ocr', 'a processar')
+                         AND tenant_id = %s
                          AND created_at > now() - interval '1 hour'
                        ORDER BY created_at DESC LIMIT 1""",
+                    (tenant_id,),
                 ).fetchone()
 
         if pending:
