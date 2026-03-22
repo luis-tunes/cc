@@ -1,8 +1,8 @@
 __pycache__/
 *.pyc
 .env
+.env.production
 !.env.example
-!.env.production
 *.egg-info/
 .venv/
 .DS_Store
