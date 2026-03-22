@@ -39,22 +39,30 @@ def fetch_document_file(paperless_id: int) -> bytes:
     r.raise_for_status()
     return r.content
 
-def fetch_document_text(paperless_id: int) -> str:
-    """Fetch the OCR plain-text content from Paperless (fallback parser)."""
+def fetch_document_metadata(paperless_id: int) -> dict:
+    """Fetch document metadata from Paperless (content, original_file_name, etc.)."""
     url = f"{PAPERLESS_URL}/api/documents/{paperless_id}/"
     headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
     r = httpx.get(url, headers=headers, timeout=30)
     r.raise_for_status()
-    return r.json().get("content", "")
+    return r.json()
+
+def fetch_document_text(paperless_id: int) -> str:
+    """Fetch the OCR plain-text content from Paperless (fallback parser)."""
+    meta = fetch_document_metadata(paperless_id)
+    return meta.get("content", "")
 
 _AMOUNT_RE = re.compile(
-    r"(?:Total|Amount|Montante|TOTAL|Valor)\s*[:\s]*(?:[A-Z€]{0,3}\s*)?"
-    r"([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d+[.,]\d{2})\s*(?:EUR|€)?",
+    r"(?:Total|Montante|Valor|Líquido|Amount)"
+    r"[\s\w/:.€()\-]{0,30}?"
+    r"([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d+[.,]\d{2})"
+    r"\s*(?:EUR|€)?",
     re.IGNORECASE | re.DOTALL,
 )
-# Broader fallback: any currency-formatted number (e.g. "2.021,74€")
-_MONEY_RE = re.compile(r"([\d]{1,3}(?:\.\d{3})+,\d{2}|[\d]{1,3},\d{2})\s*€")
+# Broader fallback: any currency-formatted number (e.g. "2.021,74€" or "50,00 €")
+_MONEY_RE = re.compile(r"([\d]{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})\s*€")
 _DATE_RE = re.compile(r"(\d{1,2})\s+(\w{3,9})\s+(\d{4})", re.IGNORECASE)
+_DATE_NUMERIC_RE = re.compile(r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})")
 _NIF_RE = re.compile(r"\b(\d{9})\b")
 
 _PT_MONTHS = {
@@ -75,6 +83,11 @@ def _parse_amount_from_text(text: str) -> Decimal:
     if candidates:
         amounts = [Decimal(c.replace(".", "").replace(",", ".")) for c in candidates]
         return max(amounts)
+    # Ultra-fallback: any PT-format decimal number (1.234,56 or 50,00)
+    any_amounts = re.findall(r"(\d{1,3}(?:\.\d{3})*,\d{2})", text)
+    if any_amounts:
+        amounts = [Decimal(c.replace(".", "").replace(",", ".")) for c in any_amounts]
+        return max(amounts)
     raise ValueError("could not find amount in document text")
 
 def _parse_date_from_text(text: str) -> date:
@@ -86,6 +99,13 @@ def _parse_date_from_text(text: str) -> date:
         month = _PT_MONTHS.get(month_str[:3])
         if month:
             return date(year, month, day)
+    # Try numeric formats: dd/mm/yyyy or dd-mm-yyyy
+    m2 = _DATE_NUMERIC_RE.search(text)
+    if m2:
+        try:
+            return date(int(m2.group(3)), int(m2.group(2)), int(m2.group(1)))
+        except ValueError:
+            pass
     return date.today()
 
 def parse_invoice(pdf_bytes: bytes) -> dict:
@@ -106,17 +126,32 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
     return result  # may be None/False — ingest_document handles fallback
 
 def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
+    import logging
+    log = logging.getLogger(__name__)
+
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 
+    # Fetch Paperless metadata (content + original filename)
+    try:
+        meta = fetch_document_metadata(paperless_id)
+        paperless_filename = meta.get("original_file_name", "") or ""
+    except Exception:
+        paperless_filename = ""
+
     # Always fetch OCR text for storage (via abstraction layer)
     raw_text = extract_text(pdf, paperless_id=paperless_id)
+
+    log.info("ingest: paperless_id=%d filename=%s raw_text_len=%d invoice2data=%s",
+             paperless_id, paperless_filename, len(raw_text), bool(data))
 
     # ── Fallback: use Paperless OCR text when invoice2data finds nothing ──
     if not data:
         try:
             total = _parse_amount_from_text(raw_text)
         except ValueError:
+            log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
+                        len(raw_text), raw_text[:500])
             total = Decimal("0")
         doc_date = _parse_date_from_text(raw_text)
         nifs = [n for n in _NIF_RE.findall(raw_text) if validate_nif(n)]
@@ -152,20 +187,48 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     status = "extraído" if total > 0 else "pendente"
 
     with get_conn() as conn:
-        row = conn.execute(
-            """INSERT INTO documents (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (paperless_id) DO UPDATE
-                 SET total=EXCLUDED.total, vat=EXCLUDED.vat, date=EXCLUDED.date,
-                     type=EXCLUDED.type, supplier_nif=EXCLUDED.supplier_nif,
-                     client_nif=EXCLUDED.client_nif, raw_text=EXCLUDED.raw_text,
-                     status=EXCLUDED.status
-               RETURNING id""",
-            (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
-        ).fetchone()
-        conn.commit()
+        # Try to find a pending upload document to update (matches by filename)
+        pending = None
+        if paperless_filename:
+            pending = conn.execute(
+                """SELECT id, tenant_id FROM documents
+                   WHERE paperless_id IS NULL
+                     AND status IN ('pendente ocr', 'a processar')
+                     AND filename = %s
+                   ORDER BY created_at DESC LIMIT 1""",
+                (paperless_filename,),
+            ).fetchone()
 
-    doc_id = row["id"]
+        if pending:
+            # Update the existing upload record, preserving its tenant_id
+            effective_tenant = pending["tenant_id"] or tenant_id
+            conn.execute(
+                """UPDATE documents
+                   SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
+                       type=%s, paperless_id=%s, raw_text=%s, status=%s, tenant_id=%s
+                   WHERE id = %s""",
+                (supplier_nif, client_nif, total, vat, doc_date, doc_type,
+                 paperless_id, raw_text, status, effective_tenant, pending["id"]),
+            )
+            conn.commit()
+            doc_id = pending["id"]
+            tenant_id = effective_tenant
+            log.info("ingest: updated pending doc id=%d tenant=%s total=%s", doc_id, tenant_id, total)
+        else:
+            row = conn.execute(
+                """INSERT INTO documents (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (paperless_id) DO UPDATE
+                     SET total=EXCLUDED.total, vat=EXCLUDED.vat, date=EXCLUDED.date,
+                         type=EXCLUDED.type, supplier_nif=EXCLUDED.supplier_nif,
+                         client_nif=EXCLUDED.client_nif, raw_text=EXCLUDED.raw_text,
+                         status=EXCLUDED.status
+                   RETURNING id""",
+                (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
+            ).fetchone()
+            conn.commit()
+            doc_id = row["id"]
+            log.info("ingest: inserted new doc id=%d tenant=%s total=%s", doc_id, tenant_id, total)
 
     # Auto-classify using tenant rules
     doc_data = {

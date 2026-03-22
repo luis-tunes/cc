@@ -387,7 +387,7 @@ async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
             raise HTTPException(status_code=404, detail="document not found")
         conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
         conn.execute(f"DELETE FROM documents WHERE {where}", params)
-        log_activity(conn, (auth.tenant_id if auth else "") or "", "document", doc_id, "deleted", None)
+        log_activity(conn, (auth.tenant_id if auth else "") or "", "document", doc_id, "deleted")
         conn.commit()
     return None
 
@@ -415,7 +415,7 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
             if row:
                 conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
                 conn.execute(f"DELETE FROM documents WHERE {where}", params)
-                log_activity(conn, tenant_id, "document", doc_id, "deleted", None)
+                log_activity(conn, tenant_id, "document", doc_id, "deleted")
         conn.commit()
     return None
 

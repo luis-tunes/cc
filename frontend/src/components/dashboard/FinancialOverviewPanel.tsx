@@ -89,7 +89,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
             Receita vs Gastos
           </p>
           <div className="mt-3 h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
@@ -144,7 +144,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
             Resultado Líquido
           </p>
           <div className="mt-3 h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
                 <XAxis

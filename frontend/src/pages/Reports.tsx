@@ -182,7 +182,7 @@ export default function Reports() {
                 ) : supplierPieData.length === 0 ? (
                   <EmptyState icon={PieChartIcon} title="Sem dados" description="Processe faturas para ver a distribuição por fornecedor." />
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={220} minWidth={0}>
                     <PieChart>
                       <Pie data={supplierPieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name">
                         {supplierPieData.map((_, i) => <Cell key={i} fill={colors.pie[i % colors.pie.length]} />)}
