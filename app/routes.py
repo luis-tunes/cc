@@ -1866,10 +1866,18 @@ async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
 @router.patch("/products/{product_id}")
 async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id or auth.user_id
-    fields = {k: body[k] for k in ("code", "name", "category", "pvp", "active", "recipe_version") if k in body}
+    fields = {k: body[k] for k in ("code", "name", "category", "pvp", "active", "recipe_version", "estimated_cost") if k in body}
+    if "estimated_cost" in fields:
+        fields["estimated_cost"] = Decimal(str(fields["estimated_cost"]))
     if not fields and "ingredients" not in body:
         raise HTTPException(status_code=422, detail="no fields to update")
     with get_conn() as conn:
+        if "estimated_cost" in fields:
+            pvp = Decimal(str(body.get("pvp", 0)))
+            if pvp <= 0:
+                existing = conn.execute("SELECT pvp FROM products WHERE id = %s AND tenant_id = %s", (product_id, tid)).fetchone()
+                pvp = existing["pvp"] if existing else Decimal("0")
+            fields["margin"] = ((pvp - fields["estimated_cost"]) / pvp) if pvp > 0 else Decimal("0")
         if fields:
             set_parts = [f"{k} = %s" for k in fields]
             params = list(fields.values()) + [product_id, tid]

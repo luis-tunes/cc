@@ -37,6 +37,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [pvp, setPvp] = useState("");
+  const [manualCost, setManualCost] = useState("");
   const [active, setActive] = useState(true);
   const [recipeLines, setRecipeLines] = useState<RecipeLine[]>([]);
 
@@ -46,6 +47,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
       setName(editProduct.name);
       setCategory(editProduct.category || "");
       setPvp(String(editProduct.pvp));
+      setManualCost(editProduct.estimated_cost > 0 && editProduct.ingredients.length === 0 ? String(editProduct.estimated_cost) : "");
       setActive(editProduct.active);
       setRecipeLines(
         editProduct.ingredients.map((ri) => ({
@@ -66,6 +68,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
     setName("");
     setCategory("");
     setPvp("");
+    setManualCost("");
     setActive(true);
     setRecipeLines([]);
   };
@@ -89,8 +92,10 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
     }, 0);
   }, [recipeLines, ingredientMap]);
 
+  const manualCostNum = parseFloat(manualCost) || 0;
+  const effectiveCost = recipeLines.length > 0 ? estimatedCost : manualCostNum;
   const pvpNum = parseFloat(pvp) || 0;
-  const margin = pvpNum > 0 ? (pvpNum - estimatedCost) / pvpNum : 0;
+  const margin = pvpNum > 0 ? (pvpNum - effectiveCost) / pvpNum : 0;
 
   const addLine = () => {
     if (availableIngredients.length === 0) return;
@@ -129,7 +134,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
       wastage_percent: parseFloat(l.wastage_percent) || 0,
     }));
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       code: code.trim() || undefined,
       name: name.trim(),
       category: category.trim() || undefined,
@@ -137,6 +142,9 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
       active,
       ingredients,
     };
+    if (recipeLines.length === 0 && manualCostNum > 0) {
+      payload.estimated_cost = manualCostNum;
+    }
 
     const onSuccess = () => {
       resetForm();
@@ -179,6 +187,22 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
               <Label htmlFor="prod-pvp">PVP (€)</Label>
               <Input id="prod-pvp" type="number" step="0.01" min="0" value={pvp} onChange={(e) => setPvp(e.target.value)} placeholder="8.50" />
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="prod-cost">Custo (€)</Label>
+              <Input
+                id="prod-cost"
+                type="number"
+                step="0.01"
+                min="0"
+                value={recipeLines.length > 0 ? estimatedCost.toFixed(2) : manualCost}
+                onChange={(e) => setManualCost(e.target.value)}
+                disabled={recipeLines.length > 0}
+                placeholder={recipeLines.length > 0 ? "Auto (receita)" : "0.00"}
+                title={recipeLines.length > 0 ? "Custo calculado pela receita" : "Custo manual"}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
             <div className="flex items-end gap-2 pb-0.5">
               <Switch id="prod-active" checked={active} onCheckedChange={setActive} />
               <Label htmlFor="prod-active" className="cursor-pointer">{active ? "Ativo" : "Inativo"}</Label>
@@ -275,7 +299,7 @@ export function AddProductDialog({ open, onOpenChange, editProduct }: AddProduct
             {recipeLines.length > 0 && (
               <div className="flex items-center justify-end gap-6 text-sm pt-1">
                 <span className="text-muted-foreground">
-                  Custo estimado: <span className="font-mono font-medium text-foreground">{eur(estimatedCost)}</span>
+                  Custo estimado: <span className="font-mono font-medium text-foreground">{eur(effectiveCost)}</span>
                 </span>
                 {pvpNum > 0 && (
                   <span className="text-muted-foreground">
