@@ -78,6 +78,8 @@ services:
       CONTACT_EMAIL: ${CONTACT_EMAIL:-info@tim.pt}
       PARTNER_STRIPE_ACCOUNT: ${PARTNER_STRIPE_ACCOUNT:-}
       REVENUE_SPLIT_PERCENT: ${REVENUE_SPLIT_PERCENT:-50}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       WEB_DIR: /opt/tim/web
     expose:
       - "8080"

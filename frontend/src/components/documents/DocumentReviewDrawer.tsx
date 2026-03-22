@@ -307,7 +307,7 @@ export function DocumentReviewDrawer({
                   Classificar como <span className="font-semibold text-primary">{suggestion.account} — {suggestion.label}</span>
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{suggestion.reason}</p>
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-2">
                   <span className={cn(
                     "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                     suggestion.confidence >= 70 ? "bg-tim-success/10 text-tim-success" :
@@ -315,6 +315,9 @@ export function DocumentReviewDrawer({
                     "bg-muted text-muted-foreground"
                   )}>
                     {suggestion.confidence}% confiança
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {suggestion.source === "llm" ? "GPT" : suggestion.source === "rule" ? "Regra" : suggestion.source === "similar" ? "Histórico" : "Tipo"}
                   </span>
                 </div>
                 <div className="mt-3 flex gap-2">

@@ -379,6 +379,12 @@ async def suggest_classification(doc_id: int, auth: AuthInfo = Depends(require_a
                 "reason": "Baseado em regras de classificação",
             }
 
+        # Try LLM classification
+        from app.parse import suggest_account_with_llm
+        llm_suggestion = suggest_account_with_llm(doc["raw_text"] or "", doc["type"] or "outro")
+        if llm_suggestion:
+            return llm_suggestion
+
         # Check similar documents from same supplier
         if doc["supplier_nif"] and doc["supplier_nif"] != "000000000":
             similar = conn.execute(

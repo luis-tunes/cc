@@ -1,9 +1,10 @@
+import json
 import logging
 import os
 import re
 import tempfile
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import httpx
 from invoice2data import extract_data
 from invoice2data.extract.loader import read_templates
@@ -15,7 +16,151 @@ log = logging.getLogger(__name__)
 
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 TEMPLATES_DIR = os.path.dirname(__file__)
+
+# -- LLM extraction prompt --
+
+_LLM_EXTRACTION_PROMPT = """\
+You are a Portuguese accounting document parser. Extract structured data from OCR text.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "total": number (total amount in EUR, 0 if not found),
+  "vat": number (IVA/VAT amount in EUR, 0 if not found),
+  "supplier_nif": string (9-digit supplier/issuer NIF, "000000000" if not found),
+  "client_nif": string (9-digit client/buyer NIF, "000000000" if not found),
+  "date": string (ISO YYYY-MM-DD, null if not found),
+  "type": string (one of: "fatura", "recibo", "nota-credito", "nota-debito", "extrato", "outro"),
+  "description": string (brief summary of the document, max 80 chars, in Portuguese)
+}
+
+Extraction rules:
+- Portuguese amounts use comma for decimals and dot for thousands: 1.234,56 means 1234.56
+- NIF is always exactly 9 digits
+- "Total a Pagar", "Total c/ IVA", "Montante", "Valor Total" = total amount
+- "IVA", "I.V.A.", "Taxa de IVA" = VAT amount
+- If multiple totals, pick the final/largest (usually "Total a Pagar" or "Total c/ IVA")
+- VAT rates in Portugal: 23%, 13%, 6%
+- Date formats: DD/MM/YYYY, DD-MM-YYYY, DD de Mês de YYYY, YYYY-MM-DD
+- Fatura = invoice, Recibo = receipt, Nota de Crédito = credit note
+- First NIF label (NIF, NIPC, Contribuinte) = supplier; second or "NIF Cliente" = client
+- Return numbers as plain numbers (1234.56), NOT strings"""
+
+
+def _extract_with_llm(text: str) -> dict | None:
+    """Use OpenAI to extract structured data from OCR text. Returns parsed dict or None."""
+    if not OPENAI_API_KEY:
+        return None
+
+    truncated = text[:6000]
+    try:
+        resp = httpx.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": OPENAI_MODEL,
+                "messages": [
+                    {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                    {"role": "user", "content": f"OCR Text:\n{truncated}"},
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"]
+        parsed = json.loads(content)
+        log.info("LLM extraction succeeded: total=%s vat=%s type=%s",
+                 parsed.get("total"), parsed.get("vat"), parsed.get("type"))
+        return parsed
+    except Exception as exc:
+        log.warning("LLM extraction failed: %s", exc)
+        return None
+
+
+_LLM_CLASSIFICATION_PROMPT = """\
+You are a Portuguese SNC (Sistema de Normalização Contabilística) accounting classifier.
+Given OCR text from a document, suggest the correct SNC account code and label.
+
+Common SNC accounts:
+- 11 Caixa (cash)
+- 12 Depósitos à Ordem (bank deposits)
+- 21 Clientes (clients/receivables)
+- 22 Fornecedores (suppliers/payables)
+- 24 Estado e Outros Entes Públicos (taxes, VAT, social security)
+- 31 Compras (purchases of goods)
+- 62 Fornecimentos e Serviços Externos (external supplies and services - FSE)
+- 63 Gastos com o Pessoal (personnel costs - salaries, social security)
+- 64 Gastos de Depreciação e Amortização
+- 68 Outros Gastos e Perdas
+- 71 Vendas (sales)
+- 72 Prestações de Serviços (services rendered)
+- 78 Outros Rendimentos e Ganhos
+
+Return ONLY valid JSON:
+{
+  "account": string (2-digit SNC account code),
+  "label": string (SNC account name in Portuguese),
+  "confidence": number (0-100),
+  "reason": string (brief explanation in Portuguese, max 80 chars)
+}
+
+Rules:
+- Invoices from suppliers → usually 62 (FSE) or 31 (Compras, if goods)
+- Utility bills (água, luz, gás, telefone, internet) → 62
+- Rent → 62
+- Insurance → 62
+- Bank statements → 12
+- Salary slips → 63
+- Tax notices (AT, Finanças) → 24
+- Sales invoices (where client NIF is "our" company) → 71 or 72
+- Credit notes → same account as underlying operation"""
+
+
+def suggest_account_with_llm(raw_text: str, doc_type: str) -> dict | None:
+    """Use LLM to suggest an SNC account for classification."""
+    if not OPENAI_API_KEY or len(raw_text) < 20:
+        return None
+    try:
+        resp = httpx.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": OPENAI_MODEL,
+                "messages": [
+                    {"role": "system", "content": _LLM_CLASSIFICATION_PROMPT},
+                    {"role": "user", "content": f"Document type: {doc_type}\n\nOCR Text:\n{raw_text[:4000]}"},
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"]
+        parsed = json.loads(content)
+        result = {
+            "account": str(parsed.get("account", "62")),
+            "label": str(parsed.get("label", "Fornecimentos e Serviços Externos")),
+            "confidence": min(int(parsed.get("confidence", 70)), 95),
+            "source": "llm",
+            "reason": str(parsed.get("reason", "Classificação por IA")),
+        }
+        log.info("LLM classification: account=%s confidence=%d", result["account"], result["confidence"])
+        return result
+    except Exception as exc:
+        log.warning("LLM classification failed: %s", exc)
+        return None
+
 
 _templates = None
 
@@ -380,42 +525,77 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     if len(raw_text) < 50:
         log.warning("ingest: very short OCR text (%d chars): %r", len(raw_text), raw_text[:200])
 
-    if not data:
+    # Strategy 1: LLM extraction (best quality)
+    llm_result = _extract_with_llm(raw_text) if len(raw_text) >= 20 else None
+    if llm_result and llm_result.get("total", 0) > 0:
+        log.info("ingest: using LLM extraction")
         try:
-            total = _parse_amount_from_text(raw_text)
-        except ValueError:
-            log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
-                        len(raw_text), raw_text[:500])
+            total = Decimal(str(llm_result["total"]))
+        except (InvalidOperation, ValueError):
             total = Decimal("0")
-        vat = _parse_vat_from_text(raw_text)
-        doc_date = _parse_date_from_text(raw_text)
-        supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
-        doc_type = _detect_document_type(raw_text)
-        data = {
-            "amount": total,
-            "vat": vat,
-            "date": doc_date,
-            "issuer_nif": supplier_nif,
-            "client_nif": client_nif,
-            "invoice_type": doc_type,
-        }
-
-    supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
-    client_nif   = str(data.get("client_nif",  "000000000")).strip()
-    if supplier_nif != "000000000" and not validate_nif(supplier_nif):
-        supplier_nif = "000000000"
-    if client_nif != "000000000" and not validate_nif(client_nif):
-        client_nif = "000000000"
-
-    total    = Decimal(str(data["amount"]))
-    vat      = Decimal(str(data.get("vat", "0")))
-    doc_date = data.get("date", date.today())
-    if isinstance(doc_date, str):
         try:
-            doc_date = date.fromisoformat(doc_date)
-        except ValueError:
-            doc_date = date.today()
-    doc_type = str(data.get("invoice_type", "outro"))
+            vat = Decimal(str(llm_result.get("vat", "0")))
+        except (InvalidOperation, ValueError):
+            vat = Decimal("0")
+        supplier_nif = str(llm_result.get("supplier_nif", "000000000")).strip()
+        client_nif = str(llm_result.get("client_nif", "000000000")).strip()
+        llm_date = llm_result.get("date")
+        if llm_date:
+            try:
+                doc_date = date.fromisoformat(llm_date)
+            except (ValueError, TypeError):
+                doc_date = _parse_date_from_text(raw_text)
+        else:
+            doc_date = _parse_date_from_text(raw_text)
+        doc_type = llm_result.get("type", "outro")
+        if doc_type not in ("fatura", "recibo", "nota-credito", "nota-debito", "extrato", "outro"):
+            doc_type = "outro"
+        # Validate NIFs from LLM
+        if supplier_nif != "000000000" and not validate_nif(supplier_nif):
+            supplier_nif = "000000000"
+        if client_nif != "000000000" and not validate_nif(client_nif):
+            client_nif = "000000000"
+        extraction_source = "llm"
+    else:
+        extraction_source = "regex"
+        # Strategy 2: invoice2data templates
+        if not data:
+            # Strategy 3: Regex fallback
+            try:
+                total = _parse_amount_from_text(raw_text)
+            except ValueError:
+                log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
+                            len(raw_text), raw_text[:500])
+                total = Decimal("0")
+            vat = _parse_vat_from_text(raw_text)
+            doc_date = _parse_date_from_text(raw_text)
+            supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
+            doc_type = _detect_document_type(raw_text)
+            data = {
+                "amount": total,
+                "vat": vat,
+                "date": doc_date,
+                "issuer_nif": supplier_nif,
+                "client_nif": client_nif,
+                "invoice_type": doc_type,
+            }
+
+        supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
+        client_nif   = str(data.get("client_nif",  "000000000")).strip()
+        if supplier_nif != "000000000" and not validate_nif(supplier_nif):
+            supplier_nif = "000000000"
+        if client_nif != "000000000" and not validate_nif(client_nif):
+            client_nif = "000000000"
+
+        total    = Decimal(str(data["amount"]))
+        vat      = Decimal(str(data.get("vat", "0")))
+        doc_date = data.get("date", date.today())
+        if isinstance(doc_date, str):
+            try:
+                doc_date = date.fromisoformat(doc_date)
+            except ValueError:
+                doc_date = date.today()
+        doc_type = str(data.get("invoice_type", "outro"))
 
     confidence = _calculate_confidence(total, vat, supplier_nif, client_nif, doc_date, doc_type, raw_text)
 
