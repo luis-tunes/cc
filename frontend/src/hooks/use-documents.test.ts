@@ -74,9 +74,11 @@ describe("toDocumentRecord", () => {
     expect(toDocumentRecord(makeDoc({ filename: "file.pdf" })).fileType).toBe("pdf");
   });
 
-  it("sets extractionConfidence based on raw_text", () => {
-    expect(toDocumentRecord(makeDoc({ raw_text: "some text" })).extractionConfidence).toBe(85);
-    expect(toDocumentRecord(makeDoc({ raw_text: null })).extractionConfidence).toBe(50);
+  it("sets extractionConfidence based on extracted fields", () => {
+    // All fields present (short raw_text): total(30) + vat(15) + nif(15) + date(10) + type(5) = 75
+    expect(toDocumentRecord(makeDoc({ raw_text: "some text" })).extractionConfidence).toBe(75);
+    // Minimal doc (no total, no vat, unknown nif): 0
+    expect(toDocumentRecord(makeDoc({ raw_text: null, total: 0, vat: 0, supplier_nif: "000000000", date: null, type: "outro", snc_account: null })).extractionConfidence).toBe(0);
   });
 
   it("sets needsReview for pending statuses", () => {
