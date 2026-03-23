@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn, log_activity
-from app.parse import ingest_document, validate_nif
+from app.parse import ingest_document, validate_nif, _extract_with_vision, _normalize_llm_result, _extract_with_llm, _calculate_confidence, _MIME_FROM_EXT
 from app.reconcile import reconcile_all, suggest_matches
 from app.cache import cache_get, cache_set, cache_invalidate
 from app.assistant import answer_question as _answer_question
@@ -151,6 +151,29 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
             with get_conn() as conn:
                 conn.execute("UPDATE documents SET status = 'a processar' WHERE id = %s", (local_id,))
                 conn.commit()
+        else:
+            # Paperless unavailable — try direct vision extraction
+            mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
+            vision_result = _extract_with_vision(content, mime_for_vision)
+            if vision_result and vision_result.get("total", 0) > 0:
+                from app.ocr import extract_text as _extract_text
+                raw_text = _extract_text(content) if ext == ".pdf" else ""
+                normalized = _normalize_llm_result(vision_result, raw_text)
+                from app.classify import classify_document
+                status = "extraído" if normalized["total"] > 0 else "pendente"
+                with get_conn() as conn:
+                    conn.execute(
+                        """UPDATE documents
+                           SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
+                               type=%s, raw_text=%s, status=%s, notes=%s, classification_source='vision'
+                           WHERE id = %s""",
+                        (normalized["supplier_nif"], normalized["client_nif"],
+                         normalized["total"], normalized["vat"], normalized["doc_date"],
+                         normalized["doc_type"], raw_text, status,
+                         normalized["extra_json"], local_id),
+                    )
+                    conn.commit()
+                logger.info("upload: vision extraction succeeded for file=%s id=%d", file.filename, local_id)
 
         status_msg = "accepted" if paperless_ok else "accepted_without_ocr"
         logger.info("upload: %s file=%s id=%d paperless=%s", status_msg, file.filename, local_id, paperless_ok)

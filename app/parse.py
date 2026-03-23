@@ -17,44 +17,206 @@ log = logging.getLogger(__name__)
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 TEMPLATES_DIR = os.path.dirname(__file__)
 
-# -- LLM extraction prompt --
+# -- LLM extraction prompt (vision + text) --
 
 _LLM_EXTRACTION_PROMPT = """\
-You are a Portuguese accounting document parser. Extract structured data from OCR text.
+You are an expert Portuguese certified accountant and fiscal document analyst.
+Your task: extract ALL structured data from this Portuguese accounting document with maximum precision.
 
 Return ONLY valid JSON with these exact fields:
 {
-  "total": number (total amount in EUR, 0 if not found),
-  "vat": number (IVA/VAT amount in EUR, 0 if not found),
-  "supplier_nif": string (9-digit supplier/issuer NIF, "000000000" if not found),
-  "client_nif": string (9-digit client/buyer NIF, "000000000" if not found),
-  "date": string (ISO YYYY-MM-DD, null if not found),
-  "type": string (one of: "fatura", "recibo", "nota-credito", "nota-debito", "extrato", "outro"),
-  "description": string (brief summary of the document, max 80 chars, in Portuguese)
+  "invoice_number": string (document number e.g. "FT 2024/1234", "FR A/5678", "RC 2024/99", "" if not found),
+  "total": number (total final amount WITH IVA in EUR — "Total a Pagar", "Total c/ IVA", "Montante Total", 0 if not found),
+  "base_amount": number (taxable base WITHOUT IVA — "Base Tributável", "Incidência", "Subtotal s/ IVA", 0 if not found),
+  "vat": number (total IVA/VAT amount in EUR, 0 if not found),
+  "vat_breakdown": [
+    {"rate": number, "base": number, "amount": number}
+  ],
+  "discount": number (discount amount in EUR, 0 if none),
+  "withholding_tax": number (retenção na fonte amount in EUR, 0 if none),
+  "supplier_nif": string (9-digit NIF of the ISSUER/EMITTER of the document, "000000000" if not found),
+  "supplier_name": string (company name of the issuer, "" if not found),
+  "client_nif": string (9-digit NIF of the CLIENT/BUYER/RECIPIENT, "000000000" if not found),
+  "client_name": string (company/person name of the client, "" if not found),
+  "date": string (document issue date in ISO YYYY-MM-DD, null if not found),
+  "due_date": string (payment due date in ISO YYYY-MM-DD, null if not found),
+  "type": string (one of: "fatura", "fatura-recibo", "fatura-simplificada", "fatura-proforma", "recibo", "nota-credito", "nota-debito", "extrato", "guia-remessa", "orcamento", "outro"),
+  "payment_method": string ("transferência", "multibanco", "mbway", "dinheiro", "cheque", "cartão", "débito direto", "" if not found),
+  "description": string (brief summary of goods/services in document, max 120 chars, in Portuguese),
+  "line_items": [
+    {"description": string, "qty": number, "unit_price": number, "vat_rate": number, "total": number}
+  ],
+  "atcud": string (ATCUD code if present, "" if not found),
+  "currency": string ("EUR" default, or detected currency code)
 }
 
-Extraction rules:
-- Portuguese amounts use comma for decimals and dot for thousands: 1.234,56 means 1234.56
-- NIF is always exactly 9 digits
-- "Total a Pagar", "Total c/ IVA", "Montante", "Valor Total" = total amount
-- "IVA", "I.V.A.", "Taxa de IVA" = VAT amount
-- If multiple totals, pick the final/largest (usually "Total a Pagar" or "Total c/ IVA")
-- VAT rates in Portugal: 23%, 13%, 6%
-- Date formats: DD/MM/YYYY, DD-MM-YYYY, DD de Mês de YYYY, YYYY-MM-DD
-- Fatura = invoice, Recibo = receipt, Nota de Crédito = credit note
-- First NIF label (NIF, NIPC, Contribuinte) = supplier; second or "NIF Cliente" = client
-- Return numbers as plain numbers (1234.56), NOT strings"""
+## CRITICAL EXTRACTION RULES — Portuguese Fiscal Documents
+
+### Amounts
+- PT format: dot=thousands, comma=decimals → 1.234,56 = 1234.56
+- ALWAYS return numbers as plain JSON numbers (1234.56), NEVER strings
+- "Total a Pagar" / "Total c/ IVA" / "Total do Documento" / "Valor Total" = total (WITH IVA)
+- "Base Tributável" / "Incidência" / "Base de Incidência" / "Total s/ IVA" / "Subtotal" = base_amount (WITHOUT IVA)
+- If base_amount not explicitly stated: base_amount = total - vat
+- "IVA" / "I.V.A." / "Imposto" = vat amount
+- Verify: total ≈ base_amount + vat (± rounding). If not, re-check values
+
+### VAT (IVA)
+- Standard PT rates: 23% (normal), 13% (intermédia), 6% (reduzida), 0% (isenta)
+- Azores: 16%, 9%, 4%. Madeira: 22%, 12%, 5%
+- Extract EACH rate separately into vat_breakdown
+- "Isento de IVA" / "IVA 0%" with legal article reference = tax exempt (rate 0)
+
+### NIF Identification (CRITICAL)
+- NIF = exactly 9 digits, validated by mod-11 algorithm
+- The ISSUER/EMITTER (who created the document) = supplier_nif. Usually appears first, in the letterhead/header
+- The RECIPIENT/CLIENT/BUYER = client_nif. Usually appears below, under "Cliente", "Adquirente", "Exmo. Sr."
+- Labels: "NIF", "NIPC", "Contribuinte", "N.º Contribuinte", "N.I.F.", "Nº Fiscal"
+- "NIF do Cliente" / "NIF Adquirente" / "NIF Destinatário" → always client_nif
+- If document header shows a company with NIF → that's the supplier
+- DO NOT confuse supplier and client NIFs
+
+### Document Type
+- "FT" / "Fatura" = fatura
+- "FR" / "Fatura-Recibo" / "Fatura/Recibo" = fatura-recibo
+- "FS" / "Fatura Simplificada" = fatura-simplificada
+- "FP" / "Fatura Pro-forma" / "Proforma" = fatura-proforma
+- "RC" / "Recibo" = recibo
+- "NC" / "Nota de Crédito" = nota-credito
+- "ND" / "Nota de Débito" = nota-debito
+- "GR" / "Guia de Remessa" = guia-remessa
+
+### Dates
+- PT formats: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, "3 de janeiro de 2024"
+- "Data de Emissão" / "Data" / "Date" = date
+- "Data de Vencimento" / "Vencimento" / "Due Date" = due_date
+- ALWAYS output ISO format: YYYY-MM-DD
+
+### Line Items
+- Extract individual items/services with description, quantity, unit price, VAT rate, line total
+- If quantities not shown, use 1
+- If line VAT rate not shown, infer from document VAT rate
+
+### ATCUD / QR Code
+- ATCUD format: "ATCUD:XXXXXXXX-N" (alphanumeric validation code)
+- Extract if visible in document
+
+### Payment
+- Look for "Forma de Pagamento", "Meio de Pagamento", "IBAN", "MB", "Referência Multibanco"
+- IBAN/transferência, Multibanco ref, MBWay, Numerário/Dinheiro, Cheque, Cartão
+
+IMPORTANT: Extract EVERYTHING visible. When uncertain, extract your best guess rather than returning empty/zero.
+Never hallucinate data that is not in the document."""
 
 
-def _extract_with_llm(text: str) -> dict | None:
-    """Use OpenAI to extract structured data from OCR text. Returns parsed dict or None."""
+def _pdf_to_images(pdf_bytes: bytes, max_pages: int = 3) -> list[tuple[bytes, str]]:
+    """Convert PDF pages to PNG images using pdftoppm (poppler-utils).
+
+    Returns list of (image_bytes, mime_type) tuples.
+    """
+    import subprocess
+    import tempfile
+    import glob
+
+    tmpdir = tempfile.mkdtemp()
+    pdf_path = os.path.join(tmpdir, "doc.pdf")
+    try:
+        with open(pdf_path, "wb") as f:
+            f.write(pdf_bytes)
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", "300", "-l", str(max_pages), pdf_path,
+             os.path.join(tmpdir, "page")],
+            capture_output=True, timeout=30,
+        )
+        images = []
+        for img_path in sorted(glob.glob(os.path.join(tmpdir, "page-*.png"))):
+            with open(img_path, "rb") as f:
+                images.append((f.read(), "image/png"))
+        return images
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log.warning("pdftoppm conversion failed: %s", e)
+        return []
+    finally:
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
+    """Send document image directly to GPT-4o vision for extraction.
+
+    For PDFs, converts pages to images first.
+    Returns parsed dict or None.
+    """
     if not OPENAI_API_KEY:
         return None
 
-    truncated = text[:6000]
+    import base64
+
+    # Build image content parts
+    image_parts: list[tuple[bytes, str]] = []
+    if mime_type == "application/pdf":
+        image_parts = _pdf_to_images(file_bytes, max_pages=3)
+        if not image_parts:
+            return None
+    else:
+        image_parts = [(file_bytes, mime_type)]
+
+    # Build message content with image(s)
+    content: list[dict] = []
+    for img_bytes, img_mime in image_parts:
+        b64 = base64.b64encode(img_bytes).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{img_mime};base64,{b64}",
+                "detail": "high",
+            },
+        })
+    content.append({
+        "type": "text",
+        "text": "Extract all structured data from this Portuguese accounting document. Follow ALL extraction rules precisely.",
+    })
+
+    try:
+        resp = httpx.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": OPENAI_MODEL,
+                "messages": [
+                    {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                    {"role": "user", "content": content},
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+                "max_tokens": 4096,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        raw = resp.json()["choices"][0]["message"]["content"]
+        parsed = json.loads(raw)
+        log.info("Vision extraction succeeded: total=%s vat=%s type=%s supplier=%s client=%s",
+                 parsed.get("total"), parsed.get("vat"), parsed.get("type"),
+                 parsed.get("supplier_nif"), parsed.get("client_nif"))
+        return parsed
+    except Exception as exc:
+        log.warning("Vision extraction failed: %s", exc)
+        return None
+
+
+def _extract_with_llm(text: str) -> dict | None:
+    """Fallback: extract structured data from OCR text via LLM. Returns parsed dict or None."""
+    if not OPENAI_API_KEY:
+        return None
+
+    truncated = text[:8000]
     try:
         resp = httpx.post(
             "https://api.openai.com/v1/chat/completions",
@@ -70,17 +232,18 @@ def _extract_with_llm(text: str) -> dict | None:
                 ],
                 "temperature": 0,
                 "response_format": {"type": "json_object"},
+                "max_tokens": 4096,
             },
             timeout=30,
         )
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
         parsed = json.loads(content)
-        log.info("LLM extraction succeeded: total=%s vat=%s type=%s",
+        log.info("LLM text extraction succeeded: total=%s vat=%s type=%s",
                  parsed.get("total"), parsed.get("vat"), parsed.get("type"))
         return parsed
     except Exception as exc:
-        log.warning("LLM extraction failed: %s", exc)
+        log.warning("LLM text extraction failed: %s", exc)
         return None
 
 
@@ -503,6 +666,115 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
     return result
 
 
+_VALID_DOC_TYPES = frozenset({
+    "fatura", "fatura-recibo", "fatura-simplificada", "fatura-proforma",
+    "recibo", "nota-credito", "nota-debito", "extrato", "guia-remessa",
+    "orcamento", "outro",
+})
+
+_MIME_FROM_EXT = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".tiff": "image/tiff",
+    ".tif": "image/tiff",
+}
+
+
+def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
+    """Normalize and validate fields from LLM/vision extraction result."""
+    try:
+        total = Decimal(str(llm_result.get("total", "0")))
+    except (InvalidOperation, ValueError):
+        total = Decimal("0")
+    try:
+        vat = Decimal(str(llm_result.get("vat", "0")))
+    except (InvalidOperation, ValueError):
+        vat = Decimal("0")
+
+    supplier_nif = str(llm_result.get("supplier_nif", "000000000")).strip()
+    client_nif = str(llm_result.get("client_nif", "000000000")).strip()
+    if supplier_nif != "000000000" and not validate_nif(supplier_nif):
+        supplier_nif = "000000000"
+    if client_nif != "000000000" and not validate_nif(client_nif):
+        client_nif = "000000000"
+
+    llm_date = llm_result.get("date")
+    if llm_date:
+        try:
+            doc_date = date.fromisoformat(llm_date)
+        except (ValueError, TypeError):
+            doc_date = _parse_date_from_text(raw_text) if raw_text else date.today()
+    else:
+        doc_date = _parse_date_from_text(raw_text) if raw_text else date.today()
+
+    doc_type = llm_result.get("type", "outro")
+    if doc_type not in _VALID_DOC_TYPES:
+        doc_type = "outro"
+
+    # Extra fields from enhanced prompt
+    description = str(llm_result.get("description", ""))[:200]
+    invoice_number = str(llm_result.get("invoice_number", ""))[:50]
+    supplier_name = str(llm_result.get("supplier_name", ""))[:200]
+    client_name = str(llm_result.get("client_name", ""))[:200]
+
+    try:
+        base_amount = Decimal(str(llm_result.get("base_amount", "0")))
+    except (InvalidOperation, ValueError):
+        base_amount = Decimal("0")
+    try:
+        discount = Decimal(str(llm_result.get("discount", "0")))
+    except (InvalidOperation, ValueError):
+        discount = Decimal("0")
+    try:
+        withholding_tax = Decimal(str(llm_result.get("withholding_tax", "0")))
+    except (InvalidOperation, ValueError):
+        withholding_tax = Decimal("0")
+
+    # Store enriched data as JSON for the notes field
+    extra = {}
+    if invoice_number:
+        extra["invoice_number"] = invoice_number
+    if supplier_name:
+        extra["supplier_name"] = supplier_name
+    if client_name:
+        extra["client_name"] = client_name
+    if description:
+        extra["description"] = description
+    if base_amount:
+        extra["base_amount"] = str(base_amount)
+    if discount:
+        extra["discount"] = str(discount)
+    if withholding_tax:
+        extra["withholding_tax"] = str(withholding_tax)
+    vat_breakdown = llm_result.get("vat_breakdown")
+    if vat_breakdown and isinstance(vat_breakdown, list):
+        extra["vat_breakdown"] = vat_breakdown
+    line_items = llm_result.get("line_items")
+    if line_items and isinstance(line_items, list):
+        extra["line_items"] = line_items
+    atcud = llm_result.get("atcud", "")
+    if atcud:
+        extra["atcud"] = str(atcud)
+    payment_method = llm_result.get("payment_method", "")
+    if payment_method:
+        extra["payment_method"] = str(payment_method)
+    due_date = llm_result.get("due_date")
+    if due_date:
+        extra["due_date"] = str(due_date)
+
+    return {
+        "total": total,
+        "vat": vat,
+        "supplier_nif": supplier_nif,
+        "client_nif": client_nif,
+        "doc_date": doc_date,
+        "doc_type": doc_type,
+        "extra_json": json.dumps(extra, ensure_ascii=False) if extra else None,
+    }
+
+
 def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
@@ -515,7 +787,10 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
         paperless_filename = ""
         paperless_content = ""
 
-    # Use Paperless content directly (already fetched above), skip duplicate API call
+    # Detect mime type from filename
+    ext = os.path.splitext(paperless_filename.lower())[1] if paperless_filename else ".pdf"
+    mime_type = _MIME_FROM_EXT.get(ext, "application/pdf")
+
     raw_text = paperless_content
     if not raw_text:
         raw_text = extract_text(pdf, paperless_id=paperless_id)
@@ -525,77 +800,75 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
     if len(raw_text) < 50:
         log.warning("ingest: very short OCR text (%d chars): %r", len(raw_text), raw_text[:200])
 
-    # Strategy 1: LLM extraction (best quality)
-    llm_result = _extract_with_llm(raw_text) if len(raw_text) >= 20 else None
-    if llm_result and llm_result.get("total", 0) > 0:
-        log.info("ingest: using LLM extraction")
-        try:
-            total = Decimal(str(llm_result["total"]))
-        except (InvalidOperation, ValueError):
-            total = Decimal("0")
-        try:
-            vat = Decimal(str(llm_result.get("vat", "0")))
-        except (InvalidOperation, ValueError):
-            vat = Decimal("0")
-        supplier_nif = str(llm_result.get("supplier_nif", "000000000")).strip()
-        client_nif = str(llm_result.get("client_nif", "000000000")).strip()
-        llm_date = llm_result.get("date")
-        if llm_date:
-            try:
-                doc_date = date.fromisoformat(llm_date)
-            except (ValueError, TypeError):
-                doc_date = _parse_date_from_text(raw_text)
-        else:
-            doc_date = _parse_date_from_text(raw_text)
-        doc_type = llm_result.get("type", "outro")
-        if doc_type not in ("fatura", "recibo", "nota-credito", "nota-debito", "extrato", "outro"):
-            doc_type = "outro"
-        # Validate NIFs from LLM
-        if supplier_nif != "000000000" and not validate_nif(supplier_nif):
-            supplier_nif = "000000000"
-        if client_nif != "000000000" and not validate_nif(client_nif):
-            client_nif = "000000000"
-        extraction_source = "llm"
+    extraction_source = "regex"
+    extra_json: str | None = None
+
+    # Strategy 1: Vision extraction (best quality — sends actual image to GPT-4o)
+    vision_result = _extract_with_vision(pdf, mime_type)
+    if vision_result and vision_result.get("total", 0) > 0:
+        log.info("ingest: using vision extraction")
+        normalized = _normalize_llm_result(vision_result, raw_text)
+        total = normalized["total"]
+        vat = normalized["vat"]
+        supplier_nif = normalized["supplier_nif"]
+        client_nif = normalized["client_nif"]
+        doc_date = normalized["doc_date"]
+        doc_type = normalized["doc_type"]
+        extra_json = normalized["extra_json"]
+        extraction_source = "vision"
     else:
-        extraction_source = "regex"
-        # Strategy 2: invoice2data templates
-        if not data:
-            # Strategy 3: Regex fallback
-            try:
-                total = _parse_amount_from_text(raw_text)
-            except ValueError:
-                log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
-                            len(raw_text), raw_text[:500])
-                total = Decimal("0")
-            vat = _parse_vat_from_text(raw_text)
-            doc_date = _parse_date_from_text(raw_text)
-            supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
-            doc_type = _detect_document_type(raw_text)
-            data = {
-                "amount": total,
-                "vat": vat,
-                "date": doc_date,
-                "issuer_nif": supplier_nif,
-                "client_nif": client_nif,
-                "invoice_type": doc_type,
-            }
+        # Strategy 2: LLM text extraction (OCR text → GPT-4o)
+        llm_result = _extract_with_llm(raw_text) if len(raw_text) >= 20 else None
+        if llm_result and llm_result.get("total", 0) > 0:
+            log.info("ingest: using LLM text extraction")
+            normalized = _normalize_llm_result(llm_result, raw_text)
+            total = normalized["total"]
+            vat = normalized["vat"]
+            supplier_nif = normalized["supplier_nif"]
+            client_nif = normalized["client_nif"]
+            doc_date = normalized["doc_date"]
+            doc_type = normalized["doc_type"]
+            extra_json = normalized["extra_json"]
+            extraction_source = "llm"
+        else:
+            # Strategy 3: invoice2data templates
+            if not data:
+                # Strategy 4: Regex fallback
+                try:
+                    total = _parse_amount_from_text(raw_text)
+                except ValueError:
+                    log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
+                                len(raw_text), raw_text[:500])
+                    total = Decimal("0")
+                vat = _parse_vat_from_text(raw_text)
+                doc_date = _parse_date_from_text(raw_text)
+                supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
+                doc_type = _detect_document_type(raw_text)
+                data = {
+                    "amount": total,
+                    "vat": vat,
+                    "date": doc_date,
+                    "issuer_nif": supplier_nif,
+                    "client_nif": client_nif,
+                    "invoice_type": doc_type,
+                }
 
-        supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
-        client_nif   = str(data.get("client_nif",  "000000000")).strip()
-        if supplier_nif != "000000000" and not validate_nif(supplier_nif):
-            supplier_nif = "000000000"
-        if client_nif != "000000000" and not validate_nif(client_nif):
-            client_nif = "000000000"
+            supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
+            client_nif   = str(data.get("client_nif",  "000000000")).strip()
+            if supplier_nif != "000000000" and not validate_nif(supplier_nif):
+                supplier_nif = "000000000"
+            if client_nif != "000000000" and not validate_nif(client_nif):
+                client_nif = "000000000"
 
-        total    = Decimal(str(data["amount"]))
-        vat      = Decimal(str(data.get("vat", "0")))
-        doc_date = data.get("date", date.today())
-        if isinstance(doc_date, str):
-            try:
-                doc_date = date.fromisoformat(doc_date)
-            except ValueError:
-                doc_date = date.today()
-        doc_type = str(data.get("invoice_type", "outro"))
+            total    = Decimal(str(data["amount"]))
+            vat      = Decimal(str(data.get("vat", "0")))
+            doc_date = data.get("date", date.today())
+            if isinstance(doc_date, str):
+                try:
+                    doc_date = date.fromisoformat(doc_date)
+                except ValueError:
+                    doc_date = date.today()
+            doc_type = str(data.get("invoice_type", "outro"))
 
     confidence = _calculate_confidence(total, vat, supplier_nif, client_nif, doc_date, doc_type, raw_text)
 
@@ -635,32 +908,35 @@ def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
             conn.execute(
                 """UPDATE documents
                    SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
-                       type=%s, paperless_id=%s, raw_text=%s, status=%s, tenant_id=%s
+                       type=%s, paperless_id=%s, raw_text=%s, status=%s, tenant_id=%s,
+                       notes=%s, classification_source=%s
                    WHERE id = %s""",
                 (supplier_nif, client_nif, total, vat, doc_date, doc_type,
-                 paperless_id, raw_text, status, effective_tenant, pending["id"]),
+                 paperless_id, raw_text, status, effective_tenant,
+                 extra_json, extraction_source, pending["id"]),
             )
             conn.commit()
             doc_id = pending["id"]
             tenant_id = effective_tenant
-            log.info("ingest: updated pending doc id=%d tenant=%s total=%s confidence=%d",
-                     doc_id, tenant_id, total, confidence)
+            log.info("ingest: updated pending doc id=%d tenant=%s total=%s confidence=%d source=%s",
+                     doc_id, tenant_id, total, confidence, extraction_source)
         else:
             row = conn.execute(
-                """INSERT INTO documents (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """INSERT INTO documents (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status, notes, classification_source)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (paperless_id) DO UPDATE
                      SET total=EXCLUDED.total, vat=EXCLUDED.vat, date=EXCLUDED.date,
                          type=EXCLUDED.type, supplier_nif=EXCLUDED.supplier_nif,
                          client_nif=EXCLUDED.client_nif, raw_text=EXCLUDED.raw_text,
-                         status=EXCLUDED.status
+                         status=EXCLUDED.status, notes=EXCLUDED.notes,
+                         classification_source=EXCLUDED.classification_source
                    RETURNING id""",
-                (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status),
+                (tenant_id, supplier_nif, client_nif, total, vat, doc_date, doc_type, paperless_id, raw_text, status, extra_json, extraction_source),
             ).fetchone()
             conn.commit()
             doc_id = row["id"]
-            log.info("ingest: inserted new doc id=%d tenant=%s total=%s confidence=%d",
-                     doc_id, tenant_id, total, confidence)
+            log.info("ingest: inserted new doc id=%d tenant=%s total=%s confidence=%d source=%s",
+                     doc_id, tenant_id, total, confidence, extraction_source)
 
     doc_data = {
         "supplier_nif": supplier_nif,

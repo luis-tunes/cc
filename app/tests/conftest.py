@@ -243,7 +243,28 @@ class FakeConn:
                     doc["filename"] = params[5]
                     doc["status"] = params[6]
                     doc["tenant_id"] = params[7]
-                # ingest_document: (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status) — 10 params
+                # ingest_document: (tenant_id, supplier_nif, client_nif, total, vat, date, type, paperless_id, raw_text, status, notes, classification_source) — 12 params
+                elif len(params) == 12:
+                    doc["tenant_id"] = params[0]
+                    doc["supplier_nif"] = params[1]
+                    doc["client_nif"] = params[2]
+                    doc["total"] = Decimal(str(params[3]))
+                    doc["vat"] = Decimal(str(params[4]))
+                    doc["date"] = params[5]
+                    doc["type"] = params[6]
+                    doc["paperless_id"] = params[7]
+                    doc["raw_text"] = params[8]
+                    doc["status"] = params[9]
+                    doc["notes"] = params[10]
+                    doc["classification_source"] = params[11]
+                    # ON CONFLICT (paperless_id) → upsert
+                    existing = [d for d in _tables["documents"] if d.get("paperless_id") == params[7]]
+                    if existing:
+                        orig_id = existing[0]["id"]
+                        existing[0].update(doc)
+                        existing[0]["id"] = orig_id
+                        return FakeCursor([existing[0]])
+                # Legacy ingest_document: 10 params (without notes/classification_source)
                 elif len(params) == 10:
                     doc["tenant_id"] = params[0]
                     doc["supplier_nif"] = params[1]
@@ -258,8 +279,9 @@ class FakeConn:
                     # ON CONFLICT (paperless_id) → upsert
                     existing = [d for d in _tables["documents"] if d.get("paperless_id") == params[7]]
                     if existing:
+                        orig_id = existing[0]["id"]
                         existing[0].update(doc)
-                        existing[0]["id"] = existing[0]["id"]  # keep original id
+                        existing[0]["id"] = orig_id
                         return FakeCursor([existing[0]])
                 # Simple (filename, tid) — 2 params
                 elif len(params) == 2:
@@ -269,24 +291,31 @@ class FakeConn:
             _tables["documents"].append(doc)
             return FakeCursor([doc])
         if sql_lower.startswith("update"):
-            doc_id = None
-            for p in params:
-                if isinstance(p, int):
-                    doc_id = p
-                    break
-            if doc_id is None and params:
-                doc_id = params[-1]
+            # Find doc_id from WHERE id = %s by counting SET params
+            set_part = sql.split("SET")[1].split("WHERE")[0] if "WHERE" in sql else ""
+            set_param_count = set_part.count("%s")
+            doc_id = params[set_param_count] if set_param_count < len(params) else (params[-1] if params else None)
             doc = next((d for d in _tables["documents"] if d["id"] == doc_id), None)
             if not doc:
                 return FakeCursor([])
-            set_part = sql.split("SET")[1].split("WHERE")[0]
             field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
             for i, fname in enumerate(field_names):
-                if i < len(params):
+                if i < set_param_count:
                     doc[fname] = params[i]
             return FakeCursor([doc])
         if sql_lower.startswith("select"):
             docs = list(_tables["documents"])
+            # Filter by paperless_id IS NULL (used by pending-doc lookup)
+            if "paperless_id is null" in sql_lower:
+                docs = [d for d in docs if d.get("paperless_id") is None]
+            # Filter by status IN (used by pending-doc lookup)
+            if "status in" in sql_lower:
+                allowed = set()
+                for s in ("pendente ocr", "a processar"):
+                    if s in sql_lower:
+                        allowed.add(s)
+                if allowed:
+                    docs = [d for d in docs if d.get("status") in allowed]
             # Filter by primary key — use word boundary to avoid matching tenant_id
             has_id_filter = ("where id = %s" in sql_lower or "and id = %s" in sql_lower)
             if has_id_filter and params:

@@ -90,7 +90,9 @@ def test_ingest_document_from_ocr_text():
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=ocr_text):
+         patch("app.parse.extract_text", return_value=ocr_text), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": ocr_text}):
         doc_id = ingest_document(42, tenant_id="test-tenant")
 
     assert isinstance(doc_id, int)
@@ -106,7 +108,9 @@ def test_ingest_document_extracts_correct_data():
     ocr_text = _mock_ocr_text()
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=ocr_text):
+         patch("app.parse.extract_text", return_value=ocr_text), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": ocr_text}):
         doc_id = ingest_document(99, tenant_id="test-tenant")
 
     doc = next(d for d in tables["documents"] if d["id"] == doc_id)
@@ -125,7 +129,9 @@ def test_ingest_document_invalid_nifs_fallback():
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=text):
+         patch("app.parse.extract_text", return_value=text), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text}):
         doc_id = ingest_document(50)
 
     import sys
@@ -141,7 +147,9 @@ def test_ingest_document_no_amount_saves_pending():
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=text):
+         patch("app.parse.extract_text", return_value=text), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text}):
         doc_id = ingest_document(51)
 
     import sys
@@ -164,7 +172,9 @@ def test_ingest_document_with_invoice2data_result():
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=inv_data), \
-         patch("app.parse.extract_text", return_value="raw text here"):
+         patch("app.parse.extract_text", return_value="raw text here"), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": "raw text here"}):
         doc_id = ingest_document(60, tenant_id="t1")
 
     import sys
@@ -184,12 +194,16 @@ def test_ingest_upserts_on_same_paperless_id():
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=text1):
+         patch("app.parse.extract_text", return_value=text1), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text1}):
         id1 = ingest_document(70)
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
-         patch("app.parse.extract_text", return_value=text2):
+         patch("app.parse.extract_text", return_value=text2), \
+         patch("app.parse._extract_with_vision", return_value=None), \
+         patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text2}):
         id2 = ingest_document(70)
 
     # Same paperless_id → same doc updated (conftest simulates upsert)
