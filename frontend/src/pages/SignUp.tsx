@@ -19,7 +19,7 @@ export default function SignUpPage() {
           routing="path"
           path="/auth/sign-up"
           signInUrl="/auth/sign-in"
-          afterSignUpUrl="/painel"
+          forceRedirectUrl="/painel"
           appearance={clerkAppearance}
         />
         <p className="text-xs text-muted-foreground/60 text-center">
