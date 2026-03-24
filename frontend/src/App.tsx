@@ -38,6 +38,7 @@ const GuidePage = lazy(() => import("@/pages/Guide"));
 const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
 const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
+const LandingPage = lazy(() => import("@/pages/Landing"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -55,7 +56,7 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public */}
-          <Route path="/" element={<Navigate to="/painel" replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/auth/sign-in/*" element={<SignInPage />} />
           <Route path="/auth/sign-up/*" element={<SignUpPage />} />
 
