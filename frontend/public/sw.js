@@ -1,4 +1,4 @@
-const CACHE_NAME = "tim-v2";
+const CACHE_NAME = "tim-v3";
 const PRECACHE = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
