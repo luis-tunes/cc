@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@clerk/react";
 import {
   FileText,
   ArrowRight,
   Shield,
   Zap,
-  Sparkles,
   BarChart3,
   Receipt,
   Bot,
@@ -20,7 +20,8 @@ import {
   X,
   Upload,
   Mail,
-  MapPin,
+  Lock,
+  CreditCard,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -52,6 +53,7 @@ const NAV_LINKS = [
 function Nav() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -64,6 +66,9 @@ function Nav() {
     else document.body.style.overflow = "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+
+  const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
+  const ctaLabel = isSignedIn ? "Ir para o painel" : "Experimentar grátis";
 
   return (
     <nav
@@ -95,17 +100,19 @@ function Nav() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {!isSignedIn && (
+            <Link
+              to="/auth/sign-in"
+              className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline"
+            >
+              Entrar
+            </Link>
+          )}
           <Link
-            to="/auth/sign-in"
-            className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline"
-          >
-            Entrar
-          </Link>
-          <Link
-            to="/auth/sign-up"
+            to={ctaTo}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 sm:px-4 sm:py-2.5"
           >
-            Começar grátis
+            {ctaLabel}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           {/* Mobile hamburger */}
@@ -137,19 +144,21 @@ function Nav() {
             </a>
           ))}
           <div className="my-2 h-px bg-border" />
+          {!isSignedIn && (
+            <Link
+              to="/auth/sign-in"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Entrar
+            </Link>
+          )}
           <Link
-            to="/auth/sign-in"
-            onClick={() => setOpen(false)}
-            className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            Entrar
-          </Link>
-          <Link
-            to="/auth/sign-up"
+            to={ctaTo}
             onClick={() => setOpen(false)}
             className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-base font-bold text-primary-foreground"
           >
-            Começar grátis
+            {ctaLabel}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -161,6 +170,10 @@ function Nav() {
 /* ── Hero ────────────────────────────────────────────────────────────── */
 
 function Hero() {
+  const { isSignedIn } = useAuth();
+  const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
+  const ctaLabel = isSignedIn ? "Ir para o painel" : "Experimentar 14 dias grátis";
+
   return (
     <section className="relative overflow-hidden">
       {/* Background effects */}
@@ -171,9 +184,9 @@ function Hero() {
       <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-20 md:pb-28 md:pt-28">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 sm:mb-8 sm:px-4 sm:py-2">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <Clock className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              14 dias grátis · Sem cartão
+              Experimente 14 dias sem compromisso
             </span>
           </div>
 
@@ -195,10 +208,10 @@ function Hero() {
 
           <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4">
             <Link
-              to="/auth/sign-up"
+              to={ctaTo}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
             >
-              Começar gratuitamente
+              {ctaLabel}
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
@@ -211,7 +224,7 @@ function Hero() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
-            <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Sem compromisso</span>
+            <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Sem cartão de crédito</span>
             <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Cancele quando quiser</span>
             <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Suporte em português</span>
           </div>
@@ -220,13 +233,13 @@ function Hero() {
         {/* App preview */}
         <div className="mx-auto mt-12 max-w-4xl sm:mt-16">
           <div className="relative rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/[0.08] sm:rounded-2xl sm:p-2">
-            {/* Fake browser bar */}
+            {/* Browser chrome */}
             <div className="flex items-center gap-1.5 rounded-t-lg bg-muted/50 px-3 py-2 sm:gap-2 sm:px-4 sm:py-2.5">
-              <div className="h-2 w-2 rounded-full bg-red-400/60 sm:h-2.5 sm:w-2.5" />
-              <div className="h-2 w-2 rounded-full bg-yellow-400/60 sm:h-2.5 sm:w-2.5" />
-              <div className="h-2 w-2 rounded-full bg-green-400/60 sm:h-2.5 sm:w-2.5" />
+              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
+              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
+              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
               <div className="ml-2 flex-1 rounded-md bg-background/80 px-3 py-1">
-                <span className="text-[10px] text-muted-foreground/40 sm:text-xs">app.tim.pt</span>
+                <span className="text-[10px] text-muted-foreground/40 sm:text-xs">app.tim.pt/painel</span>
               </div>
             </div>
             <div className="rounded-b-lg bg-muted/30 p-4 sm:p-6 md:p-8 lg:p-12">
@@ -291,14 +304,7 @@ function PreviewKpi({
 
 /* ── Social proof ────────────────────────────────────────────────────── */
 
-const SECTORS = [
-  { name: "Restauração", icon: "🍽️" },
-  { name: "Comércio", icon: "🛒" },
-  { name: "Serviços", icon: "💼" },
-  { name: "Hotelaria", icon: "🏨" },
-  { name: "Construção", icon: "🏗️" },
-  { name: "Saúde", icon: "🏥" },
-];
+const SECTORS = ["Restauração", "Comércio", "Serviços", "Hotelaria", "Construção", "Saúde"];
 
 function Logos() {
   return (
@@ -307,13 +313,15 @@ function Logos() {
         <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
           Pensado para negócios portugueses
         </p>
-        <div className="mt-5 grid grid-cols-3 gap-3 sm:mt-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-3">
-          {SECTORS.map((sector) => (
-            <div key={sector.name} className="flex items-center justify-center gap-1.5 rounded-lg py-2 sm:py-0">
-              <span className="text-base">{sector.icon}</span>
-              <span className="text-xs font-semibold text-muted-foreground/50 sm:text-sm">
-                {sector.name}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:mt-6 sm:gap-x-10">
+          {SECTORS.map((sector, i) => (
+            <div key={sector} className="flex items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground/40">
+                {sector}
               </span>
+              {i < SECTORS.length - 1 && (
+                <span className="hidden text-muted-foreground/15 sm:inline">|</span>
+              )}
             </div>
           ))}
         </div>
@@ -330,7 +338,7 @@ const FEATURES = [
     title: "OCR inteligente",
     description:
       "Digitalize faturas, recibos e notas de crédito. Extração automática de NIF, valores, IVA e datas com reconhecimento ótico avançado.",
-    highlight: "Extração em <30s",
+    highlight: "< 30 segundos",
   },
   {
     icon: Bot,
@@ -358,14 +366,14 @@ const FEATURES = [
     title: "Relatórios e insights",
     description:
       "Demonstração de resultados, análise de fornecedores e tendências — pronto para o seu contabilista.",
-    highlight: "Exportação fácil",
+    highlight: "Pronto a exportar",
   },
   {
     icon: Shield,
-    title: "Seguro e português",
+    title: "Seguro e conforme",
     description:
-      "Dados encriptados, RGPD compliant. Interface 100% em português, pensada para quem não é contabilista.",
-    highlight: "RGPD compliant",
+      "Dados encriptados, em conformidade com RGPD. Interface 100% em português, pensada para quem não é contabilista.",
+    highlight: "RGPD",
   },
 ];
 
@@ -374,10 +382,7 @@ function Features() {
     <section id="funcionalidades" className="py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/[0.06] px-4 py-1.5">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Funcionalidades</span>
-          </div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Funcionalidades</p>
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Tudo o que precisa, nada que não precise
           </h2>
@@ -396,7 +401,7 @@ function Features() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
                   <f.icon className="h-5 w-5 text-primary" />
                 </div>
-                <span className="rounded-full bg-primary/[0.06] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary sm:text-xs">
+                <span className="rounded-full border border-primary/15 bg-primary/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary/80 sm:text-xs">
                   {f.highlight}
                 </span>
               </div>
@@ -417,25 +422,21 @@ const STEPS = [
     number: "01",
     title: "Carregue os seus documentos",
     description: "Arraste faturas, recibos ou notas de crédito — PDF, foto ou scan. O OCR faz o resto.",
-    icon: Upload,
   },
   {
     number: "02",
     title: "Revisão inteligente",
     description: "O TIM extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
-    icon: Bot,
   },
   {
     number: "03",
     title: "Importe os movimentos bancários",
     description: "Carregue o extrato CSV do seu banco. Os movimentos são associados aos documentos automaticamente.",
-    icon: Receipt,
   },
   {
     number: "04",
     title: "Painel de controlo em tempo real",
     description: "Veja a saúde financeira da sua empresa num dashboard claro — pronto para o contabilista.",
-    icon: BarChart3,
   },
 ];
 
@@ -444,22 +445,17 @@ function HowItWorks() {
     <section id="como-funciona" className="border-y bg-muted/20 py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/[0.06] px-4 py-1.5">
-            <Clock className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Como funciona</span>
-          </div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Como funciona</p>
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Do papel ao digital em 4 passos
           </h2>
         </div>
 
-        {/* Mobile: vertical timeline */}
+        {/* Desktop: horizontal grid */}
         <div className="mt-10 sm:mt-14">
-          {/* Desktop: horizontal grid */}
           <div className="hidden lg:grid lg:grid-cols-4 lg:gap-0">
             {STEPS.map((step, i) => (
               <div key={step.number} className="relative px-4">
-                {/* Connector line */}
                 {i < STEPS.length - 1 && (
                   <div className="absolute right-0 top-7 h-px w-full bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" style={{ left: "calc(56px + 1rem)" }} />
                 )}
@@ -476,7 +472,6 @@ function HowItWorks() {
           <div className="flex flex-col gap-0 lg:hidden">
             {STEPS.map((step, i) => (
               <div key={step.number} className="relative flex gap-4 pb-8 sm:gap-6">
-                {/* Vertical line */}
                 {i < STEPS.length - 1 && (
                   <div className="absolute left-[23px] top-14 bottom-0 w-px bg-gradient-to-b from-primary/20 to-transparent sm:left-[27px]" />
                 )}
@@ -501,8 +496,8 @@ function HowItWorks() {
 const STATS = [
   { value: "95%", label: "Taxa de reconciliação", icon: Receipt },
   { value: "<30s", label: "Tempo de extração", icon: Zap },
-  { value: "100%", label: "Em português", icon: MapPin },
-  { value: "0€", label: "Para começar", icon: Sparkles },
+  { value: "100%", label: "Em português", icon: Shield },
+  { value: "14", label: "Dias grátis para testar", icon: Clock },
 ];
 
 function Stats() {
@@ -527,36 +522,74 @@ function Stats() {
   );
 }
 
-/* ── Pricing preview ─────────────────────────────────────────────────── */
+/* ── Pricing ─────────────────────────────────────────────────────────── */
 
 function Pricing() {
+  const { isSignedIn } = useAuth();
+
   return (
     <section id="precos" className="border-y bg-muted/20 py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Preços</p>
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Simples e transparente
+            Comece grátis, pague só quando quiser continuar
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Um plano. Tudo incluído. 14 dias grátis para experimentar.
+          <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+            Crie a sua conta, carregue os seus documentos e extratos bancários.
+            Durante 14 dias tem acesso total — sem limites, sem cartão de crédito.
           </p>
         </div>
 
-        <div className="mx-auto mt-10 max-w-md sm:mt-12">
-          <div className="relative overflow-hidden rounded-2xl border border-primary/50 bg-card p-6 shadow-lg shadow-primary/5 sm:p-8">
-            {/* Decorative corner gradient */}
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/[0.06]" />
+        {/* How trial works */}
+        <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:mt-12 sm:grid-cols-3 sm:gap-6">
+          {[
+            {
+              step: "1",
+              title: "Crie a sua conta",
+              desc: "Registe-se em 30 segundos. Sem cartão, sem papelada.",
+              icon: ArrowRight,
+            },
+            {
+              step: "2",
+              title: "Use durante 14 dias",
+              desc: "Acesso total a todas as funcionalidades. Carregue documentos e extratos à vontade.",
+              icon: Zap,
+            },
+            {
+              step: "3",
+              title: "Decida se quer continuar",
+              desc: "Subscreva o plano Profissional para manter tudo. Se não quiser, não paga nada.",
+              icon: Check,
+            },
+          ].map((item) => (
+            <div key={item.step} className="rounded-xl border bg-card p-5 sm:p-6">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                {item.step}
+              </div>
+              <h3 className="mt-3 text-sm font-semibold text-foreground">{item.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
+            </div>
+          ))}
+        </div>
 
-            <div className="absolute -top-3 left-4 rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-md sm:left-6">
-              14 dias grátis
+        {/* Pricing card */}
+        <div className="mx-auto mt-10 max-w-md sm:mt-12">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/40 bg-card p-6 shadow-lg shadow-primary/5 sm:p-8">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/[0.04]" />
+
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">Profissional</h3>
+              <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary">
+                Após os 14 dias
+              </span>
             </div>
 
-            <h3 className="mt-2 text-lg font-bold text-foreground">Profissional</h3>
-            <div className="mt-3 flex items-baseline gap-1 sm:mt-4">
+            <div className="mt-4 flex items-baseline gap-1">
               <span className="text-3xl font-bold text-foreground sm:text-4xl">€150</span>
               <span className="text-sm text-muted-foreground">/mês + IVA</span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">~€5/dia para automatizar a sua contabilidade</p>
+            <p className="mt-1 text-xs text-muted-foreground">Equivalente a ~€5/dia — menos do que um café e pastel de nata</p>
 
             <div className="mt-5 h-px bg-border sm:mt-6" />
 
@@ -565,10 +598,10 @@ function Pricing() {
                 "Documentos e OCR ilimitados",
                 "Reconciliação automática",
                 "Classificação por IA",
-                "Dashboard financeiro",
-                "Relatórios e exportação",
+                "Dashboard e relatórios",
                 "Multi-utilizador",
                 "Suporte por email em português",
+                "Exportação para contabilista",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
                   <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-tim-success/10">
@@ -580,22 +613,23 @@ function Pricing() {
             </ul>
 
             <Link
-              to="/auth/sign-up"
+              to={isSignedIn ? "/painel" : "/auth/sign-up"}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 hover:-translate-y-0.5 sm:mt-8"
             >
-              Começar teste gratuito
+              {isSignedIn ? "Ir para o painel" : "Criar conta — é grátis"}
               <ArrowRight className="h-4 w-4" />
             </Link>
 
-            <p className="mt-3 text-center text-xs text-muted-foreground/60 sm:mt-4">
-              Sem cartão de crédito · Cancele a qualquer momento
-            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
+              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> Sem cartão nos 14 dias</span>
+              <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> Pagamento seguro via Stripe</span>
+            </div>
           </div>
         </div>
 
         <div className="mx-auto mt-6 max-w-md text-center sm:mt-8">
           <p className="text-sm text-muted-foreground">
-            Empresa com necessidades especiais?{" "}
+            Empresa com necessidades específicas?{" "}
             <a href="mailto:info@tim.pt" className="font-medium text-primary hover:underline">
               Fale connosco
             </a>
@@ -613,58 +647,42 @@ const TESTIMONIALS = [
     quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O TIM mudou a forma como vejo a contabilidade.",
     author: "Ricardo M.",
     role: "Dono de restaurante, Lisboa",
-    metric: "2h → 15min",
   },
   {
     quote: "Finalmente uma ferramenta em português que não precisa de um contabilista para usar. Recomendo a todos os empresários.",
     author: "Ana S.",
     role: "Gestora de loja, Porto",
-    metric: "100% português",
   },
   {
-    quote: "A reconciliação automática é magia. Upload do extrato e está feito — quase tudo bate certo sem tocar em nada.",
+    quote: "A reconciliação automática é impressionante. Upload do extrato e está feito — quase tudo bate certo sem tocar em nada.",
     author: "Miguel T.",
     role: "Freelancer, Braga",
-    metric: "95% automático",
   },
 ];
 
 function Testimonials() {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   return (
     <section className="py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            O que dizem os nossos clientes
+            O que dizem os nossos utilizadores
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Empresários como você que já simplificaram a sua gestão financeira.
-          </p>
         </div>
 
         {/* Mobile: horizontal scroll, Desktop: grid */}
-        <div
-          ref={scrollRef}
-          className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:mt-12 md:mx-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0"
-        >
+        <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:mt-12 md:mx-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0">
           {TESTIMONIALS.map((t) => (
             <div
               key={t.author}
               className="min-w-[280px] max-w-[320px] shrink-0 snap-center rounded-xl border bg-card p-5 sm:p-6 md:min-w-0 md:max-w-none"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <svg key={s} className="h-4 w-4 fill-primary text-primary" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <span className="rounded-full bg-tim-success/10 px-2 py-0.5 text-[10px] font-bold text-tim-success sm:text-xs">
-                  {t.metric}
-                </span>
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <svg key={s} className="h-4 w-4 fill-primary text-primary" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                ))}
               </div>
               <p className="mt-4 text-sm leading-relaxed text-foreground/80 italic">&ldquo;{t.quote}&rdquo;</p>
               <div className="mt-5 flex items-center gap-3 border-t pt-4">
@@ -677,13 +695,6 @@ function Testimonials() {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Scroll indicator dots — mobile only */}
-        <div className="mt-4 flex items-center justify-center gap-1.5 md:hidden">
-          {TESTIMONIALS.map((_, i) => (
-            <div key={i} className={`h-1.5 rounded-full transition-all ${i === 0 ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/20"}`} />
           ))}
         </div>
       </div>
@@ -700,15 +711,19 @@ const FAQS = [
   },
   {
     q: "Os meus dados estão seguros?",
-    a: "Sim. Utilizamos encriptação em trânsito e em repouso, e cumprimos o RGPD. Os seus dados nunca são partilhados com terceiros.",
+    a: "Sim. Utilizamos encriptação em trânsito e em repouso, em conformidade com o RGPD. Os seus dados nunca são partilhados com terceiros.",
   },
   {
-    q: "Posso cancelar a qualquer momento?",
-    a: "Sim. Sem fidelização, sem taxas de cancelamento. Os seus dados permanecem disponíveis para exportação durante 30 dias após o cancelamento.",
+    q: "O que acontece passados os 14 dias?",
+    a: "Se quiser continuar, subscreve o plano Profissional a €150/mês + IVA. Se não quiser, não paga nada — os dados ficam disponíveis para exportação durante 30 dias.",
   },
   {
     q: "Funciona com o meu banco?",
     a: "O TIM aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
+  },
+  {
+    q: "Preciso de inserir cartão de crédito?",
+    a: "Não. Durante os 14 dias de teste não é necessário qualquer pagamento. Só insere dados de pagamento quando decidir subscrever.",
   },
 ];
 
@@ -719,12 +734,10 @@ function FAQ() {
     <section className="border-t py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <div className="text-center">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">FAQ</p>
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Perguntas frequentes
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Tudo o que precisa de saber antes de começar.
-          </p>
         </div>
 
         <div className="mt-10 divide-y">
@@ -759,9 +772,10 @@ function FAQ() {
 /* ── Final CTA ───────────────────────────────────────────────────────── */
 
 function CTA() {
+  const { isSignedIn } = useAuth();
+
   return (
     <section className="relative overflow-hidden border-t py-16 sm:py-20 md:py-28">
-      {/* Background decorations */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] to-transparent" />
       <div className="absolute -left-20 bottom-0 h-[300px] w-[300px] rounded-full bg-primary/[0.04] blur-3xl" />
       <div className="absolute -right-20 top-0 h-[300px] w-[300px] rounded-full bg-primary/[0.04] blur-3xl" />
@@ -774,14 +788,14 @@ function CTA() {
           Pronto para simplificar a sua contabilidade?
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:text-base">
-          Junte-se a centenas de empresários portugueses que já automatizaram a gestão financeira do seu negócio.
+          Carregue os seus documentos e extratos. Veja o TIM a trabalhar. Decida depois.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
           <Link
-            to="/auth/sign-up"
+            to={isSignedIn ? "/painel" : "/auth/sign-up"}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
           >
-            Começar 14 dias grátis
+            {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
             <ArrowRight className="h-4 w-4" />
           </Link>
           <a
@@ -800,10 +814,11 @@ function CTA() {
 /* ── Footer ──────────────────────────────────────────────────────────── */
 
 function Footer() {
+  const { isSignedIn } = useAuth();
+
   return (
     <footer className="border-t bg-card">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
-        {/* Top: multi-column on desktop, stacked on mobile */}
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 md:col-span-1">
@@ -830,8 +845,14 @@ function Footer() {
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">Conta</h4>
             <ul className="mt-3 space-y-2">
-              <li><Link to="/auth/sign-in" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Entrar</Link></li>
-              <li><Link to="/auth/sign-up" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Criar conta</Link></li>
+              {isSignedIn ? (
+                <li><Link to="/painel" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Painel</Link></li>
+              ) : (
+                <>
+                  <li><Link to="/auth/sign-in" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Entrar</Link></li>
+                  <li><Link to="/auth/sign-up" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Criar conta</Link></li>
+                </>
+              )}
             </ul>
           </div>
 
@@ -861,8 +882,8 @@ function Footer() {
                 RGPD
               </span>
               <span className="flex items-center gap-1 text-xs text-muted-foreground/40">
-                <MapPin className="h-3 w-3" />
-                Portugal
+                <Lock className="h-3 w-3" />
+                Encriptado
               </span>
             </div>
           </div>

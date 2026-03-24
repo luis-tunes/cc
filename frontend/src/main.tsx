@@ -24,7 +24,7 @@ const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <ClerkProvider publishableKey={CLERK_KEY} appearance={clerkAppearance}>
+      <ClerkProvider publishableKey={CLERK_KEY} appearance={clerkAppearance} afterSignInUrl="/painel" afterSignUpUrl="/painel">
         <AuthSync />
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
