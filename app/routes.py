@@ -552,6 +552,39 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
     return None
 
 
+@router.post("/documents/{doc_id}/reprocess")
+async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Re-run OCR extraction on a document that has a paperless_id."""
+    wheres = ["id = %s"]
+    params: list = [doc_id]
+    if auth and auth.tenant_id:
+        wheres.append("tenant_id = %s")
+        params.append(auth.tenant_id)
+    where = " AND ".join(wheres)
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT id, paperless_id, tenant_id FROM documents WHERE {where}", params
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="document not found")
+    if not row["paperless_id"]:
+        raise HTTPException(status_code=422, detail="document has no OCR source to reprocess")
+
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE documents SET status = 'a processar' WHERE id = %s",
+            (doc_id,),
+        )
+        conn.commit()
+
+    try:
+        new_id = ingest_document(row["paperless_id"], row["tenant_id"])
+    except Exception as e:
+        logger.exception("reprocess failed for doc %d", doc_id)
+        raise HTTPException(status_code=500, detail=f"reprocess failed: {e}")
+    return {"document_id": new_id}
+
+
 @router.get("/documents/{doc_id}/preview")
 async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Proxy the document file from Paperless-ngx for preview."""

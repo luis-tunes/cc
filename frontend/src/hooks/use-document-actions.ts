@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { patchDocument, deleteDocument, bulkDeleteDocuments, fetchClassificationSuggestion } from "@/lib/api";
+import { patchDocument, deleteDocument, bulkDeleteDocuments, fetchClassificationSuggestion, reprocessDocument } from "@/lib/api";
 import { toast } from "sonner";
 
 export interface DocumentActions {
@@ -12,6 +12,7 @@ export interface DocumentActions {
   onAddNote: (id: string, note: string) => void;
   onDelete: (id: string) => void;
   onBulkDelete: (ids: string[]) => void;
+  onReprocess: (id: string) => void;
 }
 
 export function useDocumentActions(refetch: () => void) {
@@ -53,6 +54,19 @@ export function useDocumentActions(refetch: () => void) {
     },
   });
 
+  const reprocessMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return reprocessDocument(Number(id));
+    },
+    onSuccess: () => {
+      refetch();
+      toast.success("Documento reprocessado");
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao reprocessar: ${err.message}`);
+    },
+  });
+
   function withUndo(
     id: string,
     patch: Record<string, any>,
@@ -80,8 +94,10 @@ export function useDocumentActions(refetch: () => void) {
     onReject: (id, _reason?) => {
       withUndo(id, { status: "rejeitado" }, { status: "pendente" }, "Documento rejeitado");
     },
-    onReclassify: (id, newType, _newDocType?) => {
-      mutation.mutate({ id, patch: { type: newType, status: "revisto" } });
+    onReclassify: (id, newAccount, newDocType?) => {
+      const patch: Record<string, any> = { snc_account: newAccount, status: "revisto" };
+      if (newDocType) patch.type = newDocType;
+      mutation.mutate({ id, patch });
       toast.success("Documento reclassificado");
     },
     onConfirmField: (id, _fieldIndex) => {
@@ -111,6 +127,9 @@ export function useDocumentActions(refetch: () => void) {
     },
     onBulkDelete: (ids) => {
       bulkDeleteMutation.mutate(ids);
+    },
+    onReprocess: (id) => {
+      reprocessMutation.mutate(id);
     },
   };
 
