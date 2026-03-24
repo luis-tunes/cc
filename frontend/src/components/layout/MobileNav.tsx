@@ -32,9 +32,10 @@ export function MobileNav() {
       <nav
         aria-label="Navegação principal"
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex h-16 items-end justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden transition-opacity duration-200",
+          "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card md:hidden transition-opacity duration-200",
           moreOpen && "opacity-0 pointer-events-none"
         )}
+        style={{ height: "calc(4rem + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         {MOBILE_TABS.map((tab) => {
           const active = location.pathname === tab.path;
@@ -43,26 +44,26 @@ export function MobileNav() {
               key={tab.path}
               to={tab.path}
               className={cn(
-                "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
+                "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs transition-colors",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
               <tab.icon className={cn("h-5 w-5", active && "text-primary")} />
               <span className="text-xs leading-tight">{tab.title}</span>
-              {active && <span className="absolute top-0 h-0.5 w-8 rounded-b bg-primary" />}
+              {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-b bg-primary" />}
             </NavLink>
           );
         })}
         <button
           onClick={() => setMoreOpen(true)}
           className={cn(
-            "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
+            "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs transition-colors",
             moreOpen || isOnMorePage ? "text-primary" : "text-muted-foreground"
           )}
         >
           <MoreHorizontal className="h-5 w-5" />
           <span className="text-xs leading-tight">Mais</span>
-          {isOnMorePage && !moreOpen && <span className="absolute top-0 h-0.5 w-8 rounded-b bg-primary" />}
+          {isOnMorePage && !moreOpen && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-b bg-primary" />}
         </button>
       </nav>
 

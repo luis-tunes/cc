@@ -45,7 +45,13 @@ export function AppTopbar({ title }: AppTopbarProps) {
               variant="ghost"
               size="icon"
               className="h-9 w-9 text-muted-foreground"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/painel", { replace: true });
+                }
+              }}
               aria-label="Voltar"
             >
               <ArrowLeft className="h-5 w-5" />
