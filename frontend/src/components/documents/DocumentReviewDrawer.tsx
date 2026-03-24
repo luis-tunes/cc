@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { fetchClassificationSuggestion } from "@/lib/api";
+import { fetchClassificationSuggestion, fetchAuthenticatedBlob } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -63,6 +63,7 @@ export interface DocumentActions {
   onAcceptAiSuggestion: (id: string) => void;
   onAddNote: (id: string, note: string) => void;
   onDelete: (id: string) => void;
+  onReprocess: (id: string) => void;
 }
 
 interface DocumentReviewDrawerProps {
@@ -87,6 +88,30 @@ export function DocumentReviewDrawer({
   const [showNote, setShowNote] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [previewError, setPreviewError] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Fetch thumbnail and preview with auth headers
+  useEffect(() => {
+    if (!open || !document) return;
+    setThumbnailUrl(null);
+    setPreviewUrl(null);
+    setPreviewError(false);
+
+    fetchAuthenticatedBlob(documentThumbnailUrl(Number(document.id)))
+      .then(setThumbnailUrl)
+      .catch(() => setPreviewError(true));
+
+    fetchAuthenticatedBlob(documentPreviewUrl(Number(document.id)))
+      .then(setPreviewUrl)
+      .catch(() => {});
+
+    return () => {
+      // Revoke old blob URLs on cleanup
+      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [open, document?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: suggestion } = useQuery({
     queryKey: ["doc-suggest", document?.id],
@@ -175,22 +200,24 @@ export function DocumentReviewDrawer({
         <div className="space-y-0 divide-y">
           {/* File preview */}
           <div className="bg-muted/30">
-            {!previewError ? (
+            {!previewError && thumbnailUrl ? (
               <div className="relative">
                 <img
-                  src={documentThumbnailUrl(Number(document.id))}
+                  src={thumbnailUrl}
                   alt={document.fileName}
                   className="w-full max-h-[300px] object-contain"
                   onError={() => setPreviewError(true)}
                 />
-                <a
-                  href={documentPreviewUrl(Number(document.id))}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-2 right-2 rounded-md bg-background/80 px-2 py-1 text-xs font-medium text-foreground shadow hover:bg-background transition-colors"
-                >
-                  <Eye className="mr-1 inline-block h-3 w-3" /> Abrir original
-                </a>
+                {previewUrl ? (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-2 rounded-md bg-background/80 px-2 py-1 text-xs font-medium text-foreground shadow hover:bg-background transition-colors"
+                  >
+                    <Eye className="mr-1 inline-block h-3 w-3" /> Abrir original
+                  </a>
+                ) : null}
               </div>
             ) : (
               <div className="flex items-center justify-center py-20 px-5">
@@ -517,6 +544,15 @@ export function DocumentReviewDrawer({
                   Arquivar
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-9 text-sm text-muted-foreground"
+                onClick={() => { actions.onReprocess(document.id); onClose(); resetPanels(); }}
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                Reprocessar
+              </Button>
               {isArchived && (
                 <Button size="sm" variant="ghost" className="h-9 text-sm text-muted-foreground" onClick={handleApprove}>
                   <RotateCcw className="mr-1.5 h-4 w-4" />

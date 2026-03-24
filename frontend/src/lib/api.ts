@@ -250,6 +250,23 @@ export function documentThumbnailUrl(id: number): string {
   return `${BASE}/documents/${id}/thumbnail`;
 }
 
+/** Fetch an authenticated blob URL for images/files that require auth headers. */
+export async function fetchAuthenticatedBlob(url: string): Promise<string> {
+  const headers: Record<string, string> = {};
+  const token = await getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+export async function reprocessDocument(id: number): Promise<void> {
+  await request<void>(`/documents/${id}/reprocess`, { method: "POST" });
+}
+
 // ── Bank Transactions ────────────────────────────────────────────────
 
 export async function fetchBankTransactions(params?: {
