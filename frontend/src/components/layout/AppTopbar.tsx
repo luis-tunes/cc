@@ -1,14 +1,16 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Search, Building2, CalendarDays, LogOut } from "lucide-react";
+import { Search, Building2, CalendarDays, LogOut, ArrowLeft } from "lucide-react";
 import { useCommandMenu } from "@/components/shared/CommandMenu";
 import { QuickAddButton } from "@/components/global/QuickAddButton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useUser, useClerk } from "@clerk/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { TrialBanner } from "@/components/billing/TrialBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+const MOBILE_TAB_PATHS = ["/painel", "/documentos", "/movimentos", "/reconciliacao"];
 
 interface AppTopbarProps {
   title?: string;
@@ -19,7 +21,10 @@ export function AppTopbar({ title }: AppTopbarProps) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
+
+  const showBackButton = isMobile && !MOBILE_TAB_PATHS.includes(location.pathname);
 
   const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
     .split(" ")
@@ -31,10 +36,21 @@ export function AppTopbar({ title }: AppTopbarProps) {
   return (
     <>
       <TrialBanner />
-      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4 sticky top-0 z-40">
         {/* Left */}
         <div className="flex items-center gap-3">
           {!isMobile && <SidebarTrigger className="text-muted-foreground" />}
+          {showBackButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground"
+              onClick={() => navigate(-1)}
+              aria-label="Voltar"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           {title && (
             <span className="text-lg font-semibold text-foreground">{title}</span>
           )}

@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileText, GitMerge, Landmark, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, FileText, GitMerge, Landmark, MoreHorizontal, User } from "lucide-react";
 import { useState } from "react";
 import { navigation } from "@/lib/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -17,14 +17,25 @@ export function MobileNav() {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // All nav items not in the bottom bar
-  const moreItems = navigation.flatMap((g) => g.items).filter(
-    (item) => !MOBILE_TABS.some((t) => t.path === item.path)
-  );
+  // All nav items not in the bottom bar + Perfil (not in navigation.ts)
+  const moreItems = [
+    ...navigation.flatMap((g) => g.items).filter(
+      (item) => !MOBILE_TABS.some((t) => t.path === item.path)
+    ),
+    { title: "Perfil", path: "/perfil", icon: User, status: "active" as const },
+  ];
+
+  const isOnMorePage = moreItems.some((item) => location.pathname === item.path);
 
   return (
     <>
-      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-end justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav
+        aria-label="Navegação principal"
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 flex h-16 items-end justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden transition-opacity duration-200",
+          moreOpen && "opacity-0 pointer-events-none"
+        )}
+      >
         {MOBILE_TABS.map((tab) => {
           const active = location.pathname === tab.path;
           return (
@@ -32,7 +43,7 @@ export function MobileNav() {
               key={tab.path}
               to={tab.path}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
+                "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
@@ -45,12 +56,13 @@ export function MobileNav() {
         <button
           onClick={() => setMoreOpen(true)}
           className={cn(
-            "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
-            moreOpen ? "text-primary" : "text-muted-foreground"
+            "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors",
+            moreOpen || isOnMorePage ? "text-primary" : "text-muted-foreground"
           )}
         >
           <MoreHorizontal className="h-5 w-5" />
           <span className="text-xs leading-tight">Mais</span>
+          {isOnMorePage && !moreOpen && <span className="absolute top-0 h-0.5 w-8 rounded-b bg-primary" />}
         </button>
       </nav>
 

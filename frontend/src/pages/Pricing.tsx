@@ -1,6 +1,6 @@
 import { useBillingPlans, useBillingStatus, useCheckout } from "@/hooks/use-billing";
 import { cn } from "@/lib/utils";
-import { Check, CreditCard, Loader2, Mail, ArrowRight, Shield, Zap, Clock, Sparkles } from "lucide-react";
+import { Check, CreditCard, Loader2, Mail, ArrowRight, ArrowLeft, Shield, Zap, Clock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function PricingPage() {
@@ -39,6 +39,16 @@ export default function PricingPage() {
               >
                 Continuar para o painel
                 <ArrowRight className="h-3 w-3" />
+              </button>
+            )}
+            {!isTrialing && (
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded p-1"
+                aria-label="Voltar"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Voltar</span>
               </button>
             )}
           </div>

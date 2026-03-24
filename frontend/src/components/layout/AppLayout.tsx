@@ -7,13 +7,17 @@ import { CommandMenu } from "@/components/shared/CommandMenu";
 import { navigation } from "@/lib/navigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const EXTRA_TITLES: Record<string, string> = {
+  "/perfil": "Perfil",
+};
+
 function getPageTitle(pathname: string): string {
   for (const group of navigation) {
     for (const item of group.items) {
       if (item.path === pathname) return item.title;
     }
   }
-  return "";
+  return EXTRA_TITLES[pathname] || "";
 }
 
 export function AppLayout() {
@@ -27,7 +31,7 @@ export function AppLayout() {
         {!isMobile && <AppSidebar />}
         <main className="flex flex-1 flex-col">
           <AppTopbar title={pageTitle} />
-          <div className={isMobile ? "pb-16" : ""}>
+          <div className={isMobile ? "pb-[calc(4rem+env(safe-area-inset-bottom))]" : ""}>
             <Outlet />
           </div>
         </main>
