@@ -37,6 +37,7 @@ export default function Dashboard() {
   const unmatched = summary?.unmatched_documents ?? 0;
 
   const hasData = docCount > 0 || txCount > 0;
+  const allOnboardingDone = docCount > 0 && txCount > 0 && reconciled > 0;
 
   // Sparklines from monthly data (last 6 months, doc count)
   const sparkDocs = useMemo(() =>
@@ -55,8 +56,8 @@ export default function Dashboard() {
       {/* Error state */}
       {isError && <ErrorState onRetry={refetch} />}
 
-      {/* === ONBOARDING (shown when no data yet) === */}
-      {!isLoading && !hasData && (
+      {/* === ONBOARDING (shown until all steps complete) === */}
+      {!isLoading && !allOnboardingDone && (
         <div className="mb-6">
           <OnboardingChecklist docCount={docCount} txCount={txCount} reconciled={reconciled} />
         </div>

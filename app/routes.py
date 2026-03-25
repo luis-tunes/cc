@@ -96,6 +96,7 @@ async def paperless_webhook(payload: WebhookRequest):
         doc_id = ingest_document(payload.document_id, tenant_id=tid)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    cache_invalidate(f"dashboard:{tid}")
     return {"document_id": doc_id}
 
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
@@ -187,6 +188,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
                     conn.commit()
                 logger.info("upload: vision extraction succeeded for file=%s id=%d", file.filename, local_id)
 
+        cache_invalidate(f"dashboard:{tid}")
         status_msg = "accepted" if paperless_ok else "accepted_without_ocr"
         logger.info("upload: %s file=%s id=%d paperless=%s", status_msg, file.filename, local_id, paperless_ok)
         return {"status": status_msg, "filename": file.filename, "id": local_id}
@@ -668,6 +670,7 @@ async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_aut
         conn.commit()
     if errors and count == 0:
         raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:5]))
+    cache_invalidate(f"dashboard:{tid}")
     return {"imported": count, "errors": errors[:10]}
 
 @router.get("/bank-transactions", response_model=list[BankTransactionOut])
@@ -705,6 +708,7 @@ async def run_reconciliation(auth: AuthInfo = Depends(require_auth)):
         with get_conn() as conn:
             log_activity(conn, tid, "reconciliation", None, "run", f"{len(matches)} correspondências")
             conn.commit()
+    cache_invalidate(f"dashboard:{tid}")
     return {"matched": len(matches), "matches": matches}
 
 @router.get("/reconciliations")
