@@ -69,7 +69,7 @@ def _decode_clerk_jwt(token: str) -> dict:
     """Decode and verify a Clerk-issued JWT."""
     pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").replace("\\n", "\n").strip()
 
-    if pem:
+    if pem and pem.startswith("-----BEGIN"):
         return jwt.decode(
             token,
             pem,
