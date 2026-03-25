@@ -151,14 +151,17 @@ async def optional_auth(request: Request) -> Optional[AuthInfo]:
 
 def check_auth_config() -> None:
     """Log auth configuration status at startup. Call from lifespan."""
-    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "")
+    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").strip()
+    pk = os.environ.get("VITE_CLERK_PUBLISHABLE_KEY", "")
+    has_pem = pem.startswith("-----BEGIN")
     if AUTH_DISABLED:
         logger.warning("startup: AUTH_DISABLED=1 — JWT validation is OFF (dev mode)")
-    elif not pem:
-        logger.critical(
-            "startup: CLERK_PEM_PUBLIC_KEY is empty and AUTH_DISABLED=0. "
-            "ALL authenticated API calls will fail with 401. "
-            "Set CLERK_PEM_PUBLIC_KEY or enable AUTH_DISABLED=1 for development."
-        )
+    elif has_pem:
+        logger.info("startup: Clerk JWT auth configured (RS256 PEM)")
+    elif pk:
+        logger.info("startup: Clerk JWT auth configured (JWKS auto-fetch from %s)", pk[:20])
     else:
-        logger.info("startup: Clerk JWT auth configured (RS256)")
+        logger.critical(
+            "startup: No CLERK_PEM_PUBLIC_KEY and no VITE_CLERK_PUBLISHABLE_KEY. "
+            "Auth will fail. Set one of them or enable AUTH_DISABLED=1 for dev."
+        )
