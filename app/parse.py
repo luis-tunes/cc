@@ -775,7 +775,7 @@ def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
     }
 
 
-def ingest_document(paperless_id: int, tenant_id: str | None = None) -> int:
+def ingest_document(paperless_id: int, tenant_id: str) -> int:
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 

@@ -2,18 +2,25 @@
 Clerk JWT authentication middleware for FastAPI.
 Validates JWTs from Clerk and extracts tenant (org) + user info.
 
+tenant_id is ALWAYS set: uses org_id if present, falls back to user_id (sub).
+This guarantees every authenticated request has a non-empty tenant_id for
+data isolation.
+
 Usage:
     @router.get("/protected")
     async def protected(auth: AuthInfo = Depends(require_auth)):
         print(auth.user_id, auth.tenant_id)
 """
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
 CLERK_JWT_ISSUER = os.environ.get("CLERK_JWT_ISSUER", "")  # e.g. https://your-app.clerk.accounts.dev
@@ -24,17 +31,13 @@ AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "0") == "1"
 @dataclass
 class AuthInfo:
     user_id: str
-    tenant_id: Optional[str]  # Clerk org_id — None if personal account
+    tenant_id: str  # org_id if present, else user_id — NEVER empty
     email: Optional[str]
     session_id: Optional[str]
 
 
 def _decode_clerk_jwt(token: str) -> dict:
     """Decode and verify a Clerk-issued JWT."""
-    # Clerk JWTs are signed with the instance's RSA key.
-    # The public key can be fetched from JWKS, but for simplicity
-    # we use the PEM from CLERK_PEM_PUBLIC_KEY env var, or fall back
-    # to HS256 with the secret key (Clerk supports both).
     pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").replace("\\n", "\n")
 
     if pem:
@@ -64,9 +67,16 @@ def _extract_auth(request: Request) -> Optional[AuthInfo]:
     except (jwt.InvalidTokenError, ValueError) as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
+    user_id = payload.get("sub", "")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token: missing sub claim")
+
+    # tenant_id: prefer org_id, fall back to user_id — never None/empty
+    tenant_id = payload.get("org_id") or user_id
+
     return AuthInfo(
-        user_id=payload.get("sub", ""),
-        tenant_id=payload.get("org_id"),
+        user_id=user_id,
+        tenant_id=tenant_id,
         email=payload.get("email"),
         session_id=payload.get("sid"),
     )
@@ -93,3 +103,18 @@ async def optional_auth(request: Request) -> Optional[AuthInfo]:
         return _extract_auth(request)
     except HTTPException:
         return None
+
+
+def check_auth_config() -> None:
+    """Log auth configuration status at startup. Call from lifespan."""
+    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "")
+    if AUTH_DISABLED:
+        logger.warning("startup: AUTH_DISABLED=1 — JWT validation is OFF (dev mode)")
+    elif not pem:
+        logger.critical(
+            "startup: CLERK_PEM_PUBLIC_KEY is empty and AUTH_DISABLED=0. "
+            "ALL authenticated API calls will fail with 401. "
+            "Set CLERK_PEM_PUBLIC_KEY or enable AUTH_DISABLED=1 for development."
+        )
+    else:
+        logger.info("startup: Clerk JWT auth configured (RS256)")

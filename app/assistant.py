@@ -63,9 +63,9 @@ def _fmt_eur(value) -> str:
         return str(value)
 
 
-def _handle_dashboard(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_dashboard(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     docs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents{tf}", tp).fetchone()
     txs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM bank_transactions{tf}", tp).fetchone()
     recs = conn.execute(f"SELECT COUNT(*) as count FROM reconciliations{tf}", tp).fetchone()
@@ -82,16 +82,16 @@ def _handle_dashboard(conn, tid: str | None) -> str:
     )
 
 
-def _handle_docs_count(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_docs_count(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     row = conn.execute(f"SELECT COUNT(*) as count FROM documents{tf}", tp).fetchone()
     return f"Tem **{row['count']} documentos** registados no sistema."
 
 
-def _handle_docs_pending(conn, tid: str | None) -> str:
-    tp = [tid] if tid else []
-    where = "WHERE status = 'pendente'" + (" AND tenant_id = %s" if tid else "")
+def _handle_docs_pending(conn, tid: str) -> str:
+    tp = [tid]
+    where = "WHERE status = 'pendente' AND tenant_id = %s"
     row = conn.execute(f"SELECT COUNT(*) as count FROM documents {where}", tp).fetchone()
     if row["count"] == 0:
         return "Não tem documentos pendentes de revisão. Tudo em dia! ✅"
@@ -101,14 +101,11 @@ def _handle_docs_pending(conn, tid: str | None) -> str:
     )
 
 
-def _handle_docs_this_month(conn, tid: str | None) -> str:
+def _handle_docs_this_month(conn, tid: str) -> str:
     today = datetime.date.today()
     first = today.replace(day=1)
-    tp: list = [str(first), str(today)]
-    where = "WHERE date >= %s AND date <= %s"
-    if tid:
-        where += " AND tenant_id = %s"
-        tp.append(tid)
+    tp: list = [str(first), str(today), tid]
+    where = "WHERE date >= %s AND date <= %s AND tenant_id = %s"
     row = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents {where}", tp).fetchone()
     return (
         f"Este mês ({today.strftime('%B %Y')}): "
@@ -116,9 +113,9 @@ def _handle_docs_this_month(conn, tid: str | None) -> str:
     )
 
 
-def _handle_docs_total_value(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_docs_total_value(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     row = conn.execute(f"SELECT COALESCE(SUM(total),0) as total, COALESCE(SUM(vat),0) as vat FROM documents{tf}", tp).fetchone()
     return (
         f"Valor total de documentos: **{_fmt_eur(row['total'])}** "
@@ -126,24 +123,24 @@ def _handle_docs_total_value(conn, tid: str | None) -> str:
     )
 
 
-def _handle_bank_count(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_bank_count(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     row = conn.execute(f"SELECT COUNT(*) as count FROM bank_transactions{tf}", tp).fetchone()
     return f"Tem **{row['count']} movimentos bancários** registados."
 
 
-def _handle_bank_balance(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_bank_balance(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     row = conn.execute(f"SELECT COALESCE(SUM(amount),0) as total FROM bank_transactions{tf}", tp).fetchone()
     entradas = conn.execute(
-        f"SELECT COALESCE(SUM(amount),0) as total FROM bank_transactions WHERE amount > 0{' AND tenant_id = %s' if tid else ''}",
-        tp,
+        "SELECT COALESCE(SUM(amount),0) as total FROM bank_transactions WHERE amount > 0 AND tenant_id = %s",
+        (tid,),
     ).fetchone()
     saidas = conn.execute(
-        f"SELECT COALESCE(SUM(amount),0) as total FROM bank_transactions WHERE amount < 0{' AND tenant_id = %s' if tid else ''}",
-        tp,
+        "SELECT COALESCE(SUM(amount),0) as total FROM bank_transactions WHERE amount < 0 AND tenant_id = %s",
+        (tid,),
     ).fetchone()
     return (
         f"Saldo líquido dos movimentos bancários: **{_fmt_eur(row['total'])}**\n"
@@ -151,15 +148,14 @@ def _handle_bank_balance(conn, tid: str | None) -> str:
     )
 
 
-def _handle_recon_status(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_recon_status(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     recs = conn.execute(f"SELECT COUNT(*) as count FROM reconciliations{tf}", tp).fetchone()
     docs = conn.execute(f"SELECT COUNT(*) as count FROM documents{tf}", tp).fetchone()
-    unmatched_tp = tp.copy()
     unmatched = conn.execute(
-        f"SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations){' AND tenant_id = %s' if tid else ''}",
-        unmatched_tp,
+        "SELECT COUNT(*) as count FROM documents WHERE tenant_id = %s AND id NOT IN (SELECT document_id FROM reconciliations)",
+        (tid,),
     ).fetchone()
     pct = round(recs["count"] / docs["count"] * 100) if docs["count"] > 0 else 0
     return (
@@ -168,15 +164,15 @@ def _handle_recon_status(conn, tid: str | None) -> str:
     )
 
 
-def _handle_alerts(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s AND read = false" if tid else " WHERE read = false"
-    tp = [tid] if tid else []
+def _handle_alerts(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s AND read = false"
+    tp = [tid]
     row = conn.execute(f"SELECT COUNT(*) as count FROM alerts{tf}", tp).fetchone()
     if row["count"] == 0:
         return "Sem alertas ativos. Está tudo em conformidade. ✅"
     rows = conn.execute(
-        f"SELECT severity, title FROM alerts WHERE read = false{ ' AND tenant_id = %s' if tid else ''} ORDER BY created_at DESC LIMIT 5",
-        tp,
+        "SELECT severity, title FROM alerts WHERE read = false AND tenant_id = %s ORDER BY created_at DESC LIMIT 5",
+        (tid,),
     ).fetchall()
     lines = [f"Tem **{row['count']} alertas activos**:\n"]
     emoji = {"urgente": "🔴", "atencao": "🟡", "info": "🔵"}
@@ -186,9 +182,9 @@ def _handle_alerts(conn, tid: str | None) -> str:
     return "\n".join(lines)
 
 
-def _handle_assets(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s AND status = 'ativo'" if tid else " WHERE status = 'ativo'"
-    tp = [tid] if tid else []
+def _handle_assets(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s AND status = 'ativo'"
+    tp = [tid]
     row = conn.execute(
         f"SELECT COUNT(*) as count, COALESCE(SUM(acquisition_cost),0) as cost FROM assets{tf}",
         tp,
@@ -199,15 +195,12 @@ def _handle_assets(conn, tid: str | None) -> str:
     )
 
 
-def _handle_tax_iva(conn, tid: str | None) -> str:
+def _handle_tax_iva(conn, tid: str) -> str:
     today = datetime.date.today()
     quarter = (today.month - 1) // 3 + 1
     q_start = datetime.date(today.year, (quarter - 1) * 3 + 1, 1)
-    tp: list = [str(q_start), str(today)]
-    where = "WHERE date >= %s AND date <= %s AND type = 'fatura'"
-    if tid:
-        where += " AND tenant_id = %s"
-        tp.append(tid)
+    tp: list = [str(q_start), str(today), tid]
+    where = "WHERE date >= %s AND date <= %s AND type = 'fatura' AND tenant_id = %s"
     row = conn.execute(
         f"SELECT COALESCE(SUM(vat),0) as vat, COALESCE(SUM(total),0) as total FROM documents {where}",
         tp,
@@ -219,9 +212,9 @@ def _handle_tax_iva(conn, tid: str | None) -> str:
     )
 
 
-def _handle_inventory(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_inventory(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     total = conn.execute(f"SELECT COUNT(*) as count FROM ingredients{tf}", tp).fetchone()
     return (
         f"Tem **{total['count']} ingredientes** no inventário. "
@@ -229,9 +222,9 @@ def _handle_inventory(conn, tid: str | None) -> str:
     )
 
 
-def _handle_suppliers(conn, tid: str | None) -> str:
-    tf = " WHERE tenant_id = %s" if tid else ""
-    tp = [tid] if tid else []
+def _handle_suppliers(conn, tid: str) -> str:
+    tf = " WHERE tenant_id = %s"
+    tp = [tid]
     row = conn.execute(f"SELECT COUNT(*) as count FROM suppliers{tf}", tp).fetchone()
     return f"Tem **{row['count']} fornecedores** registados. Aceda a **Fornecedores** para gerir."
 
@@ -291,7 +284,7 @@ _DB_HANDLERS: dict[str, Any] = {
 }
 
 
-def answer_question(question: str, tenant_id: str | None) -> dict:
+def answer_question(question: str, tenant_id: str) -> dict:
     """Main entry point. Returns {intent, answer}."""
     intent = _detect_intent(question)
 

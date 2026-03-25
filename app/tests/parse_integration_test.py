@@ -132,7 +132,7 @@ def test_ingest_document_invalid_nifs_fallback():
          patch("app.parse.extract_text", return_value=text), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text}):
-        doc_id = ingest_document(50)
+        doc_id = ingest_document(50, tenant_id="test-tenant")
 
     import sys
     tables = sys.modules["tests.conftest"].get_tables()
@@ -150,7 +150,7 @@ def test_ingest_document_no_amount_saves_pending():
          patch("app.parse.extract_text", return_value=text), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text}):
-        doc_id = ingest_document(51)
+        doc_id = ingest_document(51, tenant_id="test-tenant")
 
     import sys
     tables = sys.modules["tests.conftest"].get_tables()
@@ -197,14 +197,14 @@ def test_ingest_upserts_on_same_paperless_id():
          patch("app.parse.extract_text", return_value=text1), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text1}):
-        id1 = ingest_document(70)
+        id1 = ingest_document(70, tenant_id="test-tenant")
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
          patch("app.parse.extract_text", return_value=text2), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text2}):
-        id2 = ingest_document(70)
+        id2 = ingest_document(70, tenant_id="test-tenant")
 
     # Same paperless_id → same doc updated (conftest simulates upsert)
     import sys

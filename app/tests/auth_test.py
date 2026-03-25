@@ -43,7 +43,8 @@ def test_extract_auth_no_org(mock_decode):
     req = _make_request("Bearer tok")
     auth = _extract_auth(req)
     assert auth is not None
-    assert auth.tenant_id is None
+    # Without org_id, tenant_id falls back to user_id
+    assert auth.tenant_id == "user_1"
 
 
 @patch("app.auth._decode_clerk_jwt", side_effect=Exception("bad"))

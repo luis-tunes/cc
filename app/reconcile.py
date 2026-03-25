@@ -8,20 +8,20 @@ SUGGESTION_AMOUNT_TOLERANCE = Decimal("50")
 SUGGESTION_DATE_TOLERANCE = timedelta(days=30)
 
 
-def reconcile_all(tenant_id: str | None = None) -> list[dict]:
-    tf = " AND tenant_id = %s" if tenant_id else ""
-    tp = [tenant_id] if tenant_id else []
+def reconcile_all(tenant_id: str) -> list[dict]:
     with get_conn() as conn:
         docs = conn.execute(
-            f"""SELECT id, total, date FROM documents
+            """SELECT id, total, date FROM documents
                WHERE date IS NOT NULL AND total IS NOT NULL
-                 AND id NOT IN (SELECT document_id FROM reconciliations){tf}""",
-            tp,
+                 AND id NOT IN (SELECT document_id FROM reconciliations)
+                 AND tenant_id = %s""",
+            (tenant_id,),
         ).fetchall()
         txs = conn.execute(
-            f"""SELECT id, amount, date FROM bank_transactions
-               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations){tf}""",
-            tp,
+            """SELECT id, amount, date FROM bank_transactions
+               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations)
+                 AND tenant_id = %s""",
+            (tenant_id,),
         ).fetchall()
         matches = []
         used_tx = set()
@@ -45,21 +45,20 @@ def reconcile_all(tenant_id: str | None = None) -> list[dict]:
     return matches
 
 
-def suggest_matches(doc_id: int, tenant_id: str | None = None, limit: int = 3) -> list[dict]:
+def suggest_matches(doc_id: int, tenant_id: str, limit: int = 3) -> list[dict]:
     """Return top-N closest unreconciled bank transactions for a document."""
-    tf = " AND tenant_id = %s" if tenant_id else ""
-    tp = [tenant_id] if tenant_id else []
     with get_conn() as conn:
         doc = conn.execute(
-            f"SELECT id, total, date FROM documents WHERE id = %s{tf}",
-            [doc_id] + tp,
+            "SELECT id, total, date FROM documents WHERE id = %s AND tenant_id = %s",
+            (doc_id, tenant_id),
         ).fetchone()
         if not doc or doc["total"] is None or doc["date"] is None:
             return []
         txs = conn.execute(
-            f"""SELECT id, amount, date, description FROM bank_transactions
-               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations){tf}""",
-            tp,
+            """SELECT id, amount, date, description FROM bank_transactions
+               WHERE id NOT IN (SELECT bank_transaction_id FROM reconciliations)
+                 AND tenant_id = %s""",
+            (tenant_id,),
         ).fetchall()
 
     candidates = []

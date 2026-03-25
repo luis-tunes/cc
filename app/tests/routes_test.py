@@ -319,16 +319,31 @@ def test_billing_status():
 # ── Webhook ───────────────────────────────────────────────────────────
 
 @patch("app.routes.ingest_document")
+@patch("app.routes.WEBHOOK_SECRET", "test-secret")
 def test_webhook_success(mock_ingest):
     mock_ingest.return_value = 42
-    r = client.post("/api/webhook", json={"document_id": 1})
+    r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret", "tenant_id": "dev-tenant"})
     assert r.status_code == 200
     assert r.json()["document_id"] == 42
 
 
 @patch("app.routes.ingest_document", side_effect=ValueError("parse failed"))
+@patch("app.routes.WEBHOOK_SECRET", "test-secret")
 def test_webhook_parse_error(mock_ingest):
-    r = client.post("/api/webhook", json={"document_id": 1})
+    r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret", "tenant_id": "dev-tenant"})
+    assert r.status_code == 422
+
+
+def test_webhook_missing_secret():
+    """Webhook without valid secret is rejected."""
+    r = client.post("/api/webhook", json={"document_id": 1, "secret": "wrong"})
+    assert r.status_code == 403
+
+
+@patch("app.routes.WEBHOOK_SECRET", "test-secret")
+def test_webhook_missing_tenant():
+    """Webhook without tenant_id and no pending stub is rejected."""
+    r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret"})
     assert r.status_code == 422
 
 

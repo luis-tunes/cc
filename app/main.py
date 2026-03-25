@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from app.auth import check_auth_config
 from app.db import close_pool, init_db
 from app.routes import router
 from app.billing import router as billing_router, init_billing_db
@@ -17,6 +18,9 @@ async def lifespan(app: FastAPI):
     logger.info("startup: PAPERLESS_TOKEN=%s", "set" if os.environ.get("PAPERLESS_TOKEN") else "EMPTY")
     logger.info("startup: AUTH_DISABLED=%s", os.environ.get("AUTH_DISABLED", "0"))
     logger.info("startup: DATABASE_URL=%s", "set" if os.environ.get("DATABASE_URL") else "EMPTY")
+    check_auth_config()
+    if not os.environ.get("PAPERLESS_TOKEN"):
+        logger.warning("startup: PAPERLESS_TOKEN is empty — OCR will fall back to pdftotext/vision")
     init_db()
     init_billing_db()
     logger.info("startup: DB initialized OK")
@@ -36,8 +40,8 @@ app.include_router(billing_router, prefix="/api")
 # Backward-compat: Paperless post-consume calls /webhook without /api prefix
 @app.post("/webhook")
 async def webhook_compat(payload: dict):
-    from app.routes import paperless_webhook, WebhookPayload
-    return await paperless_webhook(WebhookPayload(**payload))
+    from app.routes import paperless_webhook, WebhookRequest
+    return await paperless_webhook(WebhookRequest(**payload))
 
 _web_dir = os.environ.get("WEB_DIR", "/opt/tim/web")
 if os.path.isdir(_web_dir):

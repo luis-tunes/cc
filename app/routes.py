@@ -25,13 +25,6 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 router = APIRouter()
 
-
-def _tenant_clause(auth: AuthInfo | None, clauses: list, params: list) -> None:
-    """Append tenant_id filter if auth provides one."""
-    if auth and auth.tenant_id:
-        clauses.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-
 # --- Models ---
 
 class DocumentOut(BaseModel):
@@ -75,13 +68,32 @@ class BankTransactionOut(BaseModel):
 class WebhookRequest(BaseModel):
     document_id: int
     secret: str = ""
+    tenant_id: str = ""
 
 @router.post("/webhook")
 async def paperless_webhook(payload: WebhookRequest):
-    if WEBHOOK_SECRET and payload.secret != WEBHOOK_SECRET:
+    import hmac
+    if not WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="webhook secret not configured")
+    if not hmac.compare_digest(payload.secret, WEBHOOK_SECRET):
         raise HTTPException(status_code=403, detail="invalid webhook secret")
+    # Resolve tenant_id: from payload, or from a pending document stub
+    tid = payload.tenant_id
+    if not tid:
+        # Try to find a pending stub that matches this paperless_id
+        with get_conn() as conn:
+            pending = conn.execute(
+                """SELECT tenant_id FROM documents
+                   WHERE paperless_id IS NULL
+                     AND status IN ('pendente ocr', 'a processar')
+                   ORDER BY created_at DESC LIMIT 1"""
+            ).fetchone()
+            if pending and pending["tenant_id"]:
+                tid = pending["tenant_id"]
+    if not tid:
+        raise HTTPException(status_code=422, detail="tenant_id required: pass it in the payload or ensure a pending document stub exists")
     try:
-        doc_id = ingest_document(payload.document_id)
+        doc_id = ingest_document(payload.document_id, tenant_id=tid)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return {"document_id": doc_id}
@@ -112,7 +124,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
         logger.info("upload: file=%s size=%d ext=%s", file.filename, len(content), ext)
         mime = MIME_MAP.get(ext, "application/octet-stream")
 
-        tid = auth.tenant_id if auth else None
+        tid = auth.tenant_id
 
         # Save DB record first so the upload is never lost
         try:
@@ -230,26 +242,25 @@ async def list_documents(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    clauses: list[str] = []
-    params: list = []
-    _tenant_clause(auth, clauses, params)
+    clauses: list[str] = ["d.tenant_id = %s"]
+    params: list = [auth.tenant_id]
     if supplier_nif:
-        clauses.append("supplier_nif = %s")
+        clauses.append("d.supplier_nif = %s")
         params.append(supplier_nif)
     if date_from:
-        clauses.append("date >= %s")
+        clauses.append("d.date >= %s")
         params.append(date_from)
     if date_to:
-        clauses.append("date <= %s")
+        clauses.append("d.date <= %s")
         params.append(date_to)
     if status:
-        clauses.append("status = %s")
+        clauses.append("d.status = %s")
         params.append(status)
     if search:
-        clauses.append("(supplier_nif ILIKE %s OR client_nif ILIKE %s OR filename ILIKE %s)")
+        clauses.append("(d.supplier_nif ILIKE %s OR d.client_nif ILIKE %s OR d.filename ILIKE %s)")
         q = f"%{search}%"
         params.extend([q, q, q])
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    where = "WHERE " + " AND ".join(clauses)
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
@@ -273,7 +284,7 @@ async def list_documents(
 async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
     """Run classification rules against all unclassified documents for the tenant."""
     from app.classify import classify_document
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         docs = conn.execute(
             """SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text, status
@@ -322,7 +333,7 @@ async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
 @router.get("/documents/classification-stats")
 async def classification_stats(auth: AuthInfo = Depends(require_auth)):
     """Return classification coverage statistics for the tenant."""
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         total = conn.execute(
             "SELECT COUNT(*) AS n FROM documents WHERE tenant_id = %s AND status != 'arquivado'",
@@ -361,18 +372,12 @@ _SNC_SUGGEST = {
 @router.get("/documents/{doc_id}/suggest")
 async def suggest_classification(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Return a classification suggestion for a document."""
-    wheres = ["id = %s"]
-    params: list = [doc_id]
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
 
     with get_conn() as conn:
         doc = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, type, raw_text, snc_account FROM documents WHERE {where}",
-            params,
+            "SELECT id, supplier_nif, client_nif, total, vat, type, raw_text, snc_account FROM documents WHERE id = %s AND tenant_id = %s",
+            (doc_id, tid),
         ).fetchone()
         if not doc:
             raise HTTPException(status_code=404, detail="document not found")
@@ -454,19 +459,15 @@ async def suggest_classification(doc_id: int, auth: AuthInfo = Depends(require_a
 
 @router.get("/documents/{doc_id}", response_model=DocumentOut)
 async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
-    clauses = ["id = %s"]
-    params: list = [doc_id]
-    _tenant_clause(auth, clauses, params)
-    where = "WHERE " + " AND ".join(clauses)
     with get_conn() as conn:
         row = conn.execute(
-            f"""SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text,
+            """SELECT id, supplier_nif, client_nif, total, vat, date, type, filename, raw_text,
                        status, paperless_id, created_at, notes, snc_account, classification_source,
                        (SELECT r.status FROM reconciliations r
                         WHERE r.document_id = id
                         ORDER BY r.created_at DESC LIMIT 1) AS reconciliation_status
-                FROM documents {where}""",
-            params,
+                FROM documents WHERE id = %s AND tenant_id = %s""",
+            (doc_id, auth.tenant_id),
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
@@ -482,15 +483,11 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
     for k, v in updates.items():
         set_parts.append(f"{k} = %s")
         params.append(v)
-    wheres = ["id = %s"]
     params.append(doc_id)
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
+    params.append(auth.tenant_id)
     with get_conn() as conn:
         row = conn.execute(
-            f"""UPDATE documents SET {', '.join(set_parts)} WHERE {where}
+            f"""UPDATE documents SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s
                 RETURNING id, supplier_nif, client_nif, total, vat, date, type, filename,
                           raw_text, status, paperless_id, created_at, notes, snc_account,
                           classification_source,
@@ -507,19 +504,13 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
 
 @router.delete("/documents/{doc_id}", status_code=204)
 async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
-    wheres = ["id = %s"]
-    params: list = [doc_id]
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
     with get_conn() as conn:
-        row = conn.execute(f"SELECT id, paperless_id FROM documents WHERE {where}", params).fetchone()
+        row = conn.execute("SELECT id, paperless_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="document not found")
         conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
-        conn.execute(f"DELETE FROM documents WHERE {where}", params)
-        log_activity(conn, (auth.tenant_id if auth else "") or "", "document", doc_id, "deleted")
+        conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
+        log_activity(conn, auth.tenant_id, "document", doc_id, "deleted")
         conn.commit()
     return None
 
@@ -534,20 +525,14 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
         return None
     if len(payload.ids) > 500:
         raise HTTPException(status_code=400, detail="max 500 documents per request")
-    tenant_id = (auth.tenant_id if auth else "") or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         for doc_id in payload.ids:
-            wheres = ["id = %s"]
-            params: list = [doc_id]
-            if tenant_id:
-                wheres.append("tenant_id = %s")
-                params.append(tenant_id)
-            where = " AND ".join(wheres)
-            row = conn.execute(f"SELECT id FROM documents WHERE {where}", params).fetchone()
+            row = conn.execute("SELECT id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid)).fetchone()
             if row:
                 conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
-                conn.execute(f"DELETE FROM documents WHERE {where}", params)
-                log_activity(conn, tenant_id, "document", doc_id, "deleted")
+                conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+                log_activity(conn, tid, "document", doc_id, "deleted")
         conn.commit()
     return None
 
@@ -555,15 +540,9 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
 @router.post("/documents/{doc_id}/reprocess")
 async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Re-run OCR extraction on a document that has a paperless_id."""
-    wheres = ["id = %s"]
-    params: list = [doc_id]
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"SELECT id, paperless_id, tenant_id FROM documents WHERE {where}", params
+            "SELECT id, paperless_id, tenant_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
@@ -588,15 +567,9 @@ async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)
 @router.get("/documents/{doc_id}/preview")
 async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Proxy the document file from Paperless-ngx for preview."""
-    wheres = ["id = %s"]
-    params: list = [doc_id]
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"SELECT paperless_id, filename FROM documents WHERE {where}", params
+            "SELECT paperless_id, filename FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
@@ -632,15 +605,9 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
 @router.get("/documents/{doc_id}/thumbnail")
 async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     """Proxy the document thumbnail from Paperless-ngx."""
-    wheres = ["id = %s"]
-    params: list = [doc_id]
-    if auth and auth.tenant_id:
-        wheres.append("tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = " AND ".join(wheres)
     with get_conn() as conn:
         row = conn.execute(
-            f"SELECT paperless_id FROM documents WHERE {where}", params
+            "SELECT paperless_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
@@ -677,7 +644,7 @@ async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_aut
     reader = csv.DictReader(io.StringIO(text), delimiter=";")
     if not reader.fieldnames or not {"date", "description", "amount"}.issubset(set(reader.fieldnames)):
         raise HTTPException(status_code=422, detail="CSV must have columns: date, description, amount")
-    tid = auth.tenant_id if auth else None
+    tid = auth.tenant_id
     count = 0
     errors = []
     with get_conn() as conn:
@@ -711,16 +678,15 @@ async def list_bank_transactions(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    clauses: list[str] = []
-    params: list = []
-    _tenant_clause(auth, clauses, params)
+    clauses: list[str] = ["tenant_id = %s"]
+    params: list = [auth.tenant_id]
     if date_from:
         clauses.append("date >= %s")
         params.append(date_from)
     if date_to:
         clauses.append("date <= %s")
         params.append(date_to)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    where = "WHERE " + " AND ".join(clauses)
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
@@ -733,9 +699,9 @@ async def list_bank_transactions(
 
 @router.post("/reconcile")
 async def run_reconciliation(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id if auth else None
+    tid = auth.tenant_id
     matches = reconcile_all(tid)
-    if tid and matches:
+    if matches:
         with get_conn() as conn:
             log_activity(conn, tid, "reconciliation", None, "run", f"{len(matches)} correspondências")
             conn.commit()
@@ -747,12 +713,9 @@ async def list_reconciliations(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    clauses: list[str] = []
-    params: list = []
-    if auth and auth.tenant_id:
-        clauses.append("r.tenant_id = %s")
-        params.append(auth.tenant_id)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    clauses: list[str] = ["r.tenant_id = %s"]
+    params: list = [auth.tenant_id]
+    where = "WHERE " + " AND ".join(clauses)
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
@@ -780,7 +743,7 @@ VALID_RECON_STATUSES = {"pendente", "aprovado", "rejeitado", "a_rever"}
 async def patch_reconciliation(recon_id: int, patch: ReconciliationPatch, auth: AuthInfo = Depends(require_auth)):
     if patch.status and patch.status not in VALID_RECON_STATUSES:
         raise HTTPException(status_code=422, detail=f"invalid status: {patch.status}")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     updates = patch.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=422, detail="no fields to update")
@@ -803,8 +766,7 @@ async def patch_reconciliation(recon_id: int, patch: ReconciliationPatch, auth: 
 
 @router.get("/reconciliations/{doc_id}/suggestions")
 async def reconciliation_suggestions(doc_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id if auth else None
-    return suggest_matches(doc_id, tid)
+    return suggest_matches(doc_id, auth.tenant_id)
 
 # --- Movement Classification ---
 
@@ -816,13 +778,10 @@ async def enrich_movements(
 ):
     """List bank transactions with classification and entity detection."""
     from app.classify_movements import classify_movement, detect_entity
-    tid = auth.tenant_id or ""
-    clauses: list[str] = []
-    params: list = []
-    if tid:
-        clauses.append("tenant_id = %s")
-        params.append(tid)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    tid = auth.tenant_id
+    clauses: list[str] = ["tenant_id = %s"]
+    params: list = [tid]
+    where = "WHERE " + " AND ".join(clauses)
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
@@ -848,8 +807,7 @@ async def enrich_movements(
 @router.get("/bank-transactions/duplicates")
 async def list_duplicates(auth: AuthInfo = Depends(require_auth)):
     from app.classify_movements import find_duplicates
-    tid = auth.tenant_id if auth else None
-    return find_duplicates(tid)
+    return find_duplicates(auth.tenant_id)
 
 
 # --- Movement Rules CRUD ---
@@ -884,7 +842,7 @@ class MovementRulePatch(BaseModel):
 
 @router.get("/movement-rules", response_model=list[MovementRuleOut])
 async def list_movement_rules(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         return conn.execute(
             "SELECT id, name, pattern, category, snc_account, entity_nif, priority, active FROM movement_rules WHERE tenant_id = %s ORDER BY priority ASC, id ASC",
@@ -893,7 +851,7 @@ async def list_movement_rules(auth: AuthInfo = Depends(require_auth)):
 
 @router.post("/movement-rules", response_model=MovementRuleOut, status_code=201)
 async def create_movement_rule(body: MovementRuleCreate, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO movement_rules (tenant_id, name, pattern, category, snc_account, entity_nif, priority, active)
@@ -909,7 +867,7 @@ async def update_movement_rule(rule_id: int, patch: MovementRulePatch, auth: Aut
     updates = patch.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=422, detail="no fields to update")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     set_parts = []
     params: list = []
     for k, v in updates.items():
@@ -928,7 +886,7 @@ async def update_movement_rule(rule_id: int, patch: MovementRulePatch, auth: Aut
 
 @router.delete("/movement-rules/{rule_id}", status_code=204)
 async def delete_movement_rule(rule_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             "DELETE FROM movement_rules WHERE id = %s AND tenant_id = %s RETURNING id",
@@ -956,7 +914,7 @@ async def list_alerts(
     unread_only: bool = Query(default=False),
     auth: AuthInfo = Depends(require_auth),
 ):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     clauses = ["tenant_id = %s"]
     params: list = [tid]
     if unread_only:
@@ -971,7 +929,7 @@ async def list_alerts(
 @router.patch("/alerts/{alert_id}")
 async def patch_alert(alert_id: int, auth: AuthInfo = Depends(require_auth)):
     """Mark an alert as read."""
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             "UPDATE alerts SET read = true WHERE id = %s AND tenant_id = %s RETURNING id",
@@ -986,7 +944,7 @@ async def patch_alert(alert_id: int, auth: AuthInfo = Depends(require_auth)):
 async def generate_alerts(auth: AuthInfo = Depends(require_auth)):
     """Run the alerts engine to generate new compliance alerts."""
     from app.alerts import generate_compliance_alerts
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     count = generate_compliance_alerts(tid)
     return {"generated": count}
 
@@ -1038,7 +996,7 @@ VALID_ASSET_STATUSES = {"ativo", "abatido", "vendido"}
 
 @router.get("/assets", response_model=list[AssetOut])
 async def list_assets(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT id, name, category, acquisition_date, acquisition_cost,
@@ -1059,7 +1017,7 @@ async def list_assets(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/assets/summary")
 async def assets_summary(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     from app.assets import compute_current_value
     with get_conn() as conn:
         rows = conn.execute(
@@ -1089,7 +1047,7 @@ async def assets_summary(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/assets/{asset_id}", response_model=AssetOut)
 async def get_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             """SELECT id, name, category, acquisition_date, acquisition_cost,
@@ -1111,7 +1069,7 @@ async def create_asset(body: AssetCreate, auth: AuthInfo = Depends(require_auth)
         raise HTTPException(status_code=422, detail=f"invalid category: {body.category}")
     if body.depreciation_method not in VALID_DEPRECIATION_METHODS:
         raise HTTPException(status_code=422, detail=f"invalid method: {body.depreciation_method}")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO assets (tenant_id, name, category, acquisition_date, acquisition_cost,
@@ -1138,7 +1096,7 @@ async def update_asset(asset_id: int, patch: AssetPatch, auth: AuthInfo = Depend
         raise HTTPException(status_code=422, detail=f"invalid method: {updates['depreciation_method']}")
     if "status" in updates and updates["status"] not in VALID_ASSET_STATUSES:
         raise HTTPException(status_code=422, detail=f"invalid status: {updates['status']}")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     set_parts = []
     params: list = []
     for k, v in updates.items():
@@ -1160,7 +1118,7 @@ async def update_asset(asset_id: int, patch: AssetPatch, auth: AuthInfo = Depend
 
 @router.delete("/assets/{asset_id}", status_code=204)
 async def delete_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             "DELETE FROM assets WHERE id = %s AND tenant_id = %s RETURNING id",
@@ -1175,7 +1133,7 @@ async def delete_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/export/bank-transactions/csv")
 async def export_bank_transactions_csv(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, date, description, amount FROM bank_transactions WHERE tenant_id = %s ORDER BY date DESC",
@@ -1195,23 +1153,17 @@ async def export_bank_transactions_csv(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/export/reconciliations/csv")
 async def export_reconciliations_csv(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
-    clauses = []
-    params: list = []
-    if tid:
-        clauses.append("r.tenant_id = %s")
-        params.append(tid)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence, r.status,
+            """SELECT r.id, r.document_id, r.bank_transaction_id, r.match_confidence, r.status,
                       d.supplier_nif, d.total, d.date as doc_date,
                       b.description, b.amount, b.date as tx_date
                FROM reconciliations r
                JOIN documents d ON d.id = r.document_id
                JOIN bank_transactions b ON b.id = r.bank_transaction_id
-               {where} ORDER BY r.created_at DESC""",
-            params,
+               WHERE r.tenant_id = %s ORDER BY r.created_at DESC""",
+            (tid,),
         ).fetchall()
     output = io.StringIO()
     writer = csv.DictWriter(output, extrasaction="ignore", fieldnames=["id", "document_id", "bank_transaction_id", "match_confidence", "status", "supplier_nif", "total", "doc_date", "description", "amount", "tx_date"])
@@ -1227,7 +1179,7 @@ async def export_reconciliations_csv(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/export/assets/csv")
 async def export_assets_csv(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT id, name, category, acquisition_date, acquisition_cost,
@@ -1251,26 +1203,23 @@ async def export_assets_csv(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/dashboard/summary")
 async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id if auth and auth.tenant_id else None
-    cache_key = f"dashboard:{tid or 'anon'}"
+    tid = auth.tenant_id
+    cache_key = f"dashboard:{tid}"
     cached = cache_get(cache_key)
     if cached is not None:
         return cached
-    tf = ""
-    tp: list = []
-    if tid:
-        tf = " WHERE tenant_id = %s"
-        tp = [tid]
+    tf = " WHERE tenant_id = %s"
+    tp: list = [tid]
     with get_conn() as conn:
         docs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM documents{tf}", tp).fetchone()
         txs = conn.execute(f"SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total FROM bank_transactions{tf}", tp).fetchone()
         recs = conn.execute(f"SELECT COUNT(*) as count FROM reconciliations{tf}", tp).fetchone()
         unmatched = conn.execute(
-            f"SELECT COUNT(*) as count FROM documents WHERE id NOT IN (SELECT document_id FROM reconciliations){' AND tenant_id = %s' if tp else ''}",
-            tp,
+            "SELECT COUNT(*) as count FROM documents WHERE tenant_id = %s AND id NOT IN (SELECT document_id FROM reconciliations)",
+            (tid,),
         ).fetchone()
-        pending = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('pendente','pendente ocr','a processar'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
-        classified = conn.execute(f"SELECT COUNT(*) as count FROM documents WHERE status IN ('classificado','revisto'){' AND tenant_id = %s' if tp else ''}", tp).fetchone()
+        pending = conn.execute("SELECT COUNT(*) as count FROM documents WHERE tenant_id = %s AND status IN ('pendente','pendente ocr','a processar')", (tid,)).fetchone()
+        classified = conn.execute("SELECT COUNT(*) as count FROM documents WHERE tenant_id = %s AND status IN ('classificado','revisto')", (tid,)).fetchone()
     result = {
         "documents": {"count": docs["count"], "total": str(docs["total"])},
         "bank_transactions": {"count": txs["count"], "total": str(txs["total"])},
@@ -1284,35 +1233,28 @@ async def dashboard_summary(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/dashboard/monthly")
 async def monthly_summary(auth: AuthInfo = Depends(require_auth)):
-    tf = ""
-    tp: list = []
-    if auth and auth.tenant_id:
-        tf = " WHERE tenant_id = %s"
-        tp = [auth.tenant_id]
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
-            f"""SELECT to_char(date, 'YYYY-MM') as month,
+            """SELECT to_char(date, 'YYYY-MM') as month,
                       COUNT(*) as doc_count,
                       COALESCE(SUM(total),0) as total,
                       COALESCE(SUM(vat),0) as vat
-               FROM documents{tf} GROUP BY month ORDER BY month DESC LIMIT 12""",
-            tp,
+               FROM documents WHERE tenant_id = %s GROUP BY month ORDER BY month DESC LIMIT 12""",
+            (tid,),
         ).fetchall()
     return [{"month": r["month"], "doc_count": r["doc_count"],
              "total": str(r["total"]), "vat": str(r["vat"])} for r in rows]
 
 @router.get("/export/csv")
 async def export_csv(auth: AuthInfo = Depends(require_auth)):
-    clauses: list[str] = []
-    params: list = []
-    _tenant_clause(auth, clauses, params)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    tid = auth.tenant_id
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
     with get_conn() as conn:
         docs = conn.execute(
-            f"SELECT id, supplier_nif, client_nif, total, vat, date, type FROM documents {where} ORDER BY date DESC",
-            params,
+            "SELECT id, supplier_nif, client_nif, total, vat, date, type FROM documents WHERE tenant_id = %s ORDER BY date DESC",
+            (tid,),
         ).fetchall()
     w.writerow(["ID", "NIF Fornecedor", "NIF Cliente", "Total", "IVA", "Data", "Tipo"])
     for d in docs:
@@ -1336,7 +1278,7 @@ ENTITY_FIELDS = [
 
 @router.get("/entity")
 async def get_entity(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
@@ -1350,7 +1292,7 @@ async def get_entity(auth: AuthInfo = Depends(require_auth)):
 
 @router.put("/entity")
 async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     import json as _json
     data_json = _json.dumps(request_body)
     with get_conn() as conn:
@@ -1371,7 +1313,7 @@ async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth))
 
 @router.get("/unit-families")
 async def list_unit_families(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         families = conn.execute(
             "SELECT id, name, base_unit FROM unit_families WHERE tenant_id = %s ORDER BY name",
@@ -1397,7 +1339,7 @@ async def list_unit_families(auth: AuthInfo = Depends(require_auth)):
 
 @router.post("/unit-families")
 async def create_unit_family(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     name = body.get("name", "")
     base_unit = body.get("base_unit", "")
     conversions = body.get("conversions", [])
@@ -1426,7 +1368,7 @@ async def list_suppliers(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, name, nif, category, avg_delivery_days, reliability FROM suppliers WHERE tenant_id = %s ORDER BY name LIMIT %s OFFSET %s",
@@ -1463,7 +1405,7 @@ async def list_suppliers(
 
 @router.post("/suppliers")
 async def create_supplier(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=422, detail="name required")
@@ -1497,7 +1439,7 @@ async def create_supplier(body: dict, auth: AuthInfo = Depends(require_auth)):
 
 @router.patch("/suppliers/{supplier_id}")
 async def update_supplier(supplier_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     fields = {k: body[k] for k in ("name", "nif", "category", "avg_delivery_days", "reliability") if k in body}
     if not fields:
         raise HTTPException(status_code=422, detail="no fields to update")
@@ -1538,7 +1480,7 @@ async def update_supplier(supplier_id: int, body: dict, auth: AuthInfo = Depends
 
 @router.delete("/suppliers/{supplier_id}")
 async def delete_supplier(supplier_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM suppliers WHERE id = %s AND tenant_id = %s RETURNING id", (supplier_id, tid)).fetchone()
         conn.commit()
@@ -1549,9 +1491,10 @@ async def delete_supplier(supplier_id: int, auth: AuthInfo = Depends(require_aut
 
 # --- Ingredients ---
 
-def _get_current_stock(conn, ingredient_id: int, tenant_id: str | None = None) -> Decimal:
+def _get_current_stock(conn, ingredient_id: int, tenant_id: str) -> Decimal:
     """Compute current stock from stock_events ledger."""
-    sql = """SELECT COALESCE(SUM(
+    row = conn.execute(
+        """SELECT COALESCE(SUM(
             CASE
                 WHEN type = 'entrada' THEN qty
                 WHEN type IN ('saída', 'desperdício') THEN -qty
@@ -1559,12 +1502,9 @@ def _get_current_stock(conn, ingredient_id: int, tenant_id: str | None = None) -
                 ELSE 0
             END
         ), 0) AS stock
-        FROM stock_events WHERE ingredient_id = %s"""
-    params: list = [ingredient_id]
-    if tenant_id:
-        sql += " AND tenant_id = %s"
-        params.append(tenant_id)
-    row = conn.execute(sql, params).fetchone()
+        FROM stock_events WHERE ingredient_id = %s AND tenant_id = %s""",
+        (ingredient_id, tenant_id),
+    ).fetchone()
     return row["stock"] if row else Decimal("0")
 
 
@@ -1578,11 +1518,12 @@ def _get_ingredient_status(stock: Decimal, min_threshold: Decimal) -> str:
     return "normal"
 
 
-def _get_batch_stock(conn, ingredient_ids: list[int], tenant_id: str | None = None) -> dict[int, Decimal]:
+def _get_batch_stock(conn, ingredient_ids: list[int], tenant_id: str) -> dict[int, Decimal]:
     """Compute current stock for multiple ingredients in one query. Returns {ingredient_id: stock}."""
     if not ingredient_ids:
         return {}
-    sql = """SELECT ingredient_id,
+    rows = conn.execute(
+        """SELECT ingredient_id,
                     COALESCE(SUM(
                         CASE
                             WHEN type = 'entrada' THEN qty
@@ -1592,13 +1533,10 @@ def _get_batch_stock(conn, ingredient_ids: list[int], tenant_id: str | None = No
                         END
                     ), 0) AS stock
              FROM stock_events
-             WHERE ingredient_id = ANY(%s)"""
-    params: list = [ingredient_ids]
-    if tenant_id:
-        sql += " AND tenant_id = %s"
-        params.append(tenant_id)
-    sql += " GROUP BY ingredient_id"
-    rows = conn.execute(sql, params).fetchall()
+             WHERE ingredient_id = ANY(%s) AND tenant_id = %s
+             GROUP BY ingredient_id""",
+        (ingredient_ids, tenant_id),
+    ).fetchall()
     result = {row["ingredient_id"]: row["stock"] for row in rows}
     for iid in ingredient_ids:
         result.setdefault(iid, Decimal("0"))
@@ -1613,7 +1551,7 @@ async def list_ingredients(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         clauses = ["i.tenant_id = %s"]
         params: list = [tid]
@@ -1669,7 +1607,7 @@ async def list_ingredients(
 
 @router.post("/ingredients")
 async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=422, detail="name required")
@@ -1705,7 +1643,7 @@ async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
 
 @router.patch("/ingredients/{ingredient_id}")
 async def update_ingredient(ingredient_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     fields = {k: body[k] for k in ("name", "category", "unit", "min_threshold", "supplier_id", "last_cost", "avg_cost") if k in body}
     if not fields:
         raise HTTPException(status_code=422, detail="no fields to update")
@@ -1726,7 +1664,7 @@ async def update_ingredient(ingredient_id: int, body: dict, auth: AuthInfo = Dep
 
 @router.delete("/ingredients/{ingredient_id}")
 async def delete_ingredient(ingredient_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM ingredients WHERE id = %s AND tenant_id = %s RETURNING id", (ingredient_id, tid)).fetchone()
         conn.commit()
@@ -1745,7 +1683,7 @@ async def list_stock_events(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     clauses = ["se.tenant_id = %s"]
     params: list = [tid]
     if ingredient_id:
@@ -1773,7 +1711,7 @@ async def list_stock_events(
 
 @router.post("/stock-events")
 async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     event_type = body.get("type", "")
     ingredient_id = body.get("ingredient_id")
     qty = body.get("qty")
@@ -1799,10 +1737,11 @@ async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth))
         event_unit = body.get("unit", ing["unit"])
         if event_unit != ing["unit"]:
             conv = conn.execute(
-                """SELECT factor FROM unit_conversions
-                   WHERE from_unit = %s AND to_unit = %s
+                """SELECT uc.factor FROM unit_conversions uc
+                   JOIN unit_families uf ON uf.id = uc.unit_family_id
+                   WHERE uc.from_unit = %s AND uc.to_unit = %s AND uf.tenant_id = %s
                    LIMIT 1""",
-                (event_unit, ing["unit"]),
+                (event_unit, ing["unit"], tid),
             ).fetchone()
             if not conv:
                 raise HTTPException(
@@ -1846,7 +1785,7 @@ async def list_products(
     offset: int = 0,
     auth: AuthInfo = Depends(require_auth),
 ):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT id, code, name, category, recipe_version,
@@ -1881,7 +1820,7 @@ async def list_products(
 
 @router.post("/products")
 async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     code = (body.get("code") or "").strip()
     name = (body.get("name") or "").strip()
     if not code or not name:
@@ -1895,7 +1834,7 @@ async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
         # Compute estimated cost from recipe
         estimated_cost = Decimal("0")
         for ri in ingredients_list:
-            ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s", (ri["ingredient_id"],)).fetchone()
+            ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
             if ing:
                 waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
                 estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
@@ -1921,7 +1860,7 @@ async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
 
 @router.patch("/products/{product_id}")
 async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     fields = {k: body[k] for k in ("code", "name", "category", "pvp", "active", "recipe_version", "estimated_cost") if k in body}
     if "estimated_cost" in fields:
         fields["estimated_cost"] = Decimal(str(fields["estimated_cost"]))
@@ -1981,7 +1920,7 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
 
 @router.delete("/products/{product_id}")
 async def delete_product(product_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM products WHERE id = %s AND tenant_id = %s RETURNING id", (product_id, tid)).fetchone()
         conn.commit()
@@ -1993,7 +1932,7 @@ async def delete_product(product_id: int, auth: AuthInfo = Depends(require_auth)
 @router.get("/products/{product_id}/cost")
 async def get_product_cost(product_id: int, auth: AuthInfo = Depends(require_auth)):
     """Compute live recipe cost from current ingredient avg_cost."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         prod = conn.execute(
             "SELECT id, pvp FROM products WHERE id = %s AND tenant_id = %s", (product_id, tid),
@@ -2030,7 +1969,7 @@ async def get_product_cost(product_id: int, auth: AuthInfo = Depends(require_aut
 @router.post("/products/{product_id}/produce")
 async def produce_product(product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
     """Execute production: creates saída stock events for each recipe ingredient × quantity."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     qty_to_produce = body.get("qty", 1)
     if qty_to_produce <= 0:
         raise HTTPException(status_code=422, detail="qty must be positive")
@@ -2079,7 +2018,7 @@ async def produce_product(product_id: int, body: dict, auth: AuthInfo = Depends(
 @router.get("/products/{product_id}/stock-impact")
 async def get_stock_impact(product_id: int, qty: int = 1, auth: AuthInfo = Depends(require_auth)):
     """Preview what producing qty units would do to ingredient stocks."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         prod = conn.execute(
             "SELECT id FROM products WHERE id = %s AND tenant_id = %s", (product_id, tid),
@@ -2120,7 +2059,7 @@ async def get_stock_impact(product_id: int, qty: int = 1, auth: AuthInfo = Depen
 
 @router.get("/inventory/stats")
 async def inventory_stats(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         total = conn.execute(
             "SELECT COUNT(*) as count FROM ingredients WHERE tenant_id = %s", (tid,),
@@ -2160,7 +2099,7 @@ async def inventory_stats(auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/inventory/shopping-list")
 async def shopping_list(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         ingredients = conn.execute(
             """SELECT i.id, i.name, i.unit, i.min_threshold, i.supplier_id,
@@ -2207,7 +2146,7 @@ async def shopping_list(auth: AuthInfo = Depends(require_auth)):
 @router.get("/tax/iva-periods")
 async def tax_iva_periods(auth: AuthInfo = Depends(require_auth)):
     """IVA aggregated by quarter: total invoiced, total VAT, docs count."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             """
@@ -2248,7 +2187,7 @@ async def tax_iva_periods(auth: AuthInfo = Depends(require_auth)):
 @router.get("/tax/irc-estimate")
 async def tax_irc_estimate(auth: AuthInfo = Depends(require_auth)):
     """IRC (corporate tax) estimate for the current year based on processed docs."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     year = datetime.date.today().year
     with get_conn() as conn:
         totals = conn.execute(
@@ -2288,7 +2227,7 @@ async def tax_irc_estimate(auth: AuthInfo = Depends(require_auth)):
 @router.get("/tax/audit-flags")
 async def tax_audit_flags(auth: AuthInfo = Depends(require_auth)):
     """Detect anomalies: docs with 0 VAT, round amounts, missing NIF."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         # Docs with zero VAT but non-zero total (suspicious)
         zero_vat = conn.execute(
@@ -2398,7 +2337,7 @@ async def list_obligations(year: int | None = None, _auth: AuthInfo = Depends(re
 @router.get("/reports/pl")
 async def report_pl(year: int | None = None, auth: AuthInfo = Depends(require_auth)):
     """Monthly P&L: revenues vs expenses, net result."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     target_year = year or datetime.date.today().year
     with get_conn() as conn:
         rows = conn.execute(
@@ -2449,7 +2388,7 @@ async def report_pl(year: int | None = None, auth: AuthInfo = Depends(require_au
 @router.get("/reports/top-suppliers")
 async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require_auth)):
     """Top suppliers by total spend."""
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             """
@@ -2484,7 +2423,7 @@ async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require
 
 @router.post("/price-history")
 async def add_price_point(body: dict, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or auth.user_id
+    tid = auth.tenant_id
     ingredient_id = body.get("ingredient_id")
     supplier_id = body.get("supplier_id")
     price = body.get("price")
@@ -2562,7 +2501,7 @@ VALID_OPERATORS = {"equals", "contains", "starts_with", "gte", "lte"}
 
 @router.get("/classification-rules", response_model=list[ClassificationRuleOut])
 async def list_classification_rules(auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, field, operator, value, account, label, priority, active FROM classification_rules WHERE tenant_id = %s ORDER BY priority ASC, id ASC",
@@ -2577,7 +2516,7 @@ async def create_classification_rule(body: ClassificationRuleCreate, auth: AuthI
         raise HTTPException(status_code=422, detail=f"invalid field: {body.field}")
     if body.operator not in VALID_OPERATORS:
         raise HTTPException(status_code=422, detail=f"invalid operator: {body.operator}")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO classification_rules (tenant_id, field, operator, value, account, label, priority, active)
@@ -2598,7 +2537,7 @@ async def update_classification_rule(rule_id: int, patch: ClassificationRulePatc
         raise HTTPException(status_code=422, detail=f"invalid field: {updates['field']}")
     if "operator" in updates and updates["operator"] not in VALID_OPERATORS:
         raise HTTPException(status_code=422, detail=f"invalid operator: {updates['operator']}")
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     set_parts = []
     params: list = []
     for k, v in updates.items():
@@ -2618,7 +2557,7 @@ async def update_classification_rule(rule_id: int, patch: ClassificationRulePatc
 
 @router.delete("/classification-rules/{rule_id}", status_code=204)
 async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(require_auth)):
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute(
             "DELETE FROM classification_rules WHERE id = %s AND tenant_id = %s RETURNING id",
@@ -2646,7 +2585,7 @@ async def list_activity(
     auth: AuthInfo = Depends(require_auth),
 ):
     """Return recent audit log entries for the tenant."""
-    tid = auth.tenant_id or ""
+    tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT id, entity_type, entity_id, action, detail, created_at FROM audit_log WHERE tenant_id = %s ORDER BY created_at DESC LIMIT %s",
@@ -2687,7 +2626,7 @@ async def assistant_chat(body: ChatRequest, auth: AuthInfo = Depends(require_aut
         raise HTTPException(status_code=422, detail="question is required")
     if len(question) > 500:
         raise HTTPException(status_code=422, detail="question too long (max 500 chars)")
-    tid = auth.tenant_id if auth and auth.tenant_id else None
+    tid = auth.tenant_id
     result = _answer_question(question, tid)
     return {
         "question": question,

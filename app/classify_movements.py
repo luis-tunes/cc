@@ -17,13 +17,11 @@ DUPLICATE_AMOUNT_TOLERANCE = Decimal("0.01")
 DUPLICATE_DATE_TOLERANCE = timedelta(days=3)
 
 
-def classify_movement(description: str, tenant_id: str | None) -> dict | None:
+def classify_movement(description: str, tenant_id: str) -> dict | None:
     """Match a movement description against tenant movement_rules.
 
     Returns {"category": str, "snc_account": str, "entity_nif": str|None, "source": "rule"} or None.
     """
-    if not tenant_id:
-        return None
     with get_conn() as conn:
         rules = conn.execute(
             """SELECT id, pattern, category, snc_account, entity_nif
@@ -45,13 +43,11 @@ def classify_movement(description: str, tenant_id: str | None) -> dict | None:
     return None
 
 
-def detect_entity(description: str, tenant_id: str | None) -> dict | None:
+def detect_entity(description: str, tenant_id: str) -> dict | None:
     """Match a movement description against known suppliers by name.
 
     Returns {"nif": str, "name": str, "type": "fornecedor"} or None.
     """
-    if not tenant_id:
-        return None
     with get_conn() as conn:
         suppliers = conn.execute(
             "SELECT id, name, nif FROM suppliers WHERE tenant_id = %s",
@@ -64,10 +60,8 @@ def detect_entity(description: str, tenant_id: str | None) -> dict | None:
     return None
 
 
-def find_duplicates(tenant_id: str | None) -> list[dict]:
+def find_duplicates(tenant_id: str) -> list[dict]:
     """Find bank transactions with same amount within ±3 days of each other."""
-    if not tenant_id:
-        return []
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT a.id as id_a, b.id as id_b,
@@ -86,10 +80,8 @@ def find_duplicates(tenant_id: str | None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def classify_all_movements(tenant_id: str | None) -> dict:
+def classify_all_movements(tenant_id: str) -> dict:
     """Classify all unclassified movements for a tenant. Returns summary."""
-    if not tenant_id:
-        return {"classified": 0, "entities": 0}
     with get_conn() as conn:
         txs = conn.execute(
             "SELECT id, description FROM bank_transactions WHERE tenant_id = %s",

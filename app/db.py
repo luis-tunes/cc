@@ -26,7 +26,7 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id            SERIAL PRIMARY KEY,
-                tenant_id     TEXT,
+                tenant_id     TEXT NOT NULL,
                 supplier_nif  VARCHAR(9) NOT NULL DEFAULT '',
                 client_nif    VARCHAR(9) NOT NULL DEFAULT '',
                 total         NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -42,7 +42,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS bank_transactions (
                 id          SERIAL PRIMARY KEY,
-                tenant_id   TEXT,
+                tenant_id   TEXT NOT NULL,
                 date        DATE NOT NULL,
                 description TEXT NOT NULL,
                 amount      NUMERIC(12,2) NOT NULL,
@@ -51,7 +51,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS reconciliations (
                 id                  SERIAL PRIMARY KEY,
-                tenant_id           TEXT,
+                tenant_id           TEXT NOT NULL,
                 document_id         INTEGER NOT NULL REFERENCES documents(id),
                 bank_transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id),
                 match_confidence    NUMERIC(5,4) NOT NULL,
@@ -62,7 +62,6 @@ def init_db():
         """)
         # Add columns if they don't exist yet (migration for existing DBs)
         for col, typ in [
-            ("tenant_id", "TEXT"),
             ("filename", "TEXT"),
             ("raw_text", "TEXT"),
             ("status", "VARCHAR(32) DEFAULT 'pendente'"),
@@ -92,13 +91,6 @@ def init_db():
             ALTER TABLE documents ALTER COLUMN vat SET DEFAULT 0;
             ALTER TABLE documents ALTER COLUMN type SET DEFAULT 'outro';
         """)
-        for tbl in ("bank_transactions", "reconciliations"):
-            conn.execute(f"""
-                DO $$ BEGIN
-                    ALTER TABLE {tbl} ADD COLUMN tenant_id TEXT;
-                EXCEPTION WHEN duplicate_column THEN NULL;
-                END $$;
-            """)
 
         # Key-value settings per tenant (entity profile, preferences, etc.)
         conn.execute("""

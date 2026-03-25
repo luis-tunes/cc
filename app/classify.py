@@ -11,14 +11,11 @@ from app.db import get_conn
 log = logging.getLogger(__name__)
 
 
-def classify_document(doc: dict, tenant_id: str | None) -> dict | None:
+def classify_document(doc: dict, tenant_id: str) -> dict | None:
     """Run classification rules against a document.
 
     Returns {"account": str, "label": str, "source": "rule"} or None.
     """
-    if not tenant_id:
-        return None
-
     with get_conn() as conn:
         rules = conn.execute(
             """SELECT id, field, operator, value, account, label
