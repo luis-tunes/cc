@@ -1,4 +1,4 @@
-.PHONY: dev test deploy clean
+.PHONY: dev test deploy clean sync-env
 
 dev:
 	bin/dev
@@ -8,6 +8,9 @@ test:
 
 deploy:
 	bin/deploy $(HOST)
+
+sync-env:
+	bin/sync-env $(HOST)
 
 clean:
 	bin/clean

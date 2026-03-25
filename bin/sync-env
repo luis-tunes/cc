@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+HOST="${1:?usage: bin/sync-env <user@host>}"
+DIR="/home/cc/cc"
+ENV_FILE="${2:-.env.production}"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "error: $ENV_FILE not found" >&2
+  exit 1
+fi
+
+echo "syncing $ENV_FILE → $HOST:$DIR/.env"
+scp "$ENV_FILE" "$HOST:$DIR/.env"
+
+echo "restarting containers to pick up new env…"
+ssh "$HOST" "cd $DIR && docker compose up -d --force-recreate --remove-orphans"
+
+echo "done ✓"
