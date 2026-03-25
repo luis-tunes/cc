@@ -609,11 +609,14 @@ class TestDocumentPreviewThumbnail:
         r = client.get("/api/documents/99999/preview", headers=_T1)
         assert r.status_code == 404
 
-    def test_preview_no_paperless_id(self, client):
+    def test_preview_from_local_file(self, client):
+        """Documents without paperless_id are served from local disk."""
         doc = _post_doc(client)
         doc_id = doc.json()["id"]
         r = client.get(f"/api/documents/{doc_id}/preview", headers=_T1)
-        assert r.status_code == 404
+        assert r.status_code == 200
+        assert r.content == b"dummy"
+        assert "application/pdf" in r.headers.get("content-type", "")
 
     @patch("app.routes.PAPERLESS_TOKEN", "tok-test")
     @patch("app.routes.httpx.Client")

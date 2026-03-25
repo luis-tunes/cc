@@ -1301,7 +1301,7 @@ def fake_get_conn():
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
-def _clean_db_and_patch():
+def _clean_db_and_patch(tmp_path):
     """Reset in-memory tables and re-apply FakeConn per test."""
     reset_db()
     with patch("app.routes.get_conn", fake_get_conn), \
@@ -1314,7 +1314,8 @@ def _clean_db_and_patch():
          patch("app.classify_movements.get_conn", fake_get_conn), \
          patch("app.assistant.get_conn", fake_get_conn), \
          patch("app.cache.cache_get", return_value=None), \
-         patch("app.cache.cache_set", return_value=None):
+         patch("app.cache.cache_set", return_value=None), \
+         patch("app.routes.UPLOADS_DIR", str(tmp_path / "uploads")):
         yield
 
 
