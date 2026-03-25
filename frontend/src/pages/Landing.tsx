@@ -239,7 +239,7 @@ function Hero() {
               <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
               <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
               <div className="ml-2 flex-1 rounded-md bg-background/80 px-3 py-1">
-                <span className="text-[10px] text-muted-foreground/40 sm:text-xs">app.tim.pt/painel</span>
+                <span className="text-xs text-muted-foreground/40">app.tim.pt/painel</span>
               </div>
             </div>
             <div className="rounded-b-lg bg-muted/30 p-4 sm:p-6 md:p-8 lg:p-12">
@@ -401,7 +401,7 @@ function Features() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
                   <f.icon className="h-5 w-5 text-primary" />
                 </div>
-                <span className="rounded-full border border-primary/15 bg-primary/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary/80 sm:text-xs">
+                <span className="rounded-full border border-primary/15 bg-primary/[0.04] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary/80">
                   {f.highlight}
                 </span>
               </div>

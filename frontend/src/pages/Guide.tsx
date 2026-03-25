@@ -75,7 +75,7 @@ function GuideSection({
               {title}
             </h2>
             {badge && (
-              <span className="inline-block mt-0.5 rounded-full bg-tim-gold/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-tim-gold">
+              <span className="inline-block mt-0.5 rounded-full bg-tim-gold/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-tim-gold">
                 {badge}
               </span>
             )}

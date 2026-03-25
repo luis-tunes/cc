@@ -9,6 +9,8 @@ import { useUser, useClerk } from "@clerk/react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { TrialBanner } from "@/components/billing/TrialBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 const MOBILE_TAB_PATHS = ["/painel", "/documentos", "/movimentos", "/reconciliacao"];
 
@@ -23,6 +25,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const showBackButton = isMobile && !MOBILE_TAB_PATHS.includes(location.pathname);
 
@@ -117,7 +120,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
             variant="ghost"
             size="icon"
             className="h-9 w-9 text-muted-foreground hover:text-destructive md:h-8 md:w-8"
-            onClick={() => signOut()}
+            onClick={() => setShowSignOutConfirm(true)}
             title="Terminar sessão"
             aria-label="Terminar sessão"
           >
@@ -125,6 +128,15 @@ export function AppTopbar({ title }: AppTopbarProps) {
           </Button>
         </div>
       </header>
+      <ConfirmDialog
+        open={showSignOutConfirm}
+        onOpenChange={setShowSignOutConfirm}
+        title="Terminar sessão"
+        description="Tem a certeza que pretende terminar a sessão?"
+        confirmLabel="Terminar"
+        variant="destructive"
+        onConfirm={() => signOut()}
+      />
     </>
   );
 }

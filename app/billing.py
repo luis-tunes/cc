@@ -158,7 +158,9 @@ async def list_plans():
 @router.get("/status")
 async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
     """Return current billing status for tenant, including trial info."""
-    tid = (auth.tenant_id or auth.user_id) if auth else "anonymous"
+    if not auth:
+        return {"plan": "free", "status": "trialing", "trial_days_left": 14}
+    tid = auth.tenant_id or auth.user_id
     info = _get_or_create_tenant_plan(tid)
     return _compute_trial_status(info)
 
@@ -201,11 +203,14 @@ async def stripe_webhook(request: Request):
     body = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
-    if STRIPE_WEBHOOK_SECRET and sig:
-        try:
-            _verify_stripe_signature(body, sig)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid signature")
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Stripe webhook not configured")
+    if not sig:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+    try:
+        _verify_stripe_signature(body, sig)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
 
     event = json.loads(body)
     event_type = event.get("type", "")

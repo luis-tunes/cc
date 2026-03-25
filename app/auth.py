@@ -149,10 +149,11 @@ async def require_auth(request: Request) -> AuthInfo:
 
 async def optional_auth(request: Request) -> Optional[AuthInfo]:
     """FastAPI dependency that optionally extracts auth (for public endpoints)."""
-    try:
-        return _extract_auth(request)
-    except HTTPException:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
         return None
+    # Token is present — invalid/expired tokens should still raise 401
+    return _extract_auth(request)
 
 
 def check_auth_config() -> None:

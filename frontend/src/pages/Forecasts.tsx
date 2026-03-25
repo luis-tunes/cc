@@ -16,9 +16,19 @@ function fmt(n: number) {
 }
 
 export default function Forecasts() {
-  const { data: pl, isError, refetch } = usePlReport();
+  const { data: pl, isLoading, isError, refetch } = usePlReport();
 
   const colors = useChartColors();
+
+  if (isLoading) {
+    return (
+      <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
+        <div className="flex items-center justify-center py-24">
+          <p className="text-sm text-muted-foreground">A carregar dados…</p>
+        </div>
+      </PageContainer>
+    );
+  }
 
   // Simple linear projection: average of last 3 months + trend
   const historical = pl?.months ?? [];

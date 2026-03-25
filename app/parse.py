@@ -180,35 +180,44 @@ def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
         "text": "Extract all structured data from this Portuguese accounting document. Follow ALL extraction rules precisely.",
     })
 
-    try:
-        resp = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": OPENAI_MODEL,
-                "messages": [
-                    {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
-                    {"role": "user", "content": content},
-                ],
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-                "max_tokens": 4096,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        raw = resp.json()["choices"][0]["message"]["content"]
-        parsed = json.loads(raw)
-        log.info("Vision extraction succeeded: total=%s vat=%s type=%s supplier=%s client=%s",
-                 parsed.get("total"), parsed.get("vat"), parsed.get("type"),
-                 parsed.get("supplier_nif"), parsed.get("client_nif"))
-        return parsed
-    except Exception as exc:
-        log.warning("Vision extraction failed: %s", exc)
-        return None
+    import time as _time
+    for _attempt in range(3):
+        try:
+            resp = httpx.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": OPENAI_MODEL,
+                    "messages": [
+                        {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                        {"role": "user", "content": content},
+                    ],
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"},
+                    "max_tokens": 4096,
+                },
+                timeout=60,
+            )
+            if resp.status_code in (429, 500, 502, 503) and _attempt < 2:
+                _time.sleep(2 ** _attempt)
+                continue
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(raw)
+            log.info("Vision extraction succeeded: total=%s vat=%s type=%s supplier=%s client=%s",
+                     parsed.get("total"), parsed.get("vat"), parsed.get("type"),
+                     parsed.get("supplier_nif"), parsed.get("client_nif"))
+            return parsed
+        except Exception as exc:
+            if _attempt < 2:
+                _time.sleep(2 ** _attempt)
+                continue
+            log.warning("Vision extraction failed: %s", exc)
+            return None
+    return None
 
 
 def _extract_with_llm(text: str) -> dict | None:
@@ -217,34 +226,43 @@ def _extract_with_llm(text: str) -> dict | None:
         return None
 
     truncated = text[:8000]
-    try:
-        resp = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": OPENAI_MODEL,
-                "messages": [
-                    {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
-                    {"role": "user", "content": f"OCR Text:\n{truncated}"},
-                ],
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-                "max_tokens": 4096,
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
-        log.info("LLM text extraction succeeded: total=%s vat=%s type=%s",
-                 parsed.get("total"), parsed.get("vat"), parsed.get("type"))
-        return parsed
-    except Exception as exc:
-        log.warning("LLM text extraction failed: %s", exc)
-        return None
+    import time as _time
+    for _attempt in range(3):
+        try:
+            resp = httpx.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": OPENAI_MODEL,
+                    "messages": [
+                        {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                        {"role": "user", "content": f"OCR Text:\n{truncated}"},
+                    ],
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"},
+                    "max_tokens": 4096,
+                },
+                timeout=30,
+            )
+            if resp.status_code in (429, 500, 502, 503) and _attempt < 2:
+                _time.sleep(2 ** _attempt)
+                continue
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            log.info("LLM text extraction succeeded: total=%s vat=%s type=%s",
+                     parsed.get("total"), parsed.get("vat"), parsed.get("type"))
+            return parsed
+        except Exception as exc:
+            if _attempt < 2:
+                _time.sleep(2 ** _attempt)
+                continue
+            log.warning("LLM text extraction failed: %s", exc)
+            return None
+    return None
 
 
 _LLM_CLASSIFICATION_PROMPT = """\
@@ -657,7 +675,7 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
             f.flush()
             path = f.name
         result = extract_data(path, templates=get_templates())
-    except (OSError, EnvironmentError) as exc:
+    except (OSError, EnvironmentError, ImportError) as exc:
         log.warning("pdftotext not available, falling back to OCR text: %s", exc)
         result = None
     finally:
@@ -783,7 +801,8 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
         meta = fetch_document_metadata(paperless_id)
         paperless_filename = meta.get("original_file_name", "") or ""
         paperless_content = meta.get("content", "") or ""
-    except Exception:
+    except Exception as e:
+        log.warning("Failed to fetch doc metadata for paperless_id=%s: %s", paperless_id, e)
         paperless_filename = ""
         paperless_content = ""
 

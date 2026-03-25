@@ -49,11 +49,13 @@ if os.path.isdir(_web_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(_web_dir, "assets")), name="assets")
 
     # SPA fallback — serve index.html for all non-API, non-asset routes
+    _real_web_dir = os.path.realpath(_web_dir)
+
     @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
     async def spa_fallback(request: Request, path: str):
         # If the file exists on disk, serve it (favicon, etc.)
-        file_path = os.path.join(_web_dir, path)
-        if os.path.isfile(file_path):
+        file_path = os.path.realpath(os.path.join(_web_dir, path))
+        if os.path.isfile(file_path) and file_path.startswith(_real_web_dir + os.sep):
             return FileResponse(file_path)
         # Otherwise serve the SPA
         return FileResponse(os.path.join(_web_dir, "index.html"))

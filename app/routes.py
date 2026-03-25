@@ -80,12 +80,13 @@ async def paperless_webhook(payload: WebhookRequest):
     # Resolve tenant_id: from payload, or from a pending document stub
     tid = payload.tenant_id
     if not tid:
-        # Try to find a pending stub that matches this paperless_id
+        # Try to find a pending stub — match by most recently created, scoped to avoid cross-tenant leaks
         with get_conn() as conn:
             pending = conn.execute(
                 """SELECT tenant_id FROM documents
                    WHERE paperless_id IS NULL
                      AND status IN ('pendente ocr', 'a processar')
+                     AND tenant_id != ''
                    ORDER BY created_at DESC LIMIT 1"""
             ).fetchone()
             if pending and pending["tenant_id"]:
@@ -100,6 +101,7 @@ async def paperless_webhook(payload: WebhookRequest):
     return {"document_id": doc_id}
 
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 MIME_MAP = {
     ".pdf": "application/pdf",
     ".jpg": "image/jpeg",
@@ -122,6 +124,8 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
 
     try:
         content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
         logger.info("upload: file=%s size=%d ext=%s", file.filename, len(content), ext)
         mime = MIME_MAP.get(ext, "application/octet-stream")
 
@@ -259,8 +263,9 @@ async def list_documents(
         clauses.append("d.status = %s")
         params.append(status)
     if search:
+        escaped = search.replace("%", "\\%").replace("_", "\\_")
         clauses.append("(d.supplier_nif ILIKE %s OR d.client_nif ILIKE %s OR d.filename ILIKE %s)")
-        q = f"%{search}%"
+        q = f"%{escaped}%"
         params.extend([q, q, q])
     where = "WHERE " + " AND ".join(clauses)
     params.extend([limit, offset])
@@ -597,10 +602,11 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     except httpx.HTTPError:
         raise HTTPException(status_code=502, detail="OCR service unavailable")
 
+    from urllib.parse import quote
     return StreamingResponse(
         io.BytesIO(r.content),
         media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}"},
     )
 
 
@@ -641,7 +647,10 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
 
 @router.post("/bank-transactions/upload")
 async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+    MAX_CSV_ROWS = 10_000
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
     text = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text), delimiter=";")
     if not reader.fieldnames or not {"date", "description", "amount"}.issubset(set(reader.fieldnames)):
@@ -651,6 +660,9 @@ async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_aut
     errors = []
     with get_conn() as conn:
         for line_num, row in enumerate(reader, start=2):
+            if count >= MAX_CSV_ROWS:
+                errors.append(f"Limite de {MAX_CSV_ROWS} linhas atingido, restantes ignoradas")
+                break
             try:
                 tx_date = datetime.date.fromisoformat(row["date"].strip())
             except (ValueError, AttributeError):
@@ -1839,9 +1851,10 @@ async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
         estimated_cost = Decimal("0")
         for ri in ingredients_list:
             ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
-            if ing:
-                waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
-                estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
+            if not ing:
+                raise HTTPException(status_code=400, detail=f"ingredient {ri['ingredient_id']} not found")
+            waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
+            estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
         margin = ((pvp_val - estimated_cost) / pvp_val) if pvp_val > 0 else Decimal("0")
         row = conn.execute(
             """INSERT INTO products (tenant_id, code, name, category, recipe_version, estimated_cost, pvp, margin, active)
@@ -1894,24 +1907,28 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
             conn.execute("DELETE FROM recipe_ingredients WHERE product_id = %s", (product_id,))
             estimated_cost = Decimal("0")
             for ri in body["ingredients"]:
+                ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
+                if not ing:
+                    raise HTTPException(status_code=400, detail=f"ingredient {ri['ingredient_id']} not found")
                 conn.execute(
                     """INSERT INTO recipe_ingredients (product_id, ingredient_id, qty, unit, wastage_percent)
                        VALUES (%s, %s, %s, %s, %s)""",
                     (product_id, ri["ingredient_id"], Decimal(str(ri["qty"])),
                      ri.get("unit", "kg"), Decimal(str(ri.get("wastage_percent", 0)))),
                 )
-                ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
-                if ing:
-                    waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
-                    estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
-            pvp = Decimal(str(body.get("pvp", 0)))
-            if pvp <= 0:
-                pvp = existing_prod["pvp"] if existing_prod else Decimal("0")
-            margin = ((pvp - estimated_cost) / pvp) if pvp > 0 else Decimal("0")
-            conn.execute(
-                "UPDATE products SET estimated_cost = %s, margin = %s WHERE id = %s",
-                (estimated_cost, margin, product_id),
-            )
+                waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
+                estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
+            # Only overwrite estimated_cost when a non-empty recipe is provided.
+            # When ingredients=[], manual cost from the fields block above is preserved.
+            if body["ingredients"]:
+                pvp = Decimal(str(body.get("pvp", 0)))
+                if pvp <= 0:
+                    pvp = existing_prod["pvp"] if existing_prod else Decimal("0")
+                margin = ((pvp - estimated_cost) / pvp) if pvp > 0 else Decimal("0")
+                conn.execute(
+                    "UPDATE products SET estimated_cost = %s, margin = %s WHERE id = %s",
+                    (estimated_cost, margin, product_id),
+                )
         conn.commit()
         row = conn.execute(
             "SELECT id, code, name, category, recipe_version, estimated_cost, pvp, margin, active FROM products WHERE id = %s AND tenant_id = %s",

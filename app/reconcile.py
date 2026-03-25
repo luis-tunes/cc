@@ -10,6 +10,8 @@ SUGGESTION_DATE_TOLERANCE = timedelta(days=30)
 
 def reconcile_all(tenant_id: str) -> list[dict]:
     with get_conn() as conn:
+        # Advisory lock per tenant to serialize concurrent reconciliation calls
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"reconcile:{tenant_id}",))
         docs = conn.execute(
             """SELECT id, total, date FROM documents
                WHERE date IS NOT NULL AND total IS NOT NULL

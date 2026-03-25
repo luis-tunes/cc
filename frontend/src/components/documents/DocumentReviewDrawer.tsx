@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { fetchClassificationSuggestion, fetchAuthenticatedBlob } from "@/lib/api";
@@ -90,6 +90,8 @@ export function DocumentReviewDrawer({
   const [previewError, setPreviewError] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const thumbnailUrlRef = useRef<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   // Fetch thumbnail and preview with auth headers
   useEffect(() => {
@@ -99,17 +101,19 @@ export function DocumentReviewDrawer({
     setPreviewError(false);
 
     fetchAuthenticatedBlob(documentThumbnailUrl(Number(document.id)))
-      .then(setThumbnailUrl)
+      .then((url) => { thumbnailUrlRef.current = url; setThumbnailUrl(url); })
       .catch(() => setPreviewError(true));
 
     fetchAuthenticatedBlob(documentPreviewUrl(Number(document.id)))
-      .then(setPreviewUrl)
+      .then((url) => { previewUrlRef.current = url; setPreviewUrl(url); })
       .catch(() => {});
 
     return () => {
-      // Revoke old blob URLs on cleanup
-      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      // Revoke old blob URLs on cleanup using refs (avoid stale closure)
+      if (thumbnailUrlRef.current) URL.revokeObjectURL(thumbnailUrlRef.current);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      thumbnailUrlRef.current = null;
+      previewUrlRef.current = null;
     };
   }, [open, document?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

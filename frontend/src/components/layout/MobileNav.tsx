@@ -31,6 +31,7 @@ export function MobileNav() {
     <>
       <nav
         aria-label="Navegação principal"
+        aria-hidden={moreOpen}
         className={cn(
           "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card md:hidden transition-opacity duration-200",
           moreOpen && "opacity-0 pointer-events-none"

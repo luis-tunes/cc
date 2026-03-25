@@ -33,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function FinancialOverviewPanel({ className }: { className?: string }) {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("mes");
-  const { data: rawMonthly } = useMonthlyData();
+  const { data: rawMonthly, isLoading, isError } = useMonthlyData();
   const colors = useChartColors();
 
   const chartData = useMemo(() => {
@@ -43,7 +43,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
       "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
       "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
     };
-    return rawMonthly.filter((m) => m.month != null).slice().reverse().map((m) => {
+    const all = rawMonthly.filter((m) => m.month != null).slice().reverse().map((m) => {
       const mm = m.month.split("-")[1] ?? "";
       const receita = parseFloat(m.total) || 0;
       const gastos = parseFloat(m.vat) || 0;
@@ -54,9 +54,32 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
         resultado: receita - gastos,
       };
     });
-  }, [rawMonthly]);
+    if (timeWindow === "semana") return all.slice(-1);
+    if (timeWindow === "trimestre") return all.slice(-3);
+    return all;
+  }, [rawMonthly, timeWindow]);
 
   const data = chartData;
+
+  if (isLoading) {
+    return (
+      <div className={cn("rounded-lg border bg-card", className)}>
+        <div className="flex items-center justify-center py-24">
+          <p className="text-sm text-muted-foreground">A carregar dados…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className={cn("rounded-lg border bg-card", className)}>
+        <div className="flex items-center justify-center py-24">
+          <p className="text-sm text-muted-foreground">Erro ao carregar dados financeiros.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("rounded-lg border bg-card", className)}>

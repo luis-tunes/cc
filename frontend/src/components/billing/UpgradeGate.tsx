@@ -15,10 +15,21 @@ interface UpgradeGateProps {
  * prompt instead of the page content. Paid users see the page normally.
  */
 export function UpgradeGate({ children, title, subtitle }: UpgradeGateProps) {
-  const { data: billing } = useBillingStatus();
+  const { data: billing, isLoading } = useBillingStatus();
   const navigate = useNavigate();
 
-  // While loading or if paid, render children
+  // Show loading while billing status is being fetched
+  if (isLoading) {
+    return (
+      <PageContainer title={title} subtitle={subtitle}>
+        <div className="flex items-center justify-center py-24">
+          <p className="text-sm text-muted-foreground">A verificar subscrição…</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // If paid, render children
   if (!billing || billing.plan === "pro" || billing.plan === "custom") {
     return <>{children}</>;
   }
