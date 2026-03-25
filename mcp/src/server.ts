@@ -12,7 +12,8 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { glob } from "glob";
 
-const ROOT = path.resolve(import.meta.dirname, "..");
+// import.meta.dirname = mcp/dist/, so go up two levels to repo root
+const ROOT = path.resolve(import.meta.dirname, "../..");
 
 function abs(p: string): string {
   return path.isAbsolute(p) ? p : path.join(ROOT, p);
@@ -38,7 +39,7 @@ function shell(cmd: string, cwd: string = ROOT): string {
     return execSync(cmd, {
       cwd,
       encoding: "utf8",
-      env: { ...process.env, PATH: `/home/lft/code/cc/.venv/bin:${process.env.PATH}` },
+      env: { ...process.env, PATH: `${path.join(ROOT, ".venv/bin")}:${process.env.PATH}` },
       timeout: 120_000,
     });
   } catch (e: unknown) {
