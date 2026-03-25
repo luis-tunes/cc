@@ -12,6 +12,7 @@ Usage:
         print(auth.user_id, auth.tenant_id)
 """
 
+import datetime
 import logging
 import os
 from dataclasses import dataclass
@@ -85,12 +86,17 @@ def _decode_clerk_jwt(token: str) -> dict:
             token,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_aud": False},
+            options={"verify_aud": False, "verify_exp": True},
+            leeway=datetime.timedelta(seconds=10),
         )
+    except jwt.ExpiredSignatureError:
+        raise  # let caller handle as 401
+    except jwt.InvalidTokenError:
+        raise  # bad token — propagate
     except ValueError:
         pass  # JWKS not available, fall through
     except Exception as e:
-        logger.warning("JWKS decode failed: %s", e)
+        logger.warning("JWKS fetch failed: %s", e)
 
     # Fallback: skip verification in dev (when AUTH_DISABLED)
     if AUTH_DISABLED:
