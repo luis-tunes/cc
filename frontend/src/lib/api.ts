@@ -19,10 +19,10 @@ export function setTokenProvider(provider: () => Promise<string | null>) {
   _tokenExpiry = 0;
 }
 
-// Cache the token to avoid calling getToken() (2s timeout on HTTP) on every request
+// Cache the token to avoid calling getToken() on every request
 let _cachedToken: string | null | undefined;
 let _tokenExpiry = 0;
-const TOKEN_CACHE_MS = 50_000; // cache for 50s (Clerk tokens last ~60s)
+const TOKEN_CACHE_MS = 45_000; // cache for 45s (Clerk tokens last ~60s)
 
 async function getAuthToken(): Promise<string | null> {
   if (!_tokenProvider) return null;
@@ -64,10 +64,21 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  let res = await fetch(`${BASE}${path}`, {
     ...options,
     headers,
   });
+
+  // Retry once with fresh token on 401 (expired JWT)
+  if (res.status === 401 && _tokenProvider) {
+    _cachedToken = undefined;
+    _tokenExpiry = 0;
+    const freshToken = await getAuthToken();
+    if (freshToken) {
+      headers["Authorization"] = `Bearer ${freshToken}`;
+      res = await fetch(`${BASE}${path}`, { ...options, headers });
+    }
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -89,11 +100,22 @@ async function requestFormData<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  let res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers,
     body: form,
   });
+
+  // Retry once with fresh token on 401
+  if (res.status === 401 && _tokenProvider) {
+    _cachedToken = undefined;
+    _tokenExpiry = 0;
+    const freshToken = await getAuthToken();
+    if (freshToken) {
+      headers["Authorization"] = `Bearer ${freshToken}`;
+      res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: form });
+    }
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
