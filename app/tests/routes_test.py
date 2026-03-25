@@ -46,17 +46,8 @@ def test_upload_rejects_non_pdf():
     assert "PDF" in r.json()["detail"]
 
 
-@patch("app.routes.httpx.Client")
-def test_upload_document_success(mock_client_cls):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.text = "ok"
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post.return_value = mock_resp
-    mock_client_cls.return_value = mock_client
-
+@patch("app.routes._extract_with_vision", return_value={"total": 100, "vat": 23, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+def test_upload_document_success(mock_vision):
     r = client.post(
         "/api/documents/upload",
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
@@ -64,21 +55,13 @@ def test_upload_document_success(mock_client_cls):
     assert r.status_code == 200
     data = r.json()
     assert data["filename"] == "invoice.pdf"
+    assert data["status"] == "accepted"
     assert "id" in data
+    mock_vision.assert_called_once()
 
 
-@patch("app.routes.httpx.Client")
-def test_upload_jpg_success(mock_client_cls):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.text = "ok"
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post.return_value = mock_resp
-    mock_client_cls.return_value = mock_client
-
-    # Minimal JFIF header
+@patch("app.routes._extract_with_vision", return_value={"total": 50, "vat": 11.5, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+def test_upload_jpg_success(mock_vision):
     jpg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 100
     r = client.post(
         "/api/documents/upload",
@@ -87,23 +70,14 @@ def test_upload_jpg_success(mock_client_cls):
     assert r.status_code == 200
     data = r.json()
     assert data["filename"] == "photo.jpg"
-    assert "id" in data
-    # Verify Paperless was called with correct mime
-    call_kwargs = mock_client.post.call_args
-    assert "image/jpeg" in str(call_kwargs)
+    assert data["status"] == "accepted"
+    # Vision was called with image/jpeg
+    call_args = mock_vision.call_args
+    assert call_args[0][1] == "image/jpeg"
 
 
-@patch("app.routes.httpx.Client")
-def test_upload_png_success(mock_client_cls):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.text = "ok"
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post.return_value = mock_resp
-    mock_client_cls.return_value = mock_client
-
+@patch("app.routes._extract_with_vision", return_value={"total": 25, "vat": 5.75, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+def test_upload_png_success(mock_vision):
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
     r = client.post(
         "/api/documents/upload",
@@ -111,29 +85,28 @@ def test_upload_png_success(mock_client_cls):
     )
     assert r.status_code == 200
     assert r.json()["filename"] == "scan.png"
+    assert r.json()["status"] == "accepted"
+    call_args = mock_vision.call_args
+    assert call_args[0][1] == "image/png"
 
 
-@patch("app.routes.httpx.Client")
-def test_upload_paperless_unexpected_error(mock_client_cls):
-    """Paperless down → document saved with accepted_without_ocr status."""
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post.side_effect = RuntimeError("connection pool exhausted")
-    mock_client_cls.return_value = mock_client
-
+@patch("app.routes._extract_with_vision", return_value=None)
+def test_upload_vision_fails_saves_pending(mock_vision):
+    """GPT Vision fails → document saved as pending."""
     r = client.post(
         "/api/documents/upload",
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
     )
     assert r.status_code == 200
-    assert r.json()["status"] == "accepted_without_ocr"
+    assert r.json()["status"] == "accepted_pending"
     assert "id" in r.json()
 
 
+@patch("app.routes._extract_with_vision", return_value=None)
+@patch("app.routes.PAPERLESS_TOKEN", "fake-token")
 @patch("app.routes.httpx.Client")
-def test_upload_paperless_rejects(mock_client_cls):
-    """Paperless returns 401 (bad token) — document still saved."""
+def test_upload_paperless_rejects_archive_still_works(mock_client_cls, mock_vision):
+    """Paperless archive fails, Vision also fails — document still saved as pending."""
     mock_resp = MagicMock()
     mock_resp.status_code = 401
     mock_resp.text = "Invalid token"
@@ -148,7 +121,7 @@ def test_upload_paperless_rejects(mock_client_cls):
         files={"file": ("invoice.pdf", b"%PDF-fake", "application/pdf")},
     )
     assert r.status_code == 200
-    assert r.json()["status"] == "accepted_without_ocr"
+    assert r.json()["status"] == "accepted_pending"
 
 
 def test_upload_preflight():

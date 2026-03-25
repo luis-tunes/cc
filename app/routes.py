@@ -145,56 +145,56 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
             logger.exception("upload: DB insert failed for file=%s", file.filename)
             raise HTTPException(status_code=500, detail="database error saving document record")
 
-        # Forward to Paperless for OCR (best-effort)
-        paperless_ok = False
-        headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
-        transport = httpx.HTTPTransport(retries=3)
-        try:
-            with httpx.Client(transport=transport) as client:
-                r = client.post(
-                    f"{PAPERLESS_URL}/api/documents/post_document/",
-                    headers=headers,
-                    files={"document": (file.filename, content, mime)},
-                    timeout=60,
-                )
-            if r.status_code in (200, 202):
-                paperless_ok = True
-            else:
-                logger.error("upload: paperless rejected file=%s status=%d body=%s", file.filename, r.status_code, r.text[:500])
-        except Exception as exc:
-            logger.warning("upload: paperless unreachable for file=%s: %s", file.filename, exc)
-
-        if paperless_ok:
+        # -- Primary extraction: GPT Vision (always) --
+        mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
+        vision_result = _extract_with_vision(content, mime_for_vision)
+        extracted = False
+        if vision_result and vision_result.get("total", 0) > 0:
+            raw_text = ""
+            normalized = _normalize_llm_result(vision_result, raw_text)
+            status = "extraído" if normalized["total"] > 0 else "pendente"
             with get_conn() as conn:
-                conn.execute("UPDATE documents SET status = 'a processar' WHERE id = %s", (local_id,))
+                conn.execute(
+                    """UPDATE documents
+                       SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
+                           type=%s, raw_text=%s, status=%s, notes=%s, classification_source='vision'
+                       WHERE id = %s""",
+                    (normalized["supplier_nif"], normalized["client_nif"],
+                     normalized["total"], normalized["vat"], normalized["doc_date"],
+                     normalized["doc_type"], raw_text, status,
+                     normalized["extra_json"], local_id),
+                )
                 conn.commit()
+            extracted = True
+            logger.info("upload: GPT Vision extraction succeeded for file=%s id=%d", file.filename, local_id)
         else:
-            # Paperless unavailable — try direct vision extraction
-            mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
-            vision_result = _extract_with_vision(content, mime_for_vision)
-            if vision_result and vision_result.get("total", 0) > 0:
-                from app.ocr import extract_text as _extract_text
-                raw_text = _extract_text(content) if ext == ".pdf" else ""
-                normalized = _normalize_llm_result(vision_result, raw_text)
-                from app.classify import classify_document
-                status = "extraído" if normalized["total"] > 0 else "pendente"
-                with get_conn() as conn:
-                    conn.execute(
-                        """UPDATE documents
-                           SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
-                               type=%s, raw_text=%s, status=%s, notes=%s, classification_source='vision'
-                           WHERE id = %s""",
-                        (normalized["supplier_nif"], normalized["client_nif"],
-                         normalized["total"], normalized["vat"], normalized["doc_date"],
-                         normalized["doc_type"], raw_text, status,
-                         normalized["extra_json"], local_id),
+            logger.warning("upload: GPT Vision failed for file=%s, document saved as pendente", file.filename)
+            with get_conn() as conn:
+                conn.execute("UPDATE documents SET status = 'pendente' WHERE id = %s", (local_id,))
+                conn.commit()
+
+        # -- Optional: forward to Paperless for archive (best-effort, non-blocking) --
+        if PAPERLESS_TOKEN:
+            headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
+            try:
+                transport = httpx.HTTPTransport(retries=1)
+                with httpx.Client(transport=transport) as client:
+                    r = client.post(
+                        f"{PAPERLESS_URL}/api/documents/post_document/",
+                        headers=headers,
+                        files={"document": (file.filename, content, mime)},
+                        timeout=30,
                     )
-                    conn.commit()
-                logger.info("upload: vision extraction succeeded for file=%s id=%d", file.filename, local_id)
+                if r.status_code in (200, 202):
+                    logger.info("upload: archived in Paperless file=%s", file.filename)
+                else:
+                    logger.warning("upload: paperless archive failed file=%s status=%d", file.filename, r.status_code)
+            except Exception as exc:
+                logger.warning("upload: paperless archive unreachable for file=%s: %s", file.filename, exc)
 
         cache_invalidate(f"dashboard:{tid}")
-        status_msg = "accepted" if paperless_ok else "accepted_without_ocr"
-        logger.info("upload: %s file=%s id=%d paperless=%s", status_msg, file.filename, local_id, paperless_ok)
+        status_msg = "accepted" if extracted else "accepted_pending"
+        logger.info("upload: %s file=%s id=%d vision=%s", status_msg, file.filename, local_id, extracted)
         return {"status": status_msg, "filename": file.filename, "id": local_id}
 
     except HTTPException:
