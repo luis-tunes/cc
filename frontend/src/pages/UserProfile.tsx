@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useProfile } from "@/hooks/use-profile";
-import { useUser } from "@clerk/react";
+import { useUser, useClerk } from "@clerk/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Camera, Save, User, Bell, Globe } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Loader2, Camera, Save, User, Bell, Globe, LogOut } from "lucide-react";
 
 export default function UserProfile() {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const { profile, isLoading, updateProfile, uploadAvatar } = useProfile();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const [form, setForm] = useState({
     full_name: "",
@@ -268,7 +271,40 @@ export default function UserProfile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Session */}
+        <Card className="border-destructive/20">
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">Terminar sessão</p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.primaryEmailAddress?.emailAddress}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setShowSignOutConfirm(true)}
+              >
+                <LogOut className="mr-1.5 h-4 w-4" />
+                Sair
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <ConfirmDialog
+        open={showSignOutConfirm}
+        onOpenChange={setShowSignOutConfirm}
+        title="Terminar sessão"
+        description="Tem a certeza que pretende terminar a sessão?"
+        confirmLabel="Terminar"
+        variant="destructive"
+        onConfirm={() => signOut()}
+      />
     </PageContainer>
   );
 }

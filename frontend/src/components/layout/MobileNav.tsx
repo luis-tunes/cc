@@ -13,19 +13,23 @@ const MOBILE_TABS = [
   { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge },
 ];
 
+const PERFIL_ITEM = { title: "Perfil", path: "/perfil", icon: User, status: "active" as const };
+
 export function MobileNav() {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // All nav items not in the bottom bar + Perfil (not in navigation.ts)
-  const moreItems = [
-    ...navigation.flatMap((g) => g.items).filter(
-      (item) => !MOBILE_TABS.some((t) => t.path === item.path)
-    ),
-    { title: "Perfil", path: "/perfil", icon: User, status: "active" as const },
+  // Groups for the "Mais" sheet, with sidebar section labels
+  const moreGroups = [
+    ...navigation.map((group) => ({
+      label: group.label,
+      items: group.items.filter((item) => !MOBILE_TABS.some((t) => t.path === item.path)),
+    })).filter((g) => g.items.length > 0),
+    { label: "Conta", items: [PERFIL_ITEM] },
   ];
 
-  const isOnMorePage = moreItems.some((item) => location.pathname === item.path);
+  const allMoreItems = moreGroups.flatMap((g) => g.items);
+  const isOnMorePage = allMoreItems.some((item) => location.pathname === item.path);
 
   return (
     <>
@@ -69,28 +73,37 @@ export function MobileNav() {
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="max-h-[70vh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
+        <SheetContent side="bottom" className="max-h-[80vh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
           <SheetHeader>
             <SheetTitle className="text-base">Navegação</SheetTitle>
           </SheetHeader>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {moreItems.map((item) => {
-              const active = location.pathname === item.path;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors",
-                    active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                  )}
-                  onClick={() => setMoreOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-xs font-medium leading-tight">{item.title}</span>
-                </NavLink>
-              );
-            })}
+          <div className="mt-4 overflow-y-auto space-y-4">
+            {moreGroups.map((group) => (
+              <div key={group.label}>
+                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {group.items.map((item) => {
+                    const active = location.pathname === item.path;
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        className={cn(
+                          "flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors",
+                          active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span className="text-xs font-medium leading-tight">{item.title}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </SheetContent>
       </Sheet>

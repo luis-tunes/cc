@@ -119,7 +119,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-muted-foreground hover:text-destructive md:h-8 md:w-8"
+            className="hidden h-9 w-9 text-muted-foreground hover:text-destructive md:inline-flex md:h-8 md:w-8"
             onClick={() => setShowSignOutConfirm(true)}
             title="Terminar sessão"
             aria-label="Terminar sessão"

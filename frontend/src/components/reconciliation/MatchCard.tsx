@@ -172,30 +172,30 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
 
       {/* Actions */}
       {pair.status !== "approved" && (
-        <div className="flex items-center gap-2 border-t px-4 py-2">
+        <div className="flex items-center gap-2 border-t px-4 py-3">
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10"
+            className="h-9 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10 sm:h-6"
             onClick={() => onApprove(pair.id)}
           >
-            <Check className="mr-1 h-2.5 w-2.5" /> Aprovar
+            <Check className="mr-1 h-3 w-3" /> Aprovar
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-xs"
+            className="h-9 text-xs sm:h-6"
             onClick={() => onReview(pair.id)}
           >
-            <Eye className="mr-1 h-2.5 w-2.5" /> Rever
+            <Eye className="mr-1 h-3 w-3" /> Rever
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 text-xs text-muted-foreground"
+            className="h-9 text-xs text-muted-foreground sm:h-6"
             onClick={() => onFlag(pair.id)}
           >
-            <Flag className="mr-1 h-2.5 w-2.5" /> Exceção
+            <Flag className="mr-1 h-3 w-3" /> Exceção
           </Button>
         </div>
       )}
