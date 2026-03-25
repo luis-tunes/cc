@@ -1,33 +1,35 @@
 #!/bin/bash
-set -e
+# Deploy to production. Called by CI or manually.
+# Usage: bin/deploy user@host   OR   DEPLOY_HOST=user@host bin/deploy
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-HOST="${1:?usage: bin/deploy <user@host>}"
+HOST="${DEPLOY_HOST:-${1:-}}"
+[ -z "$HOST" ] && { echo "usage: bin/deploy <user@host> or set DEPLOY_HOST" >&2; exit 1; }
+
 DIR="/home/cc/cc"
-IMAGE="ghcr.io/xzero-ai/cc:latest"
+SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10"
+SCP="scp -o StrictHostKeyChecking=no"
 
-# ── Build + push fresh image ──────────────────────────────────────
-echo "building $IMAGE (no cache)…"
-VITE_KEY="$(grep VITE_CLERK_PUBLISHABLE_KEY .env 2>/dev/null | cut -d= -f2)"
-docker build --no-cache \
-  --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_KEY" \
-  -t "$IMAGE" .
-
-echo "pushing $IMAGE…"
-docker push "$IMAGE"
-
-# ── Deploy to remote ──────────────────────────────────────────────
-ssh "$HOST" "mkdir -p $DIR/bin"
-scp docker-compose.yml Caddyfile "$HOST:$DIR/"
-scp bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
-
-# Copy .env only on first deploy (never overwrite production secrets)
-if [ -f .env ]; then
-  ssh "$HOST" "test -f $DIR/.env" \
-    && echo ".env already exists on server — skipping (edit manually if needed)" \
-    || scp .env "$HOST:$DIR/.env"
+# SSH key from env (CI) or fall back to agent (manual)
+if [ -n "${DEPLOY_KEY:-}" ]; then
+  mkdir -p ~/.ssh
+  printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+  chmod 600 ~/.ssh/id_ed25519
+  ssh-keyscan -H "${HOST#*@}" >> ~/.ssh/known_hosts 2>/dev/null || true
 fi
 
-ssh "$HOST" "cd $DIR && docker compose pull app \
-  && docker compose up -d --force-recreate --remove-orphans"
+echo "→ deploying to $HOST"
 
-echo "deployed → $HOST"
+$SSH "$HOST" "mkdir -p $DIR/bin"
+$SCP docker-compose.yml Caddyfile "$HOST:$DIR/"
+$SCP bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
+
+# Registry login (CI provides GHCR_TOKEN)
+if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+  $SSH "$HOST" "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+fi
+
+$SSH "$HOST" "cd $DIR && docker compose pull app && docker compose up -d --force-recreate --remove-orphans"
+
+echo "✓ deployed to $HOST"

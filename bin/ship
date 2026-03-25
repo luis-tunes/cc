@@ -1,0 +1,31 @@
+#!/bin/bash
+# Ship: test → build → push → deploy. One command, full pipeline.
+# Usage: make ship   OR   bin/ship
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+IMAGE="${IMAGE:-ghcr.io/xzero-ai/cc}"
+TAG="${TAG:-latest}"
+
+# 1. Test
+echo "→ testing"
+bin/test
+
+# 2. Build
+echo "→ building $IMAGE:$TAG"
+VITE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-$(grep VITE_CLERK_PUBLISHABLE_KEY .env.production 2>/dev/null | cut -d= -f2)}"
+docker build --no-cache \
+  --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_KEY" \
+  -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
+
+# 3. Push
+echo "→ pushing $IMAGE:$TAG"
+docker push "$IMAGE:$TAG"
+[ "$TAG" != "latest" ] && docker push "$IMAGE:latest"
+
+# 4. Deploy
+if [ -n "${DEPLOY_HOST:-}" ]; then
+  bin/deploy
+else
+  echo "DEPLOY_HOST not set — image pushed, deploy skipped"
+fi
