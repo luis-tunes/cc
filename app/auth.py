@@ -27,6 +27,35 @@ CLERK_JWT_ISSUER = os.environ.get("CLERK_JWT_ISSUER", "")  # e.g. https://your-a
 # For development/testing — set to "1" to skip JWT validation
 AUTH_DISABLED = os.environ.get("AUTH_DISABLED", "0") == "1"
 
+# Cache for JWKS public key fetched from Clerk
+_jwks_client: "jwt.PyJWKClient | None" = None
+
+
+def _get_jwks_client() -> "jwt.PyJWKClient":
+    """Lazily create a PyJWKClient that fetches keys from Clerk's JWKS endpoint."""
+    global _jwks_client
+    if _jwks_client is None:
+        # Clerk's JWKS endpoint is always at this URL for the frontend API key domain
+        # Extract the Clerk frontend API domain from the publishable key or use a well-known URL
+        clerk_pk = os.environ.get("VITE_CLERK_PUBLISHABLE_KEY", "")
+        if clerk_pk.startswith("pk_"):
+            # pk_live_Y2xlcmsueHRpbS5haSQ → base64 decode the suffix to get the domain
+            import base64
+            try:
+                domain = base64.b64decode(clerk_pk.split("_", 2)[2] + "==").decode().rstrip("$")
+                jwks_url = f"https://{domain}/.well-known/jwks.json"
+            except Exception:
+                jwks_url = ""
+        else:
+            jwks_url = ""
+
+        if not jwks_url:
+            raise ValueError("Cannot determine Clerk JWKS URL — set CLERK_PEM_PUBLIC_KEY or VITE_CLERK_PUBLISHABLE_KEY")
+
+        logger.info("Clerk JWKS URL: %s", jwks_url)
+        _jwks_client = jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=3600)
+    return _jwks_client
+
 
 @dataclass
 class AuthInfo:
@@ -38,7 +67,7 @@ class AuthInfo:
 
 def _decode_clerk_jwt(token: str) -> dict:
     """Decode and verify a Clerk-issued JWT."""
-    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").replace("\\n", "\n")
+    pem = os.environ.get("CLERK_PEM_PUBLIC_KEY", "").replace("\\n", "\n").strip()
 
     if pem:
         return jwt.decode(
@@ -48,11 +77,26 @@ def _decode_clerk_jwt(token: str) -> dict:
             options={"verify_aud": False},
         )
 
+    # Auto-fetch public key from Clerk's JWKS endpoint
+    try:
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+        )
+    except ValueError:
+        pass  # JWKS not available, fall through
+    except Exception as e:
+        logger.warning("JWKS decode failed: %s", e)
+
     # Fallback: skip verification in dev (when AUTH_DISABLED)
     if AUTH_DISABLED:
         return jwt.decode(token, options={"verify_signature": False})
 
-    raise ValueError("No CLERK_PEM_PUBLIC_KEY configured and AUTH_DISABLED is off")
+    raise ValueError("No CLERK_PEM_PUBLIC_KEY configured, JWKS fetch failed, and AUTH_DISABLED is off")
 
 
 def _extract_auth(request: Request) -> Optional[AuthInfo]:
