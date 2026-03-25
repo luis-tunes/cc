@@ -84,6 +84,9 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       WEB_DIR: /opt/tim/web
+      UPLOADS_DIR: /opt/tim/uploads
+    volumes:
+      - uploads:/opt/tim/uploads
     expose:
       - "8080"
     depends_on:
@@ -112,5 +115,6 @@ volumes:
   pgdata:
   paperless_data:
   paperless_media:
+  uploads:
   caddy_data:
   caddy_config:

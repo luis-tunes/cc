@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "/opt/tim/uploads")
 
 router = APIRouter()
 
@@ -144,6 +145,16 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
         except Exception:
             logger.exception("upload: DB insert failed for file=%s", file.filename)
             raise HTTPException(status_code=500, detail="database error saving document record")
+
+        # Save file to disk for preview
+        try:
+            tenant_dir = os.path.join(UPLOADS_DIR, tid or "_global")
+            os.makedirs(tenant_dir, exist_ok=True)
+            file_path = os.path.join(tenant_dir, f"{local_id}{ext}")
+            with open(file_path, "wb") as f:
+                f.write(content)
+        except Exception as exc:
+            logger.warning("upload: failed to save file to disk: %s", exc)
 
         # -- Primary extraction: GPT Vision (always) --
         mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
@@ -573,19 +584,31 @@ async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)
 
 @router.get("/documents/{doc_id}/preview")
 async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
-    """Proxy the document file from Paperless-ngx for preview."""
+    """Serve document file for preview — from local disk or Paperless."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT paperless_id, filename FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
+            "SELECT paperless_id, filename, tenant_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
 
-    paperless_id = row["paperless_id"]
     filename = row["filename"] or "document"
     ext = os.path.splitext(filename.lower())[1]
     content_type = MIME_MAP.get(ext, "application/pdf")
 
+    # Try local file first
+    tenant_dir = os.path.join(UPLOADS_DIR, row["tenant_id"] or "_global")
+    local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
+    if os.path.exists(local_path):
+        from urllib.parse import quote
+        return StreamingResponse(
+            open(local_path, "rb"),
+            media_type=content_type,
+            headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}"},
+        )
+
+    # Fallback to Paperless
+    paperless_id = row["paperless_id"]
     if not paperless_id or not PAPERLESS_TOKEN:
         raise HTTPException(status_code=404, detail="no preview available")
 
@@ -612,14 +635,30 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
 
 @router.get("/documents/{doc_id}/thumbnail")
 async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)):
-    """Proxy the document thumbnail from Paperless-ngx."""
+    """Serve document thumbnail — from local file or Paperless."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT paperless_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
+            "SELECT paperless_id, filename, tenant_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
 
+    filename = row["filename"] or "document"
+    ext = os.path.splitext(filename.lower())[1]
+
+    # For images, serve the file itself as thumbnail
+    if ext in (".jpg", ".jpeg", ".png", ".tiff", ".tif"):
+        tenant_dir = os.path.join(UPLOADS_DIR, row["tenant_id"] or "_global")
+        local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
+        if os.path.exists(local_path):
+            content_type = MIME_MAP.get(ext, "image/jpeg")
+            return StreamingResponse(
+                open(local_path, "rb"),
+                media_type=content_type,
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+
+    # Fallback to Paperless thumbnail
     paperless_id = row["paperless_id"]
     if not paperless_id or not PAPERLESS_TOKEN:
         raise HTTPException(status_code=404, detail="no thumbnail available")
