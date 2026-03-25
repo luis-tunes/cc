@@ -22,7 +22,7 @@ echo "writing PAPERLESS_TOKEN to server .env…"
 ssh "$HOST" "cd $DIR && sed -i 's/^PAPERLESS_TOKEN=.*/PAPERLESS_TOKEN=$TOKEN/' .env \
   || echo 'PAPERLESS_TOKEN=$TOKEN' >> .env"
 
-echo "restarting app…"
-ssh "$HOST" "cd $DIR && docker compose restart app"
+echo "recreating app (so new env is picked up)…"
+ssh "$HOST" "cd $DIR && docker compose up -d app"
 
 echo "done — token: ${TOKEN:0:8}…"
