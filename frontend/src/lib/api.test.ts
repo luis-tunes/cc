@@ -43,6 +43,7 @@ import {
   fetchBillingStatus,
   setTokenProvider,
   uploadDocument,
+  ApiError,
 } from "@/lib/api";
 
 function mockResponse(data: unknown, status = 200) {
@@ -235,19 +236,38 @@ describe("API client", () => {
 
   // ── Error handling ─────────────────────────────────────────────
 
-  it("throws on non-ok response", async () => {
+  it("throws ApiError on non-ok response", async () => {
     mockError(422, '{"detail":"name required"}');
-    await expect(createIngredient({ unit: "kg" })).rejects.toThrow("API 422");
+    try {
+      await createIngredient({ unit: "kg" });
+      expect.fail("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).status).toBe(422);
+      expect((e as ApiError).detail).toBe("name required");
+    }
   });
 
-  it("throws on 404", async () => {
+  it("throws ApiError on 404", async () => {
     mockError(404, "Not Found");
-    await expect(fetchDocument(999)).rejects.toThrow("API 404");
+    await expect(fetchDocument(999)).rejects.toThrow(ApiError);
   });
 
-  it("throws on 500", async () => {
+  it("throws ApiError on 500", async () => {
     mockError(500, "Internal Server Error");
-    await expect(fetchDashboardSummary()).rejects.toThrow("API 500");
+    await expect(fetchDashboardSummary()).rejects.toThrow(ApiError);
+  });
+
+  it("throws ApiError with status 0 on network failure", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    try {
+      await fetchDocuments();
+      expect.fail("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).status).toBe(0);
+      expect((e as ApiError).isNetworkError).toBe(true);
+    }
   });
 
   // ── Content-Type header ────────────────────────────────────────
@@ -363,8 +383,8 @@ describe("API client", () => {
   });
 
   it("downloadWithAuth throws on non-ok response", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
-    await expect(downloadWithAuth("/export/csv", "f.csv")).rejects.toThrow("Export failed");
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, text: () => Promise.resolve("") });
+    await expect(downloadWithAuth("/export/csv", "f.csv")).rejects.toThrow(ApiError);
   });
 
   // ── Reconciliation ─────────────────────────────────────────────
