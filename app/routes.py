@@ -8,7 +8,7 @@ from decimal import Decimal
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.assistant import answer_question as _answer_question
 from app.auth import AuthInfo, require_auth
@@ -30,6 +30,40 @@ PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "/opt/tim/uploads")
+
+
+# ── Request models for loose endpoints ─────────────────────────────────
+
+class EntityProfileBody(BaseModel):
+    """Entity profile — known fields validated, extras preserved."""
+    model_config = ConfigDict(extra="allow")
+    nif: str = ""
+    name: str = ""
+    trade_name: str = ""
+    address: str = ""
+    postal_code: str = ""
+    city: str = ""
+    country: str = "PT"
+    phone: str = ""
+    email: str = ""
+    cae: str = ""
+    regime: str = ""
+    capital_social: str = ""
+    iban: str = ""
+    fiscal_start_month: int = 1
+
+
+class UnitFamilyConversion(BaseModel):
+    from_unit: str
+    to_unit: str
+    factor: float = Field(gt=0)
+
+
+class UnitFamilyBody(BaseModel):
+    name: str = Field(min_length=1)
+    base_unit: str = Field(min_length=1)
+    conversions: list[UnitFamilyConversion] = []
+
 
 router = APIRouter()
 
@@ -1374,10 +1408,10 @@ async def get_entity(auth: AuthInfo = Depends(require_auth)):
 
 
 @router.put("/entity")
-async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth)):
+async def put_entity(request_body: EntityProfileBody, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     import json as _json
-    data_json = _json.dumps(request_body)
+    data_json = _json.dumps(request_body.model_dump())
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO tenant_settings (tenant_id, key, data) VALUES (%s, 'entity_profile', %s)
@@ -1385,7 +1419,7 @@ async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth))
             (tid, data_json, data_json),
         )
         conn.commit()
-    return request_body
+    return request_body.model_dump()
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1421,13 +1455,11 @@ async def list_unit_families(auth: AuthInfo = Depends(require_auth)):
 
 
 @router.post("/unit-families")
-async def create_unit_family(body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_unit_family(body: UnitFamilyBody, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    name = body.get("name", "")
-    base_unit = body.get("base_unit", "")
-    conversions = body.get("conversions", [])
-    if not name or not base_unit:
-        raise HTTPException(status_code=422, detail="name and base_unit required")
+    name = body.name
+    base_unit = body.base_unit
+    conversions = [c.model_dump() for c in body.conversions]
     with get_conn() as conn:
         row = conn.execute(
             "INSERT INTO unit_families (tenant_id, name, base_unit) VALUES (%s, %s, %s) RETURNING id, name, base_unit",
