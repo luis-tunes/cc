@@ -1,15 +1,14 @@
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileText, GitMerge, Landmark, MoreHorizontal, User } from "lucide-react";
+import { LayoutDashboard, Inbox, GitMerge, MoreHorizontal, User } from "lucide-react";
 import { useState } from "react";
 import { navigation } from "@/lib/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const MOBILE_TABS = [
   { title: "Painel", path: "/painel", icon: LayoutDashboard },
-  { title: "Documentos", path: "/documentos", icon: FileText },
-  { title: "Movimentos", path: "/movimentos", icon: Landmark },
+  { title: "Entrada", path: "/caixa-entrada", icon: Inbox },
   { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge },
 ];
 

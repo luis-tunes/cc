@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _conftest():
@@ -14,7 +13,8 @@ def _conftest():
 
 
 def _jwt_headers(tenant_id: str) -> dict:
-    import base64, json
+    import base64
+    import json
     header  = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
     payload = base64.urlsafe_b64encode(json.dumps({"sub": tenant_id, "org_id": tenant_id}).encode()).rstrip(b"=").decode()
     return {"Authorization": f"Bearer {header}.{payload}.fakesig"}
@@ -31,7 +31,7 @@ _T2 = _jwt_headers("t2")
 class TestBatchStock:
     def _seed_events(self):
         c = _conftest()
-        for i, iid in enumerate([1, 2, 3], start=1):
+        for _i, iid in enumerate([1, 2, 3], start=1):
             c._seq["ingredients"] = iid
             c._tables["ingredients"].append({
                 "id": iid, "tenant_id": "t1", "name": f"ing{iid}",

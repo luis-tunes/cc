@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Plus, Trash2, Tags, Zap, GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useClassificationRules, useCreateClassificationRule, useUpdateClassificationRule, useDeleteClassificationRule } from "@/hooks/use-classifications";
@@ -78,6 +80,7 @@ export default function Classifications() {
   const deleteRule = useDeleteClassificationRule();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [newRule, setNewRule] = useState<Partial<ClassificationRuleCreate>>({
     field: "supplier_nif", operator: "equals", value: "", account: "62",
   });
@@ -129,9 +132,7 @@ export default function Classifications() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : isError ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-tim-danger/20 bg-tim-danger/5 py-16">
-          <p className="text-sm text-tim-danger">Erro ao carregar regras de classificação</p>
-        </div>
+        <ErrorState title="Erro ao carregar regras" />
       ) : rules.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card py-16">
           <Tags className="h-10 w-10 text-muted-foreground/40" />
@@ -147,12 +148,7 @@ export default function Classifications() {
             <RuleRow
               key={rule.id}
               rule={rule}
-              onDelete={() => {
-                deleteRule.mutate(rule.id, {
-                  onSuccess: () => toast.success("Regra eliminada"),
-                  onError: () => toast.error("Erro ao eliminar regra"),
-                });
-              }}
+              onDelete={() => setDeleteTarget(rule.id)}
               onToggle={() => {
                 updateRule.mutate(
                   { id: rule.id, patch: { active: !rule.active } },
@@ -213,6 +209,22 @@ export default function Classifications() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Eliminar regra"
+        description="Tem a certeza que pretende eliminar esta regra de classificação?"
+        confirmLabel="Eliminar"
+        onConfirm={() => {
+          if (deleteTarget !== null) {
+            deleteRule.mutate(deleteTarget, {
+              onSuccess: () => { toast.success("Regra eliminada"); setDeleteTarget(null); },
+              onError: () => toast.error("Erro ao eliminar regra"),
+            });
+          }
+        }}
+      />
     </PageContainer>
   );
 }

@@ -67,8 +67,8 @@ export default function SettingsPage() {
                   {isPaid
                     ? "A sua subscrição está ativa. Todas as funcionalidades estão disponíveis."
                     : isTrial
-                      ? `Tem ${daysLeft} dia${daysLeft !== 1 ? "s" : ""} restante${daysLeft !== 1 ? "s" : ""} para experimentar o TIM. Algumas funcionalidades requerem subscrição.`
-                      : "Escolha um plano para continuar a usar o TIM."}
+                      ? `Tem ${daysLeft} dia${daysLeft !== 1 ? "s" : ""} restante${daysLeft !== 1 ? "s" : ""} para experimentar o xtim.ai. Algumas funcionalidades requerem subscrição.`
+                      : "Escolha um plano para continuar a usar o xtim.ai."}
                 </p>
               </div>
             </div>

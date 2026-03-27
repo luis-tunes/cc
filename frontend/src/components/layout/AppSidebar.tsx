@@ -20,14 +20,14 @@ import { useUser, OrganizationSwitcher } from "@clerk/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Lock, Crown } from "lucide-react";
 import { sidebarOrgSwitcherAppearance } from "@/lib/clerk-appearance";
-import { useIsTrial } from "@/hooks/use-trial";
+import { useIsFreePlan } from "@/hooks/use-trial";
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user } = useUser();
-  const isTrial = useIsTrial();
+  const isFreePlan = useIsFreePlan();
 
   const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
     .split(" ")
@@ -41,11 +41,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-primary">
-            TIM
+            xtim
           </span>
           {!collapsed && (
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Time is Money
+              .ai
             </span>
           )}
         </div>
@@ -62,7 +62,7 @@ export function AppSidebar() {
                 {group.items.map((item) => {
                   const active = location.pathname === item.path;
                   const isComingSoon = item.status === "coming-soon";
-                  const isLocked = isTrial && item.proOnly;
+                  const isLocked = isFreePlan && item.proOnly;
                   return (
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton asChild>

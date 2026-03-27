@@ -5,9 +5,10 @@ across all major entity types.
 """
 import base64
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app, raise_server_exceptions=False)

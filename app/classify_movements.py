@@ -4,7 +4,6 @@ Classifies bank movements using tenant rules (pattern matching on description).
 Also detects entities (matching suppliers by name/NIF) and flags duplicates.
 """
 
-import re
 import logging
 from datetime import timedelta
 from decimal import Decimal

@@ -116,7 +116,7 @@ function Legend() {
 export default function GuidePage() {
   return (
     <PageContainer
-      title="Guia do TIM"
+      title="Guia do xtim.ai"
       subtitle="Tudo o que precisas para dominar a tua contabilidade"
     >
       <div className="space-y-6">
@@ -127,10 +127,10 @@ export default function GuidePage() {
               Guia Oficial
             </p>
             <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-foreground">
-              Bem-vindo ao TIM
+              Bem-vindo ao xtim.ai
             </h2>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              O TIM trata da contabilidade para que te possas focar no teu
+              O xtim.ai trata da contabilidade para que te possas focar no teu
               negócio. Documentos entram, dados saem, tudo reconciliado. Este
               guia mostra-te como tirar o máximo partido de cada funcionalidade.
             </p>
@@ -175,13 +175,13 @@ export default function GuidePage() {
         >
           <p className="text-sm text-muted-foreground">
             Aqui é onde tudo começa. Arrasta faturas, recibos ou qualquer
-            documento — o TIM faz OCR automático e extrai fornecedor, NIF,
+            documento — o xtim.ai faz OCR automático e extrai fornecedor, NIF,
             total, IVA e data.
           </p>
           <Steps
             items={[
               "Clica em \"Importar\" ou arrasta ficheiros para a zona de upload.",
-              "O TIM processa o documento com OCR (demora segundos).",
+              "O xtim.ai processa o documento com OCR (demora segundos).",
               "Revê os campos extraídos e corrige se necessário.",
               "Aprova o documento para avançar para classificação.",
             ]}
@@ -225,7 +225,7 @@ export default function GuidePage() {
           path="/movimentos"
         >
           <p className="text-sm text-muted-foreground">
-            Importa os teus extratos bancários para que o TIM possa cruzar
+            Importa os teus extratos bancários para que o xtim.ai possa cruzar
             movimentos com documentos automaticamente.
           </p>
           <Steps
@@ -249,12 +249,12 @@ export default function GuidePage() {
           path="/reconciliacao"
         >
           <p className="text-sm text-muted-foreground">
-            A magia do TIM. A reconciliação cruza automaticamente os teus
+            A magia do xtim.ai. A reconciliação cruza automaticamente os teus
             documentos com os movimentos bancários — por valor e data.
           </p>
           <Steps
             items={[
-              "O TIM sugere correspondências automáticas (valor ±€0.01, data ±5 dias).",
+              "O xtim.ai sugere correspondências automáticas (valor ±€0.01, data ±5 dias).",
               "Revê as sugestões e aprova com um clique.",
               "Correspondências manuais também são possíveis quando o automático não acerta.",
             ]}
@@ -337,7 +337,7 @@ export default function GuidePage() {
         >
           <p className="text-sm text-muted-foreground">
             Configura o perfil da tua empresa, gestão de conta e plano de
-            subscrição. Tudo o que precisas para personalizar o TIM.
+            subscrição. Tudo o que precisas para personalizar o xtim.ai.
           </p>
           <Steps
             items={[
@@ -382,7 +382,7 @@ export default function GuidePage() {
 
         {/* Footer */}
         <div className="pb-4 text-center text-xs text-muted-foreground">
-          TIM — Time is Money · Guia v1.0
+          xtim.ai — Contabilidade Inteligente · Guia v1.0
         </div>
       </div>
     </PageContainer>

@@ -4,8 +4,8 @@ Covers: unit-families, suppliers, ingredients, stock-events,
         products, production, shopping-list, stats, price-history.
 Uses shared FakeConn from conftest.py.
 """
-import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -196,7 +196,7 @@ def test_ingredients_status_baixo():
 
 
 def test_ingredients_status_rutura():
-    ing = _create_ingredient("Sal", min_threshold=2)
+    _create_ingredient("Sal", min_threshold=2)
     r = client.get("/api/ingredients")
     items = r.json()
     assert items[0]["stock"] == 0

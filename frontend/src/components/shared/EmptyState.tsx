@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { FolderOpen, type LucideIcon } from "lucide-react";
+import { FolderOpen, Plus, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface EmptyStateProps {
@@ -8,7 +8,10 @@ interface EmptyStateProps {
   description?: string;
   tutorial?: string;
   actionLabel?: string;
+  actionIcon?: LucideIcon;
   onAction?: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   className?: string;
 }
 
@@ -18,32 +21,43 @@ export function EmptyState({
   description,
   tutorial,
   actionLabel,
+  actionIcon: ActionIcon = Plus,
   onAction,
+  secondaryLabel,
+  onSecondary,
   className,
 }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center rounded-xl border border-dashed bg-card/50 px-6 py-14 text-center",
         className
       )}
     >
-      <div className="rounded-lg bg-muted p-3">
-        <Icon className="h-6 w-6 text-muted-foreground" />
+      <div className="rounded-xl bg-primary/[0.08] p-4">
+        <Icon className="h-7 w-7 text-primary/70" />
       </div>
-      <h3 className="mt-4 text-sm font-medium text-foreground">{title}</h3>
+      <h3 className="mt-5 text-base font-semibold text-foreground">{title}</h3>
       {description && (
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
       )}
       {tutorial && (
-        <p className="mt-3 max-w-sm text-xs text-muted-foreground/80 leading-relaxed">
+        <p className="mt-3 max-w-sm text-xs text-muted-foreground/70 leading-relaxed">
           {tutorial}
         </p>
       )}
       {actionLabel && onAction && (
-        <Button variant="outline" size="sm" className="mt-4" onClick={onAction}>
-          {actionLabel}
-        </Button>
+        <div className="mt-6 flex flex-col items-center gap-2 sm:flex-row">
+          <Button size="sm" className="gap-1.5" onClick={onAction}>
+            <ActionIcon className="h-3.5 w-3.5" />
+            {actionLabel}
+          </Button>
+          {secondaryLabel && onSecondary && (
+            <Button variant="ghost" size="sm" onClick={onSecondary}>
+              {secondaryLabel}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

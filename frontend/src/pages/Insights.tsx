@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, AlertTriangle, Lightbulb, BarChart3, PieChart
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function fmt(n: number) {
   return `€${n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -18,7 +19,7 @@ function fmt(n: number) {
 
 export default function Insights() {
   const colors = useChartColors();
-  const { data: pl, isError, refetch } = usePlReport();
+  const { data: pl, isLoading, isError, refetch } = usePlReport();
   const { data: topSuppliers = [] } = useTopSuppliers(8);
   const { data: auditData } = useAuditFlags();
 
@@ -47,6 +48,20 @@ export default function Insights() {
 
   return (
     <PageContainer title="Insights" subtitle="Análises financeiras e deteção de anomalias">
+      {isLoading ? (
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-64 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg" />
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Summary insights */}
       {cashFlowData.length > 0 && (
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -136,6 +151,8 @@ export default function Insights() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </PageContainer>
   );
 }

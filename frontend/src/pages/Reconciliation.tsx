@@ -4,6 +4,7 @@ import { ReconciliationCommandBar } from "@/components/reconciliation/Reconcilia
 import { MatchCard } from "@/components/reconciliation/MatchCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { GitMerge, CheckCircle2, PartyPopper } from "lucide-react";
 import { type ReconciliationPair } from "@/lib/reconciliation-data";
 import { useReconciliations, useRunReconciliation, usePatchReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
@@ -142,7 +143,14 @@ export default function Reconciliation() {
       title="Reconciliação"
       subtitle="Correspondência entre documentos e movimentos bancários"
     >
-      {isEmpty ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+        </div>
+      ) : isEmpty ? (
         <EmptyState
           icon={GitMerge}
           title="Sem dados para reconciliar"

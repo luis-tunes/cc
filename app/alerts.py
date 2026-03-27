@@ -9,7 +9,6 @@ Generates alerts for common compliance issues:
 
 import datetime
 import logging
-from decimal import Decimal
 
 from app.db import get_conn
 

@@ -77,12 +77,12 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       APP_URL: ${APP_URL:-https://localhost}
-      CONTACT_EMAIL: ${CONTACT_EMAIL:-info@tim.pt}
-      PARTNER_STRIPE_ACCOUNT: ${PARTNER_STRIPE_ACCOUNT:-}
-      REVENUE_SPLIT_PERCENT: ${REVENUE_SPLIT_PERCENT:-50}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-info@xtim.ai}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
       WEB_DIR: /opt/tim/web
       UPLOADS_DIR: /opt/tim/uploads
     volumes:

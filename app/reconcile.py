@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+
 from app.db import get_conn
 
 AMOUNT_TOLERANCE = Decimal("0.01")

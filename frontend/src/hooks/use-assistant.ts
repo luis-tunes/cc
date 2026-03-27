@@ -24,7 +24,7 @@ export function useAssistant() {
       id: "welcome",
       role: "assistant",
       content:
-        "Olá! Sou o assistente TIM. Posso consultar os seus dados contabilísticos em tempo real — documentos, movimentos, reconciliações, IVA e muito mais. Como posso ajudá-lo?",
+        "Olá! Sou o assistente xtim. Posso consultar os seus dados contabilísticos em tempo real — documentos, movimentos, reconciliações, IVA e muito mais. Como posso ajudá-lo?",
       timestamp: new Date(),
     },
   ]);
@@ -72,7 +72,7 @@ export function useAssistant() {
         id: "welcome-reset",
         role: "assistant",
         content:
-          "Olá! Sou o assistente TIM. Como posso ajudá-lo?",
+          "Olá! Sou o assistente xtim. Como posso ajudá-lo?",
         timestamp: new Date(),
       },
     ]);

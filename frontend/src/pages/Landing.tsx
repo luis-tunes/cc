@@ -80,9 +80,9 @@ function Nav() {
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold tracking-tight text-primary">TIM</span>
+          <span className="text-2xl font-bold tracking-tight text-primary">xtim.ai</span>
           <span className="hidden text-xs font-medium uppercase tracking-widest text-muted-foreground sm:inline">
-            Time is Money
+            Contabilidade Inteligente
           </span>
         </Link>
 
@@ -172,7 +172,7 @@ function Nav() {
 function Hero() {
   const { isSignedIn } = useAuth();
   const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
-  const ctaLabel = isSignedIn ? "Ir para o painel" : "Experimentar 14 dias grátis";
+  const ctaLabel = isSignedIn ? "Ir para o painel" : "Começar grátis";
 
   return (
     <section className="relative overflow-hidden">
@@ -186,7 +186,7 @@ function Hero() {
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 sm:mb-8 sm:px-4 sm:py-2">
             <Clock className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              Experimente 14 dias sem compromisso
+              Comece grátis — sem cartão de crédito
             </span>
           </div>
 
@@ -239,7 +239,7 @@ function Hero() {
               <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
               <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
               <div className="ml-2 flex-1 rounded-md bg-background/80 px-3 py-1">
-                <span className="text-xs text-muted-foreground/40">app.tim.pt/painel</span>
+                <span className="text-xs text-muted-foreground/40">app.xtim.ai/painel</span>
               </div>
             </div>
             <div className="rounded-b-lg bg-muted/30 p-4 sm:p-6 md:p-8 lg:p-12">
@@ -344,7 +344,7 @@ const FEATURES = [
     icon: Bot,
     title: "Classificação por IA",
     description:
-      "O TIM aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
+      "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
     highlight: "Aprende consigo",
   },
   {
@@ -426,7 +426,7 @@ const STEPS = [
   {
     number: "02",
     title: "Revisão inteligente",
-    description: "O TIM extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
+    description: "O xtim.ai extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
   },
   {
     number: "03",
@@ -497,7 +497,7 @@ const STATS = [
   { value: "95%", label: "Taxa de reconciliação", icon: Receipt },
   { value: "<30s", label: "Tempo de extração", icon: Zap },
   { value: "100%", label: "Em português", icon: Shield },
-  { value: "14", label: "Dias grátis para testar", icon: Clock },
+  { value: "0€", label: "Para começar a usar", icon: Clock },
 ];
 
 function Stats() {
@@ -533,11 +533,11 @@ function Pricing() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Preços</p>
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Comece grátis, pague só quando quiser continuar
+            Comece grátis, pague só quando precisar de mais
           </h2>
           <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-            Crie a sua conta, carregue os seus documentos e extratos bancários.
-            Durante 14 dias tem acesso total — sem limites, sem cartão de crédito.
+            Crie a sua conta e carregue o primeiro documento grátis.
+            Veja o xtim.ai a extrair dados e sugerir classificações. Decida depois.
           </p>
         </div>
 
@@ -552,14 +552,14 @@ function Pricing() {
             },
             {
               step: "2",
-              title: "Use durante 14 dias",
-              desc: "Acesso total a todas as funcionalidades. Carregue documentos e extratos à vontade.",
+              title: "Carregue um documento",
+              desc: "Envie uma fatura ou recibo. Veja a IA a extrair dados e classificar automaticamente.",
               icon: Zap,
             },
             {
               step: "3",
-              title: "Decida se quer continuar",
-              desc: "Subscreva o plano Profissional para manter tudo. Se não quiser, não paga nada.",
+              title: "Subscreva para desbloquear tudo",
+              desc: "Gostou? Subscreva o plano Pro para documentos ilimitados, reconciliação e muito mais.",
               icon: Check,
             },
           ].map((item) => (
@@ -581,7 +581,7 @@ function Pricing() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">Profissional</h3>
               <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary">
-                Após os 14 dias
+                Recomendado
               </span>
             </div>
 
@@ -616,12 +616,12 @@ function Pricing() {
               to={isSignedIn ? "/painel" : "/auth/sign-up"}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 hover:-translate-y-0.5 sm:mt-8"
             >
-              {isSignedIn ? "Ir para o painel" : "Criar conta — é grátis"}
+              {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
               <ArrowRight className="h-4 w-4" />
             </Link>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
-              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> Sem cartão nos 14 dias</span>
+              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> Sem cartão necessário</span>
               <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> Pagamento seguro via Stripe</span>
             </div>
           </div>
@@ -630,7 +630,7 @@ function Pricing() {
         <div className="mx-auto mt-6 max-w-md text-center sm:mt-8">
           <p className="text-sm text-muted-foreground">
             Empresa com necessidades específicas?{" "}
-            <a href="mailto:info@tim.pt" className="font-medium text-primary hover:underline">
+            <a href="mailto:info@xtim.ai" className="font-medium text-primary hover:underline">
               Fale connosco
             </a>
           </p>
@@ -644,7 +644,7 @@ function Pricing() {
 
 const TESTIMONIALS = [
   {
-    quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O TIM mudou a forma como vejo a contabilidade.",
+    quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O xtim.ai mudou a forma como vejo a contabilidade.",
     author: "Ricardo M.",
     role: "Dono de restaurante, Lisboa",
   },
@@ -707,23 +707,23 @@ function Testimonials() {
 const FAQS = [
   {
     q: "Preciso de conhecimentos de contabilidade?",
-    a: "Não. O TIM foi desenhado para empresários, não para contabilistas. A interface explica tudo em linguagem simples.",
+    a: "Não. O xtim.ai foi desenhado para empresários, não para contabilistas. A interface explica tudo em linguagem simples.",
   },
   {
     q: "Os meus dados estão seguros?",
     a: "Sim. Utilizamos encriptação em trânsito e em repouso, em conformidade com o RGPD. Os seus dados nunca são partilhados com terceiros.",
   },
   {
-    q: "O que acontece passados os 14 dias?",
-    a: "Se quiser continuar, subscreve o plano Profissional a €150/mês + IVA. Se não quiser, não paga nada — os dados ficam disponíveis para exportação durante 30 dias.",
+    q: "Posso experimentar antes de pagar?",
+    a: "Sim! Crie uma conta gratuita e carregue o primeiro documento. Veja o xtim.ai a extrair dados automaticamente. Para desbloquear todas as funcionalidades, subscreva o plano Pro.",
   },
   {
     q: "Funciona com o meu banco?",
-    a: "O TIM aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
+    a: "O xtim.ai aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
   },
   {
     q: "Preciso de inserir cartão de crédito?",
-    a: "Não. Durante os 14 dias de teste não é necessário qualquer pagamento. Só insere dados de pagamento quando decidir subscrever.",
+    a: "Não. A conta gratuita não requer qualquer pagamento. Só insere dados de pagamento quando decidir subscrever o plano Pro.",
   },
 ];
 
@@ -788,7 +788,7 @@ function CTA() {
           Pronto para simplificar a sua contabilidade?
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:text-base">
-          Carregue os seus documentos e extratos. Veja o TIM a trabalhar. Decida depois.
+          Carregue os seus documentos e extratos. Veja o xtim.ai a trabalhar. Decida depois.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
           <Link
@@ -799,7 +799,7 @@ function CTA() {
             <ArrowRight className="h-4 w-4" />
           </Link>
           <a
-            href="mailto:info@tim.pt"
+            href="mailto:info@xtim.ai"
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Falar com a equipa
@@ -823,8 +823,8 @@ function Footer() {
           {/* Brand */}
           <div className="sm:col-span-2 md:col-span-1">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-primary">TIM</span>
-              <span className="text-xs text-muted-foreground">Time is Money</span>
+              <span className="text-xl font-bold tracking-tight text-primary">xtim.ai</span>
+              <span className="text-xs text-muted-foreground">Contabilidade Inteligente</span>
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
               Contabilidade automatizada para negócios portugueses. Simples, seguro e 100% em português.
@@ -861,9 +861,9 @@ function Footer() {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">Contacto</h4>
             <ul className="mt-3 space-y-2">
               <li>
-                <a href="mailto:info@tim.pt" className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                <a href="mailto:info@xtim.ai" className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
                   <Mail className="h-3 w-3" />
-                  info@tim.pt
+                  info@xtim.ai
                 </a>
               </li>
             </ul>
@@ -874,7 +874,7 @@ function Footer() {
         <div className="mt-8 border-t pt-6 sm:mt-10 sm:pt-8">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <p className="text-xs text-muted-foreground/50">
-              © {new Date().getFullYear()} TIM — Time is Money. Todos os direitos reservados.
+              © {new Date().getFullYear()} xtim.ai — Contabilidade Inteligente. Todos os direitos reservados.
             </p>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1 text-xs text-muted-foreground/40">

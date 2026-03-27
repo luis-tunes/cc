@@ -5,7 +5,7 @@ import datetime
 import json
 import sys
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

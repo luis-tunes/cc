@@ -1,5 +1,5 @@
 /**
- * Shared Clerk appearance configuration for TIM brand.
+ * Shared Clerk appearance configuration for xtim.ai brand.
  * Applied globally via ClerkProvider and overridden per-component where needed.
  */
 export const clerkAppearance = {

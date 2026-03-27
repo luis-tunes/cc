@@ -6,13 +6,15 @@ and customer.subscription.deleted flows.
 import hashlib
 import hmac
 import json
-import os
 import time
+from datetime import UTC
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Response
+
+from app.billing import _compute_trial_status, _verify_stripe_signature
 from app.main import app
-from app.billing import PLANS, _verify_stripe_signature, _compute_trial_status
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -61,9 +63,8 @@ def test_verify_valid_signature():
 def test_verify_invalid_signature():
     payload = b'{"type":"test"}'
     sig = _stripe_sig(payload, secret="wrong-secret")
-    with _patch_webhook_secret():
-        with pytest.raises(ValueError, match="Signature mismatch"):
-            _verify_stripe_signature(payload, sig)
+    with _patch_webhook_secret(), pytest.raises(ValueError, match="Signature mismatch"):
+        _verify_stripe_signature(payload, sig)
 
 
 def test_verify_missing_timestamp():
@@ -186,8 +187,8 @@ def test_plans_endpoint():
 # ── Trial computation ────────────────────────────────────────────────
 
 def test_trial_active():
-    from datetime import datetime, timedelta, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime, timedelta
+    now = datetime.now(UTC)
     info = {
         "tenant_id": "t1",
         "plan": "free",
@@ -201,8 +202,8 @@ def test_trial_active():
 
 
 def test_trial_expired():
-    from datetime import datetime, timedelta, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime, timedelta
+    now = datetime.now(UTC)
     info = {
         "tenant_id": "t-expired",
         "plan": "free",

@@ -6,6 +6,24 @@
 
 const BASE = "/api";
 
+/** Structured API error with status code and detail message. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly detail: string,
+    public readonly code?: string,
+  ) {
+    super(detail);
+    this.name = "ApiError";
+  }
+
+  get isNetworkError() { return this.status === 0; }
+  get isNotFound() { return this.status === 404; }
+  get isForbidden() { return this.status === 403; }
+  get isServerError() { return this.status >= 500; }
+  get isRateLimited() { return this.status === 429; }
+}
+
 /**
  * Token provider — set by AuthSync component so the API client
  * can obtain a fresh Clerk session token from outside React.
@@ -64,10 +82,15 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  let res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new ApiError(0, "Sem ligação à internet");
+  }
 
   // Retry once with fresh token on 401 (expired JWT)
   if (res.status === 401 && _tokenProvider) {
@@ -76,13 +99,24 @@ async function request<T>(
     const freshToken = await getAuthToken();
     if (freshToken) {
       headers["Authorization"] = `Bearer ${freshToken}`;
-      res = await fetch(`${BASE}${path}`, { ...options, headers });
+      try {
+        res = await fetch(`${BASE}${path}`, { ...options, headers });
+      } catch {
+        throw new ApiError(0, "Sem ligação à internet");
+      }
     }
   }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${body || res.statusText}`);
+    let detail = body || res.statusText;
+    let code: string | undefined;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.detail) detail = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+      if (parsed?.code) code = parsed.code;
+    } catch { /* not JSON */ }
+    throw new ApiError(res.status, detail, code);
   }
 
   if (res.status === 204) return undefined as T;
@@ -100,11 +134,16 @@ async function requestFormData<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  let res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers,
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+  } catch {
+    throw new ApiError(0, "Sem ligação à internet");
+  }
 
   // Retry once with fresh token on 401
   if (res.status === 401 && _tokenProvider) {
@@ -113,18 +152,24 @@ async function requestFormData<T>(
     const freshToken = await getAuthToken();
     if (freshToken) {
       headers["Authorization"] = `Bearer ${freshToken}`;
-      res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: form });
+      try {
+        res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: form });
+      } catch {
+        throw new ApiError(0, "Sem ligação à internet");
+      }
     }
   }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    let detail = text;
+    let detail = text || res.statusText;
+    let code: string | undefined;
     try {
       const parsed = JSON.parse(text);
-      if (parsed?.detail) detail = parsed.detail;
+      if (parsed?.detail) detail = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+      if (parsed?.code) code = parsed.code;
     } catch { /* not JSON */ }
-    throw new Error(`Upload failed ${res.status}: ${detail || res.statusText}`);
+    throw new ApiError(res.status, detail, code);
   }
 
   return res.json();
@@ -363,9 +408,14 @@ export async function downloadWithAuth(path: string, filename: string): Promise<
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  const res = await fetch(`${BASE}${path}`, { headers });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, "Sem ligação à internet");
+  }
   if (!res.ok) {
-    throw new Error(`Export failed: ${res.status}`);
+    throw new ApiError(res.status, `Export failed: ${res.status}`);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

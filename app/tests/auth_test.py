@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
-from app.auth import AuthInfo, _extract_auth, _decode_clerk_jwt
+
+from app.auth import AuthInfo, _extract_auth
 
 
 def _make_request(auth_header: str = ""):

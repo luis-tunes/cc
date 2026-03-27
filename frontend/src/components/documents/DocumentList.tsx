@@ -25,6 +25,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface DocumentListProps {
   documents: DocumentRecord[];
@@ -55,9 +56,30 @@ export function DocumentList({
     documents.length > 0 && documents.every((d) => selectedIds.has(d.id));
   const { focusedIndex, containerRef } = useKeyboardNav(documents.length);
   const isMobile = useIsMobile();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const confirmDelete = (id: string) => setDeleteTarget(id);
+  const handleConfirmDelete = () => {
+    if (deleteTarget && onDelete) {
+      onDelete(deleteTarget);
+      setDeleteTarget(null);
+    }
+  };
+
+  const deleteConfirmDialog = (
+    <ConfirmDialog
+      open={deleteTarget !== null}
+      onOpenChange={(open) => !open && setDeleteTarget(null)}
+      title="Eliminar documento"
+      description="Tem a certeza que pretende eliminar este documento? Esta ação não pode ser desfeita."
+      confirmLabel="Eliminar"
+      onConfirm={handleConfirmDelete}
+    />
+  );
 
   if (isMobile) {
     return (
+      <>
       <div className={cn("space-y-2", className)}>
         {documents.map((doc) => {
           const FileIcon = doc.fileType === "pdf" ? FileText : Image;
@@ -100,7 +122,7 @@ export function DocumentList({
               )}
               {onDelete && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(doc.id); }}
+                  onClick={(e) => { e.stopPropagation(); confirmDelete(doc.id); }}
                   className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="Eliminar documento"
                 >
@@ -111,6 +133,8 @@ export function DocumentList({
           );
         })}
       </div>
+      {deleteConfirmDialog}
+      </>
     );
   }
 
@@ -221,7 +245,7 @@ export function DocumentList({
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   {onDelete && (
                     <button
-                      onClick={() => onDelete(doc.id)}
+                      onClick={() => confirmDelete(doc.id)}
                       className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
                       aria-label="Eliminar documento"
                     >
@@ -234,6 +258,7 @@ export function DocumentList({
           })}
         </TableBody>
       </Table>
+      {deleteConfirmDialog}
     </div>
   );
 }

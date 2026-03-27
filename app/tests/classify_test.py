@@ -1,7 +1,8 @@
 """Tests for classification rules CRUD and auto-classification engine."""
 import sys
 from decimal import Decimal
-from app.classify import classify_document, _matches
+
+from app.classify import _matches, classify_document
 
 
 class TestClassifyMatches:

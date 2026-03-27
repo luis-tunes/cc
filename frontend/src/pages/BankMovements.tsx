@@ -6,6 +6,7 @@ import { MovementLedger } from "@/components/movements/MovementLedger";
 import { MovementDetailDrawer } from "@/components/movements/MovementDetailDrawer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { Button } from "@/components/ui/button";
 import { Upload, Landmark } from "lucide-react";
 import { type BankMovement } from "@/lib/movements-data";
@@ -115,16 +116,16 @@ export default function BankMovements() {
         </Button>
       }
     >
-      {isEmpty && showImport && (
+      {isLoading ? (
+        <TableSkeleton rows={8} />
+      ) : isEmpty && showImport ? (
         <ImportPanel
           onImport={handleImport}
           importing={importing}
           importProgress={importProgress}
           importResult={importResult}
         />
-      )}
-
-      {isEmpty && !showImport ? (
+      ) : isEmpty && !showImport ? (
         <EmptyState
           icon={Landmark}
           title="Sem movimentos bancários"

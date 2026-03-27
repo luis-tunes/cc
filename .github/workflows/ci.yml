@@ -15,6 +15,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: pip install -r requirements-test.txt
+      - run: pip install ruff mypy
+      - run: ruff check app/
+      - run: mypy app/ --ignore-missing-imports
       - run: cd frontend && npm ci
       - run: make test
 

@@ -5,12 +5,14 @@ import re
 import tempfile
 from datetime import date
 from decimal import Decimal, InvalidOperation
+
 import httpx
 from invoice2data import extract_data
 from invoice2data.extract.loader import read_templates
+
+from app.classify import classify_document
 from app.db import get_conn
 from app.ocr import extract_text
-from app.classify import classify_document
 
 log = logging.getLogger(__name__)
 
@@ -117,9 +119,9 @@ def _pdf_to_images(pdf_bytes: bytes, max_pages: int = 3) -> list[tuple[bytes, st
 
     Returns list of (image_bytes, mime_type) tuples.
     """
+    import glob
     import subprocess
     import tempfile
-    import glob
 
     tmpdir = tempfile.mkdtemp()
     pdf_path = os.path.join(tmpdir, "doc.pdf")
@@ -675,7 +677,7 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
             f.flush()
             path = f.name
         result = extract_data(path, templates=get_templates())
-    except (OSError, EnvironmentError, ImportError) as exc:
+    except (OSError, ImportError) as exc:
         log.warning("pdftotext not available, falling back to OCR text: %s", exc)
         result = None
     finally:
@@ -891,12 +893,7 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
 
     confidence = _calculate_confidence(total, vat, supplier_nif, client_nif, doc_date, doc_type, raw_text)
 
-    if confidence >= 60:
-        status = "extraído"
-    elif total > 0:
-        status = "extraído"
-    else:
-        status = "pendente"
+    status = "extraído" if confidence >= 60 or total > 0 else "pendente"
 
     with get_conn() as conn:
         pending = None

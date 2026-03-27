@@ -6,6 +6,7 @@ import {
   AlertCircle, Package, Truck, ShoppingCart, Loader2,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -48,9 +49,7 @@ export default function ActivityFeed() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : isError ? (
-        <div className="flex items-center justify-center rounded-lg border border-tim-danger/20 bg-tim-danger/5 py-16">
-          <p className="text-sm text-tim-danger">Erro ao carregar atividade</p>
-        </div>
+        <ErrorState title="Erro ao carregar atividade" />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={Activity}

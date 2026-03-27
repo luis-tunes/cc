@@ -1,14 +1,16 @@
 import { useBillingPlans, useBillingStatus, useCheckout } from "@/hooks/use-billing";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, Loader2, Mail, ArrowRight, ArrowLeft, Shield, Zap, Clock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function PricingPage() {
-  const { data: plans = [], isLoading: plansLoading } = useBillingPlans();
-  const { data: billing, isLoading: billingLoading } = useBillingStatus();
+  const { data: plans = [], isLoading: plansLoading, isError: plansError } = useBillingPlans();
+  const { data: billing, isLoading: billingLoading, isError: billingError } = useBillingStatus();
   const checkout = useCheckout();
   const navigate = useNavigate();
   const isLoading = plansLoading || billingLoading;
+  const isError = plansError || billingError;
   const currentPlan = billing?.plan ?? "none";
   const isTrialing = billing?.status === "trialing";
   const isExpired = billing?.status === "trial_expired";
@@ -27,9 +29,9 @@ export default function PricingPage() {
         <div className="mx-auto max-w-5xl px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold tracking-tight text-primary">TIM</span>
+              <span className="text-2xl font-bold tracking-tight text-primary">xtim.ai</span>
               <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Time is Money
+                Contabilidade Inteligente
               </span>
             </div>
             {isTrialing && (
@@ -63,8 +65,8 @@ export default function PricingPage() {
             {isExpired
               ? "O seu período de teste terminou"
               : isTrialing
-                ? "Está a gostar do TIM?"
-                : "Comece a usar o TIM"}
+                ? "Está a gostar do xtim.ai?"
+                : "Comece a usar o xtim.ai"}
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
             {isExpired
@@ -91,6 +93,10 @@ export default function PricingPage() {
         {isLoading ? (
           <div className="mt-12 flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : isError ? (
+          <div className="mt-12">
+            <ErrorState onRetry={() => window.location.reload()} />
           </div>
         ) : (
           <div className="mt-10 grid gap-8 md:grid-cols-2 max-w-3xl mx-auto">
