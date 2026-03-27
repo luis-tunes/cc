@@ -56,6 +56,46 @@ class TestClassifyMatches:
         doc = {"raw_text": "Fatura edp comercial", "total": Decimal("80")}
         assert _matches(rule, doc) is True
 
+    def test_not_equals_match(self):
+        rule = {"field": "type", "operator": "not_equals", "value": "fatura"}
+        doc = {"type": "recibo", "total": Decimal("100")}
+        assert _matches(rule, doc) is True
+
+    def test_not_equals_no_match(self):
+        rule = {"field": "type", "operator": "not_equals", "value": "fatura"}
+        doc = {"type": "fatura", "total": Decimal("100")}
+        assert _matches(rule, doc) is False
+
+    def test_not_contains_match(self):
+        rule = {"field": "description", "operator": "not_contains", "value": "agua"}
+        doc = {"raw_text": "Fatura de eletricidade", "total": Decimal("50")}
+        assert _matches(rule, doc) is True
+
+    def test_not_contains_no_match(self):
+        rule = {"field": "description", "operator": "not_contains", "value": "eletricidade"}
+        doc = {"raw_text": "Fatura de eletricidade", "total": Decimal("50")}
+        assert _matches(rule, doc) is False
+
+    def test_regex_match(self):
+        rule = {"field": "description", "operator": "regex", "value": r"EDP\s+\d+"}
+        doc = {"raw_text": "Pagamento EDP 12345", "total": Decimal("80")}
+        assert _matches(rule, doc) is True
+
+    def test_regex_no_match(self):
+        rule = {"field": "description", "operator": "regex", "value": r"^VODAFONE"}
+        doc = {"raw_text": "Pagamento EDP 12345", "total": Decimal("80")}
+        assert _matches(rule, doc) is False
+
+    def test_regex_invalid_pattern_returns_false(self):
+        rule = {"field": "description", "operator": "regex", "value": "[invalid"}
+        doc = {"raw_text": "anything", "total": Decimal("80")}
+        assert _matches(rule, doc) is False
+
+    def test_unknown_operator_returns_false(self):
+        rule = {"field": "type", "operator": "between", "value": "x"}
+        doc = {"type": "fatura", "total": Decimal("100")}
+        assert _matches(rule, doc) is False
+
 
 class TestClassifyDocument:
     def test_no_tenant_returns_none(self):
@@ -115,6 +155,26 @@ class TestClassificationRulesAPI:
         assert data["account"] == "62"
         assert data["active"] is True
 
+    def test_create_rule_regex_operator(self, client):
+        resp = client.post("/api/classification-rules", json={
+            "field": "description",
+            "operator": "regex",
+            "value": r"EDP\s+\d+",
+            "account": "62",
+            "label": "EDP",
+        })
+        assert resp.status_code == 201
+        assert resp.json()["operator"] == "regex"
+
+    def test_create_rule_not_contains_operator(self, client):
+        resp = client.post("/api/classification-rules", json={
+            "field": "description",
+            "operator": "not_contains",
+            "value": "agua",
+            "account": "63",
+        })
+        assert resp.status_code == 201
+
     def test_create_rule_invalid_field(self, client):
         resp = client.post("/api/classification-rules", json={
             "field": "invalid_field",
@@ -127,7 +187,7 @@ class TestClassificationRulesAPI:
     def test_create_rule_invalid_operator(self, client):
         resp = client.post("/api/classification-rules", json={
             "field": "type",
-            "operator": "regex",
+            "operator": "invalid_op",
             "value": "test",
             "account": "62",
         })

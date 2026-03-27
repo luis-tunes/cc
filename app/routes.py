@@ -2641,7 +2641,7 @@ class ClassificationRulePatch(BaseModel):
 
 
 VALID_FIELDS = {"supplier_nif", "description", "amount_gte", "amount_lte", "type"}
-VALID_OPERATORS = {"equals", "contains", "starts_with", "gte", "lte"}
+VALID_OPERATORS = {"equals", "not_equals", "contains", "not_contains", "starts_with", "regex", "gte", "lte"}
 
 
 @router.get("/classification-rules", response_model=list[ClassificationRuleOut])
