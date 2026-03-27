@@ -892,6 +892,22 @@ async def reconciliation_suggestions(doc_id: int, auth: AuthInfo = Depends(requi
 
 # --- Movement Classification ---
 
+@router.delete("/bank-transactions/{tx_id}", status_code=204)
+async def delete_bank_transaction(tx_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM bank_transactions WHERE id = %s AND tenant_id = %s",
+            (tx_id, tid),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="transaction not found")
+        conn.execute("DELETE FROM reconciliations WHERE bank_transaction_id = %s", (tx_id,))
+        conn.execute("DELETE FROM bank_transactions WHERE id = %s AND tenant_id = %s", (tx_id, tid))
+        log_activity(conn, tid, "bank_transaction", tx_id, "deleted")
+        conn.commit()
+    return None
+
 @router.get("/bank-transactions/enrich")
 async def enrich_movements(
     limit: int = Query(default=100, le=1000),

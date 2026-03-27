@@ -49,7 +49,12 @@ def reconcile_all(tenant_id: str) -> list[dict]:
                         best = tx
             if best is not None:
                 amount_diff = abs(doc["total"] - abs(best["amount"]))
-                confidence = Decimal("1") - amount_diff
+                date_diff = abs(doc["date"] - best["date"])
+                # Confidence: 70% weight on amount closeness, 30% on date closeness
+                amount_score = Decimal("1") - (amount_diff / max(doc["total"], Decimal("0.01")))
+                date_score = Decimal(str(max(0, 1 - date_diff.days / DATE_TOLERANCE.days)))
+                confidence = (amount_score * Decimal("0.7") + date_score * Decimal("0.3")).quantize(Decimal("0.01"))
+                confidence = max(Decimal("0"), min(Decimal("1"), confidence))
                 conn.execute(
                     """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence, tenant_id)
                        VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",

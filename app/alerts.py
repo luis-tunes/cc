@@ -14,12 +14,27 @@ from app.db import get_conn
 
 log = logging.getLogger(__name__)
 
-IVA_QUARTERS = {
-    1: (datetime.date(2026, 2, 15), "T4 2025"),
-    2: (datetime.date(2026, 5, 15), "T1 2026"),
-    3: (datetime.date(2026, 8, 15), "T2 2026"),
-    4: (datetime.date(2026, 11, 15), "T3 2026"),
-}
+
+def _iva_deadline(today: datetime.date) -> tuple[datetime.date, str] | None:
+    """Compute the next IVA quarterly deadline relative to today.
+
+    Portuguese IVA deadlines: Q1 submitted by 15 May, Q2 by 15 Aug,
+    Q3 by 15 Nov, Q4 by 15 Feb of the next year.
+    """
+    year = today.year
+    # (deadline_date, period_label) for each quarter's submission
+    deadlines = [
+        (datetime.date(year, 2, 15), f"T4 {year - 1}"),
+        (datetime.date(year, 5, 15), f"T1 {year}"),
+        (datetime.date(year, 8, 15), f"T2 {year}"),
+        (datetime.date(year, 11, 15), f"T3 {year}"),
+        (datetime.date(year + 1, 2, 15), f"T4 {year}"),
+    ]
+    for deadline, period in deadlines:
+        days_left = (deadline - today).days
+        if 0 < days_left <= 30:
+            return deadline, period
+    return None
 
 
 def generate_compliance_alerts(tenant_id: str) -> int:
@@ -83,22 +98,20 @@ def generate_compliance_alerts(tenant_id: str) -> int:
 
         # 3. IVA deadline approaching
         today = datetime.date.today()
-        quarter = (today.month - 1) // 3 + 1
-        deadline_info = IVA_QUARTERS.get(quarter)
-        if deadline_info:
-            deadline, period = deadline_info
+        iva_info = _iva_deadline(today)
+        if iva_info:
+            deadline, period = iva_info
             days_left = (deadline - today).days
-            if 0 < days_left <= 30:
-                conn.execute(
-                    """INSERT INTO alerts (tenant_id, type, severity, title, description, action_url)
-                       VALUES (%s, 'iva_deadline', %s, %s, %s, %s)""",
-                    (tenant_id,
-                     "critico" if days_left <= 7 else "urgente",
-                     f"Entrega IVA {period} — {days_left} dias restantes",
-                     f"A declaração periódica de IVA referente a {period} deve ser entregue até {deadline.strftime('%d/%m/%Y')}.",
-                     "/obrigacoes"),
-                )
-                count += 1
+            conn.execute(
+                """INSERT INTO alerts (tenant_id, type, severity, title, description, action_url)
+                   VALUES (%s, 'iva_deadline', %s, %s, %s, %s)""",
+                (tenant_id,
+                 "critico" if days_left <= 7 else "urgente",
+                 f"Entrega IVA {period} — {days_left} dias restantes",
+                 f"A declaração periódica de IVA referente a {period} deve ser entregue até {deadline.strftime('%d/%m/%Y')}.",
+                 "/obrigacoes"),
+            )
+            count += 1
 
         # 4. Months with bank transactions but no documents
         gap_months = conn.execute(

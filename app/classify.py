@@ -4,6 +4,7 @@ Matches documents against tenant classification rules (first match wins).
 """
 
 import logging
+import re
 from decimal import Decimal, InvalidOperation
 
 from app.db import get_conn
@@ -57,10 +58,19 @@ def _matches(rule: dict, doc: dict) -> bool:
 
     if op == "equals":
         return actual_str == expected_lower
+    if op == "not_equals":
+        return actual_str != expected_lower
     if op == "contains":
         return expected_lower in actual_str
+    if op == "not_contains":
+        return expected_lower not in actual_str
     if op == "starts_with":
         return actual_str.startswith(expected_lower)
+    if op == "regex":
+        try:
+            return bool(re.search(expected, str(actual).strip(), re.IGNORECASE))
+        except re.error:
+            return False
     if op in ("gte", "lte"):
         try:
             actual_num = Decimal(str(actual))
