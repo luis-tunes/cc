@@ -1,4 +1,4 @@
-.PHONY: dev test ship deploy sync-env clean
+.PHONY: dev test ship deploy sync-env clean backup
 
 dev:
 	bin/dev
@@ -12,3 +12,5 @@ sync-env:
 	bin/sync-env $(HOST)
 clean:
 	bin/clean
+backup:
+	bash bin/backup
