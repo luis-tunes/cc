@@ -27,9 +27,9 @@ export default function PricingPage() {
         <div className="mx-auto max-w-5xl px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold tracking-tight text-primary">TIM</span>
+              <span className="text-2xl font-bold tracking-tight text-primary">xtim.ai</span>
               <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Time is Money
+                Contabilidade Inteligente
               </span>
             </div>
             {isTrialing && (
@@ -63,8 +63,8 @@ export default function PricingPage() {
             {isExpired
               ? "O seu período de teste terminou"
               : isTrialing
-                ? "Está a gostar do TIM?"
-                : "Comece a usar o TIM"}
+                ? "Está a gostar do xtim.ai?"
+                : "Comece a usar o xtim.ai"}
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
             {isExpired

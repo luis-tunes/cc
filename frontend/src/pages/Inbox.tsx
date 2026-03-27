@@ -187,7 +187,7 @@ export default function InboxPage() {
         <EmptyState
           icon={FileText}
           title="Nenhum documento importado"
-          description="Comece por importar faturas, recibos ou outros documentos. O TIM irá extrair automaticamente os campos relevantes e sugerir classificações."
+          description="Comece por importar faturas, recibos ou outros documentos. O xtim.ai irá extrair automaticamente os campos relevantes e sugerir classificações."
           actionLabel="Importar primeiro documento"
           onAction={() => setShowIntake(true)}
           className="py-20"

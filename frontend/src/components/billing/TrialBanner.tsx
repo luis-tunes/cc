@@ -31,7 +31,7 @@ export function TrialBanner() {
         <Clock className="h-3.5 w-3.5" />
         <span className="font-medium">
           {isExpired
-            ? "O seu período de teste terminou. Subscreva para continuar a usar o TIM."
+            ? "O seu período de teste terminou. Subscreva para continuar a usar o xtim.ai."
             : `${daysLeft} dia${daysLeft !== 1 ? "s" : ""} restante${daysLeft !== 1 ? "s" : ""} do período de teste gratuito`}
         </span>
       </div>

@@ -41,11 +41,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-primary">
-            TIM
+            xtim
           </span>
           {!collapsed && (
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Time is Money
+              .ai
             </span>
           )}
         </div>

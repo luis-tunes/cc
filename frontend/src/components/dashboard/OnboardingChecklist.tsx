@@ -29,7 +29,7 @@ const steps = [
   {
     id: "reconcile",
     title: "Executar a primeira reconciliação",
-    description: "O TIM cruza automaticamente documentos com movimentos",
+    description: "O xtim.ai cruza automaticamente documentos com movimentos",
     icon: GitMerge,
     path: "/reconciliacao",
     check: (p: OnboardingChecklistProps) => p.reconciled > 0,
@@ -59,7 +59,7 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
       <div className="flex items-center justify-between border-b px-5 py-4">
         <div>
           <h3 className="text-base font-semibold text-foreground">
-            Bem-vindo ao TIM 👋
+            Bem-vindo ao xtim.ai 👋
           </h3>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Complete estes passos para configurar a sua conta

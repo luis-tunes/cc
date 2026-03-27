@@ -12,7 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
-const MOBILE_TAB_PATHS = ["/painel", "/documentos", "/movimentos", "/reconciliacao"];
+const MOBILE_TAB_PATHS = ["/painel", "/caixa-entrada", "/reconciliacao"];
 
 interface AppTopbarProps {
   title?: string;
@@ -70,7 +70,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
           <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-sm text-muted-foreground">
             <Building2 className="h-4 w-4" />
             <span className="font-medium text-foreground">
-              {user?.organizationMemberships?.[0]?.organization?.name || "TIM"}
+              {user?.organizationMemberships?.[0]?.organization?.name || "xtim.ai"}
             </span>
           </div>
           <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-sm text-muted-foreground">

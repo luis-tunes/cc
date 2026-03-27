@@ -47,8 +47,8 @@ export function UpgradeGate({ children, title, subtitle }: UpgradeGateProps) {
         </h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
           {daysLeft > 0
-            ? `Esta funcionalidade requer uma subscrição ativa. Tem ${daysLeft} dias de teste gratuito — subscreva para desbloquear todas as funcionalidades do TIM.`
-            : "Subscreva o plano Profissional para aceder a esta funcionalidade e a todas as ferramentas avançadas do TIM."}
+            ? `Esta funcionalidade requer uma subscrição ativa. Tem ${daysLeft} dias de teste gratuito — subscreva para desbloquear todas as funcionalidades do xtim.ai.`
+            : "Subscreva o plano Profissional para aceder a esta funcionalidade e a todas as ferramentas avançadas do xtim.ai."}
         </p>
         <div className="mt-8 flex flex-col items-center gap-3">
           <button

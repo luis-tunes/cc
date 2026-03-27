@@ -80,9 +80,9 @@ function Nav() {
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold tracking-tight text-primary">TIM</span>
+          <span className="text-2xl font-bold tracking-tight text-primary">xtim.ai</span>
           <span className="hidden text-xs font-medium uppercase tracking-widest text-muted-foreground sm:inline">
-            Time is Money
+            Contabilidade Inteligente
           </span>
         </Link>
 
@@ -344,7 +344,7 @@ const FEATURES = [
     icon: Bot,
     title: "Classificação por IA",
     description:
-      "O TIM aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
+      "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
     highlight: "Aprende consigo",
   },
   {
@@ -426,7 +426,7 @@ const STEPS = [
   {
     number: "02",
     title: "Revisão inteligente",
-    description: "O TIM extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
+    description: "O xtim.ai extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
   },
   {
     number: "03",
@@ -644,7 +644,7 @@ function Pricing() {
 
 const TESTIMONIALS = [
   {
-    quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O TIM mudou a forma como vejo a contabilidade.",
+    quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O xtim.ai mudou a forma como vejo a contabilidade.",
     author: "Ricardo M.",
     role: "Dono de restaurante, Lisboa",
   },
@@ -707,7 +707,7 @@ function Testimonials() {
 const FAQS = [
   {
     q: "Preciso de conhecimentos de contabilidade?",
-    a: "Não. O TIM foi desenhado para empresários, não para contabilistas. A interface explica tudo em linguagem simples.",
+    a: "Não. O xtim.ai foi desenhado para empresários, não para contabilistas. A interface explica tudo em linguagem simples.",
   },
   {
     q: "Os meus dados estão seguros?",
@@ -719,7 +719,7 @@ const FAQS = [
   },
   {
     q: "Funciona com o meu banco?",
-    a: "O TIM aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
+    a: "O xtim.ai aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
   },
   {
     q: "Preciso de inserir cartão de crédito?",
@@ -788,7 +788,7 @@ function CTA() {
           Pronto para simplificar a sua contabilidade?
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:text-base">
-          Carregue os seus documentos e extratos. Veja o TIM a trabalhar. Decida depois.
+          Carregue os seus documentos e extratos. Veja o xtim.ai a trabalhar. Decida depois.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
           <Link
@@ -823,8 +823,8 @@ function Footer() {
           {/* Brand */}
           <div className="sm:col-span-2 md:col-span-1">
             <Link to="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight text-primary">TIM</span>
-              <span className="text-xs text-muted-foreground">Time is Money</span>
+              <span className="text-xl font-bold tracking-tight text-primary">xtim.ai</span>
+              <span className="text-xs text-muted-foreground">Contabilidade Inteligente</span>
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
               Contabilidade automatizada para negócios portugueses. Simples, seguro e 100% em português.
@@ -874,7 +874,7 @@ function Footer() {
         <div className="mt-8 border-t pt-6 sm:mt-10 sm:pt-8">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <p className="text-xs text-muted-foreground/50">
-              © {new Date().getFullYear()} TIM — Time is Money. Todos os direitos reservados.
+              © {new Date().getFullYear()} xtim.ai — Contabilidade Inteligente. Todos os direitos reservados.
             </p>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1 text-xs text-muted-foreground/40">

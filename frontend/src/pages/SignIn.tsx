@@ -11,8 +11,8 @@ export default function SignInPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 w-full max-w-sm px-4">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-primary">TIM</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Time is Money</p>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">xtim.ai</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Contabilidade Inteligente</p>
           <p className="mt-3 text-xs text-muted-foreground/80">Contabilidade inteligente para o seu negócio</p>
         </div>
         <SignIn
