@@ -192,6 +192,7 @@ export interface Document {
   created_at: string | null;
   snc_account: string | null;
   classification_source: string | null;
+  notes: string | null;
   reconciliation_status?: string | null;
 }
 
@@ -355,6 +356,10 @@ export async function uploadBankCSV(file: File): Promise<{ imported: number }> {
   const form = new FormData();
   form.append("file", file);
   return requestFormData("/bank-transactions/upload", form);
+}
+
+export async function deleteBankTransaction(id: number): Promise<void> {
+  await request<void>(`/bank-transactions/${id}`, { method: "DELETE" });
 }
 
 // ── Reconciliation ───────────────────────────────────────────────────

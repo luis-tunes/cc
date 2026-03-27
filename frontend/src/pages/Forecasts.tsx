@@ -39,11 +39,13 @@ export default function Forecasts() {
 
   const today = new Date();
   const projections = Array.from({ length: 6 }, (_, i) => {
-    const m = (today.getMonth() + i) % 12;
+    const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    const m = futureDate.getMonth();
+    const yr = futureDate.getFullYear().toString().slice(-2);
     const projReceitas = Math.max(0, avgReceitas + trend * i * 0.3);
     const projGastos = Math.max(0, avgGastos + trend * i * 0.1);
     return {
-      month: MONTHS_PT[m],
+      month: `${MONTHS_PT[m]} ${yr}`,
       receitas: Math.round(projReceitas),
       gastos: Math.round(projGastos),
       resultado: Math.round(projReceitas - projGastos),

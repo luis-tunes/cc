@@ -18,6 +18,7 @@ function makeDoc(overrides: Partial<Document> = {}): Document {
     created_at: "2024-06-01T10:00:00Z",
     snc_account: null,
     classification_source: null,
+    notes: null,
     ...overrides,
   };
 }
