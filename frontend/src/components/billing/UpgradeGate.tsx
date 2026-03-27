@@ -11,8 +11,8 @@ interface UpgradeGateProps {
 }
 
 /**
- * Wraps a proOnly page. If the user is on free trial, shows an upgrade
- * prompt instead of the page content. Paid users see the page normally.
+ * Wraps a proOnly page. Free-plan users see an upgrade prompt.
+ * Pro/Custom subscribers see the page content normally.
  */
 export function UpgradeGate({ children, title, subtitle }: UpgradeGateProps) {
   const { data: billing, isLoading } = useBillingStatus();
@@ -34,8 +34,6 @@ export function UpgradeGate({ children, title, subtitle }: UpgradeGateProps) {
     return <>{children}</>;
   }
 
-  const daysLeft = billing.trial_days_left ?? 0;
-
   return (
     <PageContainer title={title} subtitle={subtitle}>
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -46,9 +44,7 @@ export function UpgradeGate({ children, title, subtitle }: UpgradeGateProps) {
           Funcionalidade disponível no plano Profissional
         </h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          {daysLeft > 0
-            ? `Esta funcionalidade requer uma subscrição ativa. Tem ${daysLeft} dias de teste gratuito — subscreva para desbloquear todas as funcionalidades do xtim.ai.`
-            : "Subscreva o plano Profissional para aceder a esta funcionalidade e a todas as ferramentas avançadas do xtim.ai."}
+          Subscreva o plano Profissional para aceder a esta funcionalidade e a todas as ferramentas avançadas do xtim.ai.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3">
           <button
