@@ -14,7 +14,7 @@ from app.assistant import answer_question as _answer_question
 from app.auth import AuthInfo, require_auth
 from app.cache import cache_get, cache_invalidate, cache_set
 from app.db import get_conn, log_activity
-from app.limiter import UPLOAD_RATE, WEBHOOK_RATE, limiter
+from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.parse import (
     _MIME_FROM_EXT,
     _extract_with_vision,
@@ -322,7 +322,8 @@ async def list_documents(
 
 
 @router.post("/documents/auto-classify")
-async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def auto_classify_documents(request: Request, auth: AuthInfo = Depends(require_auth)):
     """Run classification rules against all unclassified documents for the tenant."""
     from app.classify import classify_document
     tid = auth.tenant_id
@@ -777,7 +778,8 @@ async def list_bank_transactions(
 # --- Reconciliation ---
 
 @router.post("/reconcile")
-async def run_reconciliation(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def run_reconciliation(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     matches = reconcile_all(tid)
     if matches:
@@ -1021,7 +1023,8 @@ async def patch_alert(alert_id: int, auth: AuthInfo = Depends(require_auth)):
     return {"id": alert_id, "read": True}
 
 @router.post("/alerts/generate")
-async def generate_alerts(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def generate_alerts(request: Request, auth: AuthInfo = Depends(require_auth)):
     """Run the alerts engine to generate new compliance alerts."""
     from app.alerts import generate_compliance_alerts
     tid = auth.tenant_id
@@ -2704,7 +2707,8 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/assistant/chat")
-async def assistant_chat(body: ChatRequest, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def assistant_chat(request: Request, body: ChatRequest, auth: AuthInfo = Depends(require_auth)):
     """Answer a natural-language accounting question using live DB data."""
     question = body.question.strip()
     if not question:

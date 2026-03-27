@@ -16,6 +16,7 @@ DEFAULT_RATE = os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")
 AUTH_RATE = os.environ.get("RATE_LIMIT_AUTH", "10/minute")
 UPLOAD_RATE = os.environ.get("RATE_LIMIT_UPLOAD", "20/minute")
 WEBHOOK_RATE = os.environ.get("RATE_LIMIT_WEBHOOK", "30/minute")
+EXPENSIVE_RATE = os.environ.get("RATE_LIMIT_EXPENSIVE", "10/minute")
 
 
 def _key_func(request: Request) -> str:

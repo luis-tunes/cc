@@ -18,11 +18,16 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   paperless:
     image: ghcr.io/paperless-ngx/paperless-ngx:2.14
@@ -33,7 +38,7 @@ services:
       PAPERLESS_DBNAME: paperless
       PAPERLESS_DBUSER: ${POSTGRES_USER:-cc}
       PAPERLESS_DBPASS: ${POSTGRES_PASSWORD:-cc}
-      PAPERLESS_REDIS: redis://redis:6379
+      PAPERLESS_REDIS: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
       PAPERLESS_URL: http://localhost:8000
       PAPERLESS_OCR_LANGUAGE: por+eng
       PAPERLESS_OCR_LANGUAGES: por
@@ -81,6 +86,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       SENTRY_DSN: ${SENTRY_DSN:-}
       LOG_FORMAT: ${LOG_FORMAT:-text}
       WEB_DIR: /opt/tim/web
@@ -89,6 +96,16 @@ services:
       - uploads:/opt/tim/uploads
     expose:
       - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     depends_on:
       db:
         condition: service_healthy
@@ -108,8 +125,18 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
 volumes:
   pgdata:
