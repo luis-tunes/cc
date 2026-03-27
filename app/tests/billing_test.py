@@ -1,5 +1,6 @@
 """Tests for billing module."""
 import pytest
+
 from app.billing import PLANS, _verify_stripe_signature
 
 

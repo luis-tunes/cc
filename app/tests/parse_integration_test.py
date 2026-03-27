@@ -4,15 +4,16 @@ Tests ingest_document with mocked httpx calls and real text-parsing logic.
 """
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
-from app.parse import (
-    validate_nif, ingest_document, parse_invoice,
-    _parse_amount_from_text, _parse_date_from_text,
-    fetch_document_file, fetch_document_text, extract_text,
-)
 
+from app.parse import (
+    _parse_amount_from_text,
+    _parse_date_from_text,
+    ingest_document,
+    validate_nif,
+)
 
 # ── Text parsing helpers ──────────────────────────────────────────────
 
@@ -197,14 +198,14 @@ def test_ingest_upserts_on_same_paperless_id():
          patch("app.parse.extract_text", return_value=text1), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text1}):
-        id1 = ingest_document(70, tenant_id="test-tenant")
+        ingest_document(70, tenant_id="test-tenant")
 
     with patch("app.parse.fetch_document_file", return_value=b"%PDF-dummy"), \
          patch("app.parse.parse_invoice", return_value=None), \
          patch("app.parse.extract_text", return_value=text2), \
          patch("app.parse._extract_with_vision", return_value=None), \
          patch("app.parse.fetch_document_metadata", return_value={"original_file_name": "test.pdf", "content": text2}):
-        id2 = ingest_document(70, tenant_id="test-tenant")
+        ingest_document(70, tenant_id="test-tenant")
 
     # Same paperless_id → same doc updated (conftest simulates upsert)
     import sys

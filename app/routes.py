@@ -1,21 +1,28 @@
 import csv
 import datetime
 import io
-import json
 import logging
 import os
 from decimal import Decimal
-from typing import Optional
+
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.auth import AuthInfo, optional_auth, require_auth
-from app.db import get_conn, log_activity
-from app.parse import ingest_document, validate_nif, _extract_with_vision, _normalize_llm_result, _extract_with_llm, _calculate_confidence, _MIME_FROM_EXT
-from app.reconcile import reconcile_all, suggest_matches
-from app.cache import cache_get, cache_set, cache_invalidate
+
 from app.assistant import answer_question as _answer_question
+from app.auth import AuthInfo, require_auth
+from app.cache import cache_get, cache_invalidate, cache_set
+from app.db import get_conn, log_activity
+from app.limiter import UPLOAD_RATE, WEBHOOK_RATE, limiter
+from app.parse import (
+    _MIME_FROM_EXT,
+    _extract_with_vision,
+    _normalize_llm_result,
+    ingest_document,
+    validate_nif,
+)
+from app.reconcile import reconcile_all, suggest_matches
 
 logger = logging.getLogger(__name__)
 
@@ -47,16 +54,16 @@ class DocumentOut(BaseModel):
     reconciliation_status: str | None = None
 
 class DocumentPatch(BaseModel):
-    status: Optional[str] = None
-    type: Optional[str] = None
-    supplier_nif: Optional[str] = None
-    client_nif: Optional[str] = None
-    total: Optional[Decimal] = None
-    vat: Optional[Decimal] = None
-    date: Optional[datetime.date] = None
-    filename: Optional[str] = None
-    notes: Optional[str] = None
-    snc_account: Optional[str] = None
+    status: str | None = None
+    type: str | None = None
+    supplier_nif: str | None = None
+    client_nif: str | None = None
+    total: Decimal | None = None
+    vat: Decimal | None = None
+    date: datetime.date | None = None
+    filename: str | None = None
+    notes: str | None = None
+    snc_account: str | None = None
 
 class BankTransactionOut(BaseModel):
     id: int
@@ -72,7 +79,8 @@ class WebhookRequest(BaseModel):
     tenant_id: str = ""
 
 @router.post("/webhook")
-async def paperless_webhook(payload: WebhookRequest):
+@limiter.limit(WEBHOOK_RATE)
+async def paperless_webhook(request: Request, payload: WebhookRequest):
     import hmac
     if not WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="webhook secret not configured")
@@ -97,7 +105,7 @@ async def paperless_webhook(payload: WebhookRequest):
     try:
         doc_id = ingest_document(payload.document_id, tenant_id=tid)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     cache_invalidate(f"dashboard:{tid}")
     return {"document_id": doc_id}
 
@@ -113,7 +121,8 @@ MIME_MAP = {
 }
 
 @router.post("/documents/upload")
-async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(UPLOAD_RATE)
+async def upload_document(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
     if not file.filename:
         raise HTTPException(status_code=422, detail="filename is required")
     ext = os.path.splitext(file.filename.lower())[1]
@@ -144,7 +153,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
                 local_id = row["id"]
         except Exception:
             logger.exception("upload: DB insert failed for file=%s", file.filename)
-            raise HTTPException(status_code=500, detail="database error saving document record")
+            raise HTTPException(status_code=500, detail="database error saving document record") from None
 
         # Save file to disk for preview
         try:
@@ -212,7 +221,7 @@ async def upload_document(file: UploadFile, auth: AuthInfo = Depends(require_aut
         raise
     except Exception:
         logger.exception("upload: unexpected error for file=%s", getattr(file, 'filename', '?'))
-        raise HTTPException(status_code=500, detail="internal error during upload")
+        raise HTTPException(status_code=500, detail="internal error during upload") from None
 
 
 @router.get("/debug/upload-check")
@@ -578,7 +587,7 @@ async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)
         new_id = ingest_document(row["paperless_id"], row["tenant_id"])
     except Exception as e:
         logger.exception("reprocess failed for doc %d", doc_id)
-        raise HTTPException(status_code=500, detail=f"reprocess failed: {e}")
+        raise HTTPException(status_code=500, detail=f"reprocess failed: {e}") from None
     return {"document_id": new_id}
 
 
@@ -623,7 +632,7 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail="failed to fetch from OCR service")
     except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="OCR service unavailable")
+        raise HTTPException(status_code=502, detail="OCR service unavailable") from None
 
     from urllib.parse import quote
     return StreamingResponse(
@@ -674,7 +683,7 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail="failed to fetch thumbnail")
     except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="OCR service unavailable")
+        raise HTTPException(status_code=502, detail="OCR service unavailable") from None
 
     return StreamingResponse(
         io.BytesIO(r.content),
@@ -685,7 +694,8 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
 # --- Bank Transactions ---
 
 @router.post("/bank-transactions/upload")
-async def upload_bank_csv(file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(UPLOAD_RATE)
+async def upload_bank_csv(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
     MAX_CSV_ROWS = 10_000
     content = await file.read()
     if len(content) > MAX_UPLOAD_BYTES:
@@ -790,7 +800,7 @@ async def list_reconciliations(
 
 
 class ReconciliationPatch(BaseModel):
-    status: Optional[str] = None
+    status: str | None = None
 
 VALID_RECON_STATUSES = {"pendente", "aprovado", "rejeitado", "a_rever"}
 
@@ -887,13 +897,13 @@ class MovementRuleCreate(BaseModel):
     active: bool = True
 
 class MovementRulePatch(BaseModel):
-    name: Optional[str] = None
-    pattern: Optional[str] = None
-    category: Optional[str] = None
-    snc_account: Optional[str] = None
-    entity_nif: Optional[str] = None
-    priority: Optional[int] = None
-    active: Optional[bool] = None
+    name: str | None = None
+    pattern: str | None = None
+    category: str | None = None
+    snc_account: str | None = None
+    entity_nif: str | None = None
+    priority: int | None = None
+    active: bool | None = None
 
 @router.get("/movement-rules", response_model=list[MovementRuleOut])
 async def list_movement_rules(auth: AuthInfo = Depends(require_auth)):
@@ -1034,16 +1044,16 @@ class AssetCreate(BaseModel):
     notes: str | None = None
 
 class AssetPatch(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    acquisition_date: Optional[datetime.date] = None
-    acquisition_cost: Optional[Decimal] = None
-    useful_life_years: Optional[int] = None
-    depreciation_method: Optional[str] = None
-    status: Optional[str] = None
-    supplier: Optional[str] = None
-    invoice_ref: Optional[str] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    category: str | None = None
+    acquisition_date: datetime.date | None = None
+    acquisition_cost: Decimal | None = None
+    useful_life_years: int | None = None
+    depreciation_method: str | None = None
+    status: str | None = None
+    supplier: str | None = None
+    invoice_ref: str | None = None
+    notes: str | None = None
 
 VALID_ASSET_CATEGORIES = {"equipamento", "mobiliário", "veículo", "imóvel", "informático", "intangível"}
 VALID_DEPRECIATION_METHODS = {"linha-reta", "quotas-decrescentes", "não-definido"}
@@ -1473,7 +1483,7 @@ async def create_supplier(body: dict, auth: AuthInfo = Depends(require_auth)):
         reliability = min(max(Decimal(str(body.get("reliability", 80))), Decimal("0")), Decimal("100"))
         avg_days = max(int(body.get("avg_delivery_days", 3)), 0)
     except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid numeric value")
+        raise HTTPException(status_code=422, detail="invalid numeric value") from None
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO suppliers (tenant_id, name, nif, category, avg_delivery_days, reliability)
@@ -1514,12 +1524,12 @@ async def update_supplier(supplier_id: int, body: dict, auth: AuthInfo = Depends
         try:
             fields["reliability"] = min(max(Decimal(str(fields["reliability"])), Decimal("0")), Decimal("100"))
         except (ValueError, ArithmeticError):
-            raise HTTPException(status_code=422, detail="invalid reliability value")
+            raise HTTPException(status_code=422, detail="invalid reliability value") from None
     if "avg_delivery_days" in fields:
         try:
             fields["avg_delivery_days"] = max(int(fields["avg_delivery_days"]), 0)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=422, detail="invalid avg_delivery_days value")
+            raise HTTPException(status_code=422, detail="invalid avg_delivery_days value") from None
     set_parts = [f"{k} = %s" for k in fields]
     params = list(fields.values()) + [supplier_id, tid]
     with get_conn() as conn:
@@ -1671,7 +1681,7 @@ async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
         last_cost = max(Decimal(str(body.get("last_cost", 0))), Decimal("0"))
         avg_cost = max(Decimal(str(body.get("avg_cost", 0))), Decimal("0"))
     except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid numeric value")
+        raise HTTPException(status_code=422, detail="invalid numeric value") from None
     supplier_id = body.get("supplier_id")
     with get_conn() as conn:
         # Verify supplier belongs to tenant if provided
@@ -1777,7 +1787,7 @@ async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth))
     try:
         qty_dec = Decimal(str(qty))
     except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid qty value")
+        raise HTTPException(status_code=422, detail="invalid qty value") from None
     if qty_dec <= 0:
         raise HTTPException(status_code=422, detail="qty must be positive")
     with get_conn() as conn:
@@ -1808,7 +1818,7 @@ async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth))
         try:
             cost_val = Decimal(str(body["cost"])) if body.get("cost") is not None else None
         except (ValueError, ArithmeticError):
-            raise HTTPException(status_code=422, detail="invalid cost value")
+            raise HTTPException(status_code=422, detail="invalid cost value") from None
         if cost_val is not None and cost_val < 0:
             raise HTTPException(status_code=422, detail="cost must be non-negative")
         row = conn.execute(
@@ -1883,7 +1893,7 @@ async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
     try:
         pvp_val = max(Decimal(str(body.get("pvp", 0))), Decimal("0"))
     except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid pvp value")
+        raise HTTPException(status_code=422, detail="invalid pvp value") from None
     ingredients_list = body.get("ingredients", [])
     with get_conn() as conn:
         # Compute estimated cost from recipe
@@ -2492,7 +2502,7 @@ async def add_price_point(body: dict, auth: AuthInfo = Depends(require_auth)):
     try:
         price_dec = Decimal(str(price))
     except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid price value")
+        raise HTTPException(status_code=422, detail="invalid price value") from None
     if price_dec < 0:
         raise HTTPException(status_code=422, detail="price must be non-negative")
     with get_conn() as conn:
@@ -2546,13 +2556,13 @@ class ClassificationRuleCreate(BaseModel):
 
 
 class ClassificationRulePatch(BaseModel):
-    field: Optional[str] = None
-    operator: Optional[str] = None
-    value: Optional[str] = None
-    account: Optional[str] = None
-    label: Optional[str] = None
-    priority: Optional[int] = None
-    active: Optional[bool] = None
+    field: str | None = None
+    operator: str | None = None
+    value: str | None = None
+    account: str | None = None
+    label: str | None = None
+    priority: int | None = None
+    active: bool | None = None
 
 
 VALID_FIELDS = {"supplier_nif", "description", "amount_gte", "amount_lte", "type"}

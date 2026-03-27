@@ -2,23 +2,16 @@
 Stripe billing — checkout sessions, webhooks, plan status.
 Clerk handles auth; Stripe handles money. They connect via metadata.
 
-Revenue split: 50/50 via Stripe Connect destination charges.
-Partner (sales) gets 50% directly to their connected account.
-Platform (builder) keeps 50% as the application fee.
-
-Trial: 14 days free, persisted in DB (tenant_plans table).
-
 Plans:
   pro    — 150€ + IVA/mês, documentos ilimitados, 5 utilizadores
   custom — empresa, SLA + garantia, preço personalizado (contacte-nos)
 """
 
-import os
-import hmac
 import hashlib
+import hmac
 import json
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+import os
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -30,11 +23,7 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_API = "https://api.stripe.com/v1"
 APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
-CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@tim.pt")
-
-# Stripe Connect — 50/50 revenue split
-PARTNER_STRIPE_ACCOUNT = os.environ.get("PARTNER_STRIPE_ACCOUNT", "")
-REVENUE_SPLIT_PERCENT = int(os.environ.get("REVENUE_SPLIT_PERCENT", "50"))
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@xtim.ai")
 
 TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "14"))
 
@@ -78,7 +67,7 @@ def _get_or_create_tenant_plan(tenant_id: str) -> dict:
         if row:
             return dict(row)
         # Create new trial
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trial_end = now + timedelta(days=TRIAL_DAYS)
         conn.execute(
             "INSERT INTO tenant_plans (tenant_id, plan, status, trial_start, trial_end) VALUES (%s, 'free', 'trialing', %s, %s)",
@@ -109,9 +98,9 @@ def _compute_trial_status(info: dict) -> dict:
 
     trial_end = info.get("trial_end")
     if trial_end:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if hasattr(trial_end, 'tzinfo') and trial_end.tzinfo is None:
-            trial_end = trial_end.replace(tzinfo=timezone.utc)
+            trial_end = trial_end.replace(tzinfo=UTC)
         days_left = max(0, (trial_end - now).days)
         result["trial_days_left"] = days_left
         result["trial_end"] = trial_end.isoformat() if trial_end else None
@@ -188,11 +177,6 @@ async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
         "metadata[user_id]": auth.user_id,
     }
 
-    # Stripe Connect: 50/50 split
-    if PARTNER_STRIPE_ACCOUNT:
-        checkout_data["subscription_data[application_fee_percent]"] = str(REVENUE_SPLIT_PERCENT)
-        checkout_data["subscription_data[transfer_data][destination]"] = PARTNER_STRIPE_ACCOUNT
-
     session = _stripe("POST", "/checkout/sessions", checkout_data)
     return {"checkout_url": session["url"]}
 
@@ -210,7 +194,7 @@ async def stripe_webhook(request: Request):
     try:
         _verify_stripe_signature(body, sig)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid signature") from None
 
     event = json.loads(body)
     event_type = event.get("type", "")
@@ -254,8 +238,8 @@ def _verify_stripe_signature(payload: bytes, sig_header: str) -> None:
     try:
         ts = int(timestamp)
     except ValueError:
-        raise ValueError("Invalid timestamp")
-    now = int(datetime.now(timezone.utc).timestamp())
+        raise ValueError("Invalid timestamp") from None
+    now = int(datetime.now(UTC).timestamp())
     if abs(now - ts) > WEBHOOK_TOLERANCE_SECONDS:
         raise ValueError("Webhook timestamp too old (possible replay)")
     signed = f"{timestamp}.".encode() + payload

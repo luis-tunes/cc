@@ -2,10 +2,10 @@
 Comprehensive API route tests.
 Uses shared FakeConn from conftest.py — no PostgreSQL needed.
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app, raise_server_exceptions=False)

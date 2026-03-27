@@ -16,10 +16,9 @@ import datetime
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +61,8 @@ def _get_jwks_client() -> "jwt.PyJWKClient":
 class AuthInfo:
     user_id: str
     tenant_id: str  # org_id if present, else user_id — NEVER empty
-    email: Optional[str]
-    session_id: Optional[str]
+    email: str | None
+    session_id: str | None
 
 
 def _decode_clerk_jwt(token: str) -> dict:
@@ -105,7 +104,7 @@ def _decode_clerk_jwt(token: str) -> dict:
     raise ValueError("No CLERK_PEM_PUBLIC_KEY configured, JWKS fetch failed, and AUTH_DISABLED is off")
 
 
-def _extract_auth(request: Request) -> Optional[AuthInfo]:
+def _extract_auth(request: Request) -> AuthInfo | None:
     """Extract AuthInfo from the request, or None if no token."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -115,7 +114,7 @@ def _extract_auth(request: Request) -> Optional[AuthInfo]:
     try:
         payload = _decode_clerk_jwt(token)
     except (jwt.InvalidTokenError, ValueError) as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}") from e
 
     user_id = payload.get("sub", "")
     if not user_id:
@@ -147,7 +146,7 @@ async def require_auth(request: Request) -> AuthInfo:
     return auth
 
 
-async def optional_auth(request: Request) -> Optional[AuthInfo]:
+async def optional_auth(request: Request) -> AuthInfo | None:
     """FastAPI dependency that optionally extracts auth (for public endpoints)."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):

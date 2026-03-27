@@ -5,17 +5,19 @@ All test files import the FakeConn and helpers from here instead of
 duplicating ~500 lines of mock infrastructure each.
 """
 import os
-import pytest
 from contextlib import contextmanager
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
+
+import pytest
 
 # Ensure auth is disabled for tests
 os.environ.setdefault("AUTH_DISABLED", "1")
 os.environ.setdefault("DATABASE_URL", "postgresql://cc:cc@localhost:5432/cc")
 
 import app.auth
+
 app.auth.AUTH_DISABLED = True
 
 
@@ -553,7 +555,7 @@ class FakeConn:
             rows = [r for r in _tables["tenant_plans"] if r.get("tenant_id") == tid]
             return FakeCursor(rows)
         if sql_lower.startswith("insert"):
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             # Full upsert from billing webhook
             if "on conflict" in sql_lower:
                 entry = {
@@ -1096,7 +1098,7 @@ class FakeConn:
         if sql_lower.startswith("delete"):
             # DELETE FROM alerts WHERE tenant_id = %s AND read = false
             tid = params[0] if params else None
-            before = len(_tables["alerts"])
+            len(_tables["alerts"])
             _tables["alerts"] = [a for a in _tables["alerts"]
                                   if not (a.get("tenant_id") == tid and not a.get("read", False))]
             return FakeCursor([])
@@ -1323,5 +1325,6 @@ def _clean_db_and_patch(tmp_path):
 def client():
     """Provide a FastAPI TestClient."""
     from fastapi.testclient import TestClient
+
     from app.main import app
     return TestClient(app, raise_server_exceptions=False)

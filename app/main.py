@@ -1,16 +1,40 @@
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from app.auth import check_auth_config
-from app.db import close_pool, init_db
-from app.routes import router
-from app.billing import router as billing_router, init_billing_db
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+import sentry_sdk
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.auth import check_auth_config
+from app.billing import init_billing_db
+from app.billing import router as billing_router
+from app.db import close_pool, init_db
+from app.limiter import limiter
+from app.routes import router
+
+# ── Structured logging ─────────────────────────────────────────────────
+_log_format = os.environ.get("LOG_FORMAT", "text")  # "json" or "text"
+if _log_format == "json":
+    from pythonjsonlogger.json import JsonFormatter
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(JsonFormatter(fmt="%(asctime)s %(name)s %(levelname)s %(message)s", rename_fields={"asctime": "timestamp", "levelname": "level"}))
+    logging.root.handlers = [_handler]
+    logging.root.setLevel(logging.INFO)
+else:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+# ── Sentry (optional) ─────────────────────────────────────────────────
+_sentry_dsn = os.environ.get("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.1, profiles_sample_rate=0.1, enable_tracing=True)
+    logger.info("startup: Sentry initialized")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +51,21 @@ async def lifespan(app: FastAPI):
     yield
     close_pool()
 
-app = FastAPI(title="TIM — Time is Money", lifespan=lifespan)
+app = FastAPI(title="xtim.ai — Contabilidade Inteligente", lifespan=lifespan)
+
+# ── Rate limiting ──────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# ── Request ID middleware ──────────────────────────────────────────────
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 @app.get("/health")
 async def health():
@@ -39,9 +77,9 @@ app.include_router(billing_router, prefix="/api")
 
 # Backward-compat: Paperless post-consume calls /webhook without /api prefix
 @app.post("/webhook")
-async def webhook_compat(payload: dict):
-    from app.routes import paperless_webhook, WebhookRequest
-    return await paperless_webhook(WebhookRequest(**payload))
+async def webhook_compat(request: Request, payload: dict):
+    from app.routes import WebhookRequest, paperless_webhook
+    return await paperless_webhook(request, WebhookRequest(**payload))
 
 _web_dir = os.environ.get("WEB_DIR", "/opt/tim/web")
 if os.path.isdir(_web_dir):

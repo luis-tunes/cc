@@ -3,13 +3,13 @@ Reconciliation integration tests.
 Tests reconcile_all() with real matching logic against the in-memory mock DB.
 Previously, reconcile_all was always mocked out in routes tests.
 """
-from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
 from app.main import app
-from app.reconcile import reconcile_all, AMOUNT_TOLERANCE, DATE_TOLERANCE
+from app.reconcile import AMOUNT_TOLERANCE, DATE_TOLERANCE
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -70,7 +70,7 @@ def test_reconcile_empty():
 
 def test_reconcile_constants():
     """Tolerance constants match specification."""
-    assert AMOUNT_TOLERANCE == Decimal("0.01")
+    assert Decimal("0.01") == AMOUNT_TOLERANCE
     assert DATE_TOLERANCE.days == 5
 
 

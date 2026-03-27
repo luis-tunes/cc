@@ -1,10 +1,12 @@
 from datetime import date, timedelta
 from decimal import Decimal
+
 from app.reconcile import AMOUNT_TOLERANCE, DATE_TOLERANCE
 
+
 def test_tolerance_values():
-    assert AMOUNT_TOLERANCE == Decimal("0.01")
-    assert DATE_TOLERANCE == timedelta(days=5)
+    assert Decimal("0.01") == AMOUNT_TOLERANCE
+    assert timedelta(days=5) == DATE_TOLERANCE
 
 def test_amount_within_tolerance():
     diff = abs(Decimal("100.00") - Decimal("100.005"))
