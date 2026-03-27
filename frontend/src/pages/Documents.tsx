@@ -22,6 +22,7 @@ import { downloadWithAuth } from "@/lib/api";
 import { toast } from "sonner";
 import { TableSkeleton, KpiSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 type ViewTab = "todos" | "revisao" | "classificados" | "reconciliados";
 
@@ -39,6 +40,7 @@ export default function Documents() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ViewTab>("todos");
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let docs = [...documents];
@@ -207,7 +209,7 @@ export default function Documents() {
           onFlag={() => bulkStub("Sinalizados")}
           onExport={bulkExport}
           onArchive={bulkArchive}
-          onDelete={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); }}
+          onDelete={() => setBulkDeleteOpen(true)}
           onClear={() => setSelectedIds(new Set())}
         />
 
@@ -255,6 +257,15 @@ export default function Documents() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onDocumentProcessed={handleDocumentProcessed}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={`Eliminar ${selectedIds.size} documento${selectedIds.size === 1 ? "" : "s"}`}
+        description="Tem a certeza que pretende eliminar os documentos selecionados? Esta ação não pode ser desfeita."
+        confirmLabel="Eliminar"
+        onConfirm={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); setBulkDeleteOpen(false); }}
       />
     </PageContainer>
   );

@@ -8,6 +8,7 @@ import { DocumentReviewDrawer } from "@/components/documents/DocumentReviewDrawe
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
 import { type DocumentRecord, type UploadingFile } from "@/lib/documents-data";
@@ -36,6 +37,7 @@ export default function InboxPage() {
   // Review drawer
   const [reviewDoc, setReviewDoc] = useState<DocumentRecord | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // Filter documents
   const filtered = useMemo(() => {
@@ -218,7 +220,7 @@ export default function InboxPage() {
             onFlag={() => bulkAction("Sinalizar")}
             onExport={() => bulkAction("Exportar")}
             onArchive={() => bulkAction("Arquivar")}
-            onDelete={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); }}
+            onDelete={() => setBulkDeleteOpen(true)}
             onClear={() => setSelectedIds(new Set())}
           />
 
@@ -247,6 +249,15 @@ export default function InboxPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         actions={actions}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={`Eliminar ${selectedIds.size} documento${selectedIds.size === 1 ? "" : "s"}`}
+        description="Tem a certeza que pretende eliminar os documentos selecionados? Esta ação não pode ser desfeita."
+        confirmLabel="Eliminar"
+        onConfirm={() => { actions.onBulkDelete([...selectedIds]); setSelectedIds(new Set()); setBulkDeleteOpen(false); }}
       />
     </PageContainer>
   );

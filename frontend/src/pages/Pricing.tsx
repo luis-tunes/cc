@@ -1,14 +1,16 @@
 import { useBillingPlans, useBillingStatus, useCheckout } from "@/hooks/use-billing";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, Loader2, Mail, ArrowRight, ArrowLeft, Shield, Zap, Clock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function PricingPage() {
-  const { data: plans = [], isLoading: plansLoading } = useBillingPlans();
-  const { data: billing, isLoading: billingLoading } = useBillingStatus();
+  const { data: plans = [], isLoading: plansLoading, isError: plansError } = useBillingPlans();
+  const { data: billing, isLoading: billingLoading, isError: billingError } = useBillingStatus();
   const checkout = useCheckout();
   const navigate = useNavigate();
   const isLoading = plansLoading || billingLoading;
+  const isError = plansError || billingError;
   const currentPlan = billing?.plan ?? "none";
   const isTrialing = billing?.status === "trialing";
   const isExpired = billing?.status === "trial_expired";
@@ -91,6 +93,10 @@ export default function PricingPage() {
         {isLoading ? (
           <div className="mt-12 flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : isError ? (
+          <div className="mt-12">
+            <ErrorState onRetry={() => window.location.reload()} />
           </div>
         ) : (
           <div className="mt-10 grid gap-8 md:grid-cols-2 max-w-3xl mx-auto">

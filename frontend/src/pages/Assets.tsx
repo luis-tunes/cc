@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -212,6 +213,7 @@ export default function Assets() {
   const deleteAssetMutation = useDeleteAsset();
   const isMobile = useIsMobile();
   const [showAdd, setShowAdd] = useState(false);
+  const [deleteAssetTarget, setDeleteAssetTarget] = useState<number | null>(null);
 
   const activeAssets = assets.filter((a) => a.status === "ativo");
 
@@ -344,7 +346,7 @@ export default function Assets() {
                     </TableCell>
                     <TableCell>
                       <button
-                        onClick={() => deleteAssetMutation.mutate(asset.id)}
+                        onClick={() => setDeleteAssetTarget(asset.id)}
                         className="p-1 text-muted-foreground hover:text-tim-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                         aria-label="Eliminar ativo"
                       >
@@ -360,6 +362,20 @@ export default function Assets() {
       )}
 
       <AddAssetDialog open={showAdd} onClose={() => setShowAdd(false)} />
+
+      <ConfirmDialog
+        open={deleteAssetTarget !== null}
+        onOpenChange={(open) => !open && setDeleteAssetTarget(null)}
+        title="Eliminar ativo"
+        description="Tem a certeza que pretende eliminar este ativo? Esta ação não pode ser desfeita."
+        confirmLabel="Eliminar"
+        onConfirm={() => {
+          if (deleteAssetTarget !== null) {
+            deleteAssetMutation.mutate(deleteAssetTarget);
+            setDeleteAssetTarget(null);
+          }
+        }}
+      />
     </PageContainer>
   );
 }

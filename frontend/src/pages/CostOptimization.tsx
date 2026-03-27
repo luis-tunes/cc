@@ -8,6 +8,7 @@ import { TrendingDown, TrendingUp, Lightbulb, AlertTriangle, Truck, BarChart3 } 
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -19,7 +20,7 @@ function pct(part: number, total: number) {
 }
 
 export default function CostOptimization() {
-  const { data: pl, isError, refetch } = usePlReport();
+  const { data: pl, isLoading, isError, refetch } = usePlReport();
   const { data: suppliers = [] } = useTopSuppliers(10);
 
   const colors = useChartColors();
@@ -82,6 +83,14 @@ export default function CostOptimization() {
       subtitle="Análise de despesas e oportunidades de poupança"
     >
       {/* KPIs */}
+      {isLoading ? (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+        </div>
+      ) : (
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground">Total gastos (ano)</p>
@@ -110,6 +119,7 @@ export default function CostOptimization() {
           </p>
         </div>
       </div>
+      )}
 
       {/* Suggestions */}
       {suggestions.length > 0 && (
