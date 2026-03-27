@@ -6,7 +6,7 @@ import os
 from decimal import Decimal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -32,6 +32,17 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "/opt/tim/uploads")
 
 router = APIRouter()
+
+
+def _auto_reconcile(tenant_id: str) -> None:
+    """Background task: run reconciliation after doc/bank upload."""
+    try:
+        result = reconcile_all(tenant_id)
+        if result:
+            logger.info("auto-reconcile: tenant=%s matched=%d", tenant_id, len(result))
+        cache_invalidate(f"dashboard:{tenant_id}")
+    except Exception:
+        logger.exception("auto-reconcile failed for tenant=%s", tenant_id)
 
 # --- Models ---
 
@@ -80,7 +91,7 @@ class WebhookRequest(BaseModel):
 
 @router.post("/webhook")
 @limiter.limit(WEBHOOK_RATE)
-async def paperless_webhook(request: Request, payload: WebhookRequest):
+async def paperless_webhook(request: Request, payload: WebhookRequest, background_tasks: BackgroundTasks = None):
     import hmac
     if not WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="webhook secret not configured")
@@ -107,6 +118,8 @@ async def paperless_webhook(request: Request, payload: WebhookRequest):
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     cache_invalidate(f"dashboard:{tid}")
+    if background_tasks:
+        background_tasks.add_task(_auto_reconcile, tid)
     return {"document_id": doc_id}
 
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif"}
@@ -122,7 +135,7 @@ MIME_MAP = {
 
 @router.post("/documents/upload")
 @limiter.limit(UPLOAD_RATE)
-async def upload_document(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+async def upload_document(request: Request, file: UploadFile, background_tasks: BackgroundTasks, auth: AuthInfo = Depends(require_auth)):
     if not file.filename:
         raise HTTPException(status_code=422, detail="filename is required")
     ext = os.path.splitext(file.filename.lower())[1]
@@ -213,6 +226,7 @@ async def upload_document(request: Request, file: UploadFile, auth: AuthInfo = D
                 logger.warning("upload: paperless archive unreachable for file=%s: %s", file.filename, exc)
 
         cache_invalidate(f"dashboard:{tid}")
+        background_tasks.add_task(_auto_reconcile, tid)
         status_msg = "accepted" if extracted else "accepted_pending"
         logger.info("upload: %s file=%s id=%d vision=%s", status_msg, file.filename, local_id, extracted)
         return {"status": status_msg, "filename": file.filename, "id": local_id}
@@ -695,7 +709,7 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
 
 @router.post("/bank-transactions/upload")
 @limiter.limit(UPLOAD_RATE)
-async def upload_bank_csv(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: BackgroundTasks, auth: AuthInfo = Depends(require_auth)):
     MAX_CSV_ROWS = 10_000
     content = await file.read()
     if len(content) > MAX_UPLOAD_BYTES:
@@ -732,6 +746,7 @@ async def upload_bank_csv(request: Request, file: UploadFile, auth: AuthInfo = D
     if errors and count == 0:
         raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:5]))
     cache_invalidate(f"dashboard:{tid}")
+    background_tasks.add_task(_auto_reconcile, tid)
     return {"imported": count, "errors": errors[:10]}
 
 @router.get("/bank-transactions", response_model=list[BankTransactionOut])
