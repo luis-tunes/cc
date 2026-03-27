@@ -359,7 +359,7 @@ async def list_documents(
 @limiter.limit(EXPENSIVE_RATE)
 async def auto_classify_documents(request: Request, auth: AuthInfo = Depends(require_auth)):
     """Run classification rules against all unclassified documents for the tenant."""
-    from app.classify import classify_document
+    from app.classify import classify_document, fetch_rules
     tid = auth.tenant_id
     with get_conn() as conn:
         docs = conn.execute(
@@ -370,22 +370,23 @@ async def auto_classify_documents(request: Request, auth: AuthInfo = Depends(req
             (tid,),
         ).fetchall()
 
+    rules = fetch_rules(tid)
     classified = 0
     skipped = 0
-    for doc in docs:
-        result = classify_document(dict(doc), tid)
-        if result:
-            with get_conn() as conn:
+    with get_conn() as conn:
+        for doc in docs:
+            result = classify_document(dict(doc), tid, _rules=rules)
+            if result:
                 conn.execute(
                     "UPDATE documents SET snc_account = %s, classification_source = %s WHERE id = %s AND tenant_id = %s",
                     (result["account"], result["source"], doc["id"], tid),
                 )
                 log_activity(conn, tid, "document", doc["id"], "auto_classified",
                              f"Conta {result['account']} via regra")
-                conn.commit()
-            classified += 1
-        else:
-            skipped += 1
+                classified += 1
+            else:
+                skipped += 1
+        conn.commit()
 
     with get_conn() as conn:
         total_classified = conn.execute(
@@ -603,11 +604,16 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
         raise HTTPException(status_code=400, detail="max 500 documents per request")
     tid = auth.tenant_id
     with get_conn() as conn:
-        for doc_id in payload.ids:
-            row = conn.execute("SELECT id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid)).fetchone()
-            if row:
-                conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
-                conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+        # Batch delete: single query per table instead of N+1
+        existing = conn.execute(
+            "SELECT id FROM documents WHERE id = ANY(%s) AND tenant_id = %s",
+            (payload.ids, tid),
+        ).fetchall()
+        existing_ids = [r["id"] for r in existing]
+        if existing_ids:
+            conn.execute("DELETE FROM reconciliations WHERE document_id = ANY(%s)", (existing_ids,))
+            conn.execute("DELETE FROM documents WHERE id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
+            for doc_id in existing_ids:
                 log_activity(conn, tid, "document", doc_id, "deleted")
         conn.commit()
     return None
@@ -893,7 +899,7 @@ async def enrich_movements(
     auth: AuthInfo = Depends(require_auth),
 ):
     """List bank transactions with classification and entity detection."""
-    from app.classify_movements import classify_movement, detect_entity
+    from app.classify_movements import _fetch_rules, _fetch_suppliers, classify_movement, detect_entity
     tid = auth.tenant_id
     clauses: list[str] = ["tenant_id = %s"]
     params: list = [tid]
@@ -904,10 +910,13 @@ async def enrich_movements(
             f"SELECT id, date, description, amount FROM bank_transactions {where} ORDER BY date DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall()
+    # Fetch rules and suppliers once for the whole batch
+    rules = _fetch_rules(tid)
+    suppliers = _fetch_suppliers(tid)
     results = []
     for tx in rows:
-        cls = classify_movement(tx["description"], tid)
-        entity = detect_entity(tx["description"], tid)
+        cls = classify_movement(tx["description"], tid, _rules=rules)
+        entity = detect_entity(tx["description"], tid, _suppliers=suppliers)
         results.append({
             **dict(tx),
             "category": cls["category"] if cls else None,

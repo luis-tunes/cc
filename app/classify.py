@@ -11,19 +11,25 @@ from app.db import get_conn
 log = logging.getLogger(__name__)
 
 
-def classify_document(doc: dict, tenant_id: str) -> dict | None:
-    """Run classification rules against a document.
-
-    Returns {"account": str, "label": str, "source": "rule"} or None.
-    """
+def fetch_rules(tenant_id: str) -> list[dict]:
+    """Fetch active classification rules for a tenant (sorted by priority)."""
     with get_conn() as conn:
-        rules = conn.execute(
+        return [dict(r) for r in conn.execute(
             """SELECT id, field, operator, value, account, label
                FROM classification_rules
                WHERE tenant_id = %s AND active = true
                ORDER BY priority ASC, id ASC""",
             (tenant_id,),
-        ).fetchall()
+        ).fetchall()]
+
+
+def classify_document(doc: dict, tenant_id: str, *, _rules: list[dict] | None = None) -> dict | None:
+    """Run classification rules against a document.
+
+    Returns {"account": str, "label": str, "source": "rule"} or None.
+    Pass _rules to avoid repeated DB queries in batch scenarios.
+    """
+    rules = _rules if _rules is not None else fetch_rules(tenant_id)
 
     for rule in rules:
         if _matches(rule, doc):

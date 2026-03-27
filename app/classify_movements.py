@@ -16,19 +16,34 @@ DUPLICATE_AMOUNT_TOLERANCE = Decimal("0.01")
 DUPLICATE_DATE_TOLERANCE = timedelta(days=3)
 
 
-def classify_movement(description: str, tenant_id: str) -> dict | None:
-    """Match a movement description against tenant movement_rules.
-
-    Returns {"category": str, "snc_account": str, "entity_nif": str|None, "source": "rule"} or None.
-    """
+def _fetch_rules(tenant_id: str) -> list[dict]:
+    """Fetch active movement rules for a tenant (sorted by priority)."""
     with get_conn() as conn:
-        rules = conn.execute(
+        return [dict(r) for r in conn.execute(
             """SELECT id, pattern, category, snc_account, entity_nif
                FROM movement_rules
                WHERE tenant_id = %s AND active = true
                ORDER BY priority ASC, id ASC""",
             (tenant_id,),
-        ).fetchall()
+        ).fetchall()]
+
+
+def _fetch_suppliers(tenant_id: str) -> list[dict]:
+    """Fetch suppliers for a tenant."""
+    with get_conn() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT id, name, nif FROM suppliers WHERE tenant_id = %s",
+            (tenant_id,),
+        ).fetchall()]
+
+
+def classify_movement(description: str, tenant_id: str, *, _rules: list[dict] | None = None) -> dict | None:
+    """Match a movement description against tenant movement_rules.
+
+    Returns {"category": str, "snc_account": str, "entity_nif": str|None, "source": "rule"} or None.
+    Pass _rules to avoid repeated DB queries in batch scenarios.
+    """
+    rules = _rules if _rules is not None else _fetch_rules(tenant_id)
     desc_lower = description.lower()
     for rule in rules:
         pattern = rule["pattern"].lower()
@@ -42,16 +57,13 @@ def classify_movement(description: str, tenant_id: str) -> dict | None:
     return None
 
 
-def detect_entity(description: str, tenant_id: str) -> dict | None:
+def detect_entity(description: str, tenant_id: str, *, _suppliers: list[dict] | None = None) -> dict | None:
     """Match a movement description against known suppliers by name.
 
     Returns {"nif": str, "name": str, "type": "fornecedor"} or None.
+    Pass _suppliers to avoid repeated DB queries in batch scenarios.
     """
-    with get_conn() as conn:
-        suppliers = conn.execute(
-            "SELECT id, name, nif FROM suppliers WHERE tenant_id = %s",
-            (tenant_id,),
-        ).fetchall()
+    suppliers = _suppliers if _suppliers is not None else _fetch_suppliers(tenant_id)
     desc_lower = description.lower()
     for sup in suppliers:
         if sup["name"] and sup["name"].lower() in desc_lower:
