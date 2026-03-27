@@ -1,7 +1,5 @@
 """Tests for movement classification engine."""
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 def _make_conn(rows):

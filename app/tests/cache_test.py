@@ -7,13 +7,12 @@ These tests import the real functions directly and test them in isolation.
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
+import app.cache as cache_module
 
 # Import the real implementations directly
 from app.cache import cache_get as _real_cache_get
-from app.cache import cache_set as _real_cache_set
 from app.cache import cache_invalidate as _real_cache_invalidate
-import app.cache as cache_module
+from app.cache import cache_set as _real_cache_set
 
 
 class TestCacheWithoutRedis:

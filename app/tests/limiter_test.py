@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 from starlette.requests import Request
-from starlette.testclient import TestClient
 
 from app.limiter import _key_func, rate_limit_exceeded_handler
 

@@ -1,6 +1,5 @@
 """Tests for OCR engine abstraction layer."""
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -148,7 +147,7 @@ def test_pdftotext_success():
 
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = "extracted text".encode()
+    mock_result.stdout = b"extracted text"
 
     with patch("subprocess.run", return_value=mock_result):
         result = _extract_pdftotext(b"pdf bytes")
