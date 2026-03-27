@@ -10,12 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { useDashboardSummary, useMonthlyData } from "@/hooks/use-dashboard";
 import { useTour } from "@/hooks/use-tour";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   FileText,
   CheckCircle2,
   Clock,
-  ChevronDown,
+  Landmark,
 } from "lucide-react";
 
 function formatEUR(val: string | number): string {
@@ -28,11 +28,11 @@ export default function Dashboard() {
   const { data: summary, isLoading, isError, refetch } = useDashboardSummary();
   const { data: monthly } = useMonthlyData();
   const tour = useTour();
-  const [showDetails, setShowDetails] = useState(false);
 
   const docCount = summary?.documents?.count ?? 0;
   const docTotal = summary?.documents?.total ?? "0";
   const txCount = summary?.bank_transactions?.count ?? 0;
+  const txTotal = summary?.bank_transactions?.total ?? "0";
   const reconciled = summary?.reconciliations ?? 0;
   const unmatched = summary?.unmatched_documents ?? 0;
 
@@ -63,10 +63,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* === TOP KPI ROW (3 cards) === */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* === QUICK UPLOAD (prominent at top) === */}
+      <div className="mb-4">
+        <DashboardQuickUpload />
+      </div>
+
+      {/* === TOP KPI ROW (4 cards) === */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {isLoading ? (
           <>
+            <Skeleton className="h-28 rounded-lg" />
             <Skeleton className="h-28 rounded-lg" />
             <Skeleton className="h-28 rounded-lg" />
             <Skeleton className="h-28 rounded-lg" />
@@ -80,6 +86,12 @@ export default function Dashboard() {
               icon={FileText}
               accent
               sparkline={sparkDocs}
+            />
+            <KpiCard
+              label="Movimentos"
+              value={String(txCount)}
+              trend={{ value: formatEUR(txTotal), direction: "neutral" }}
+              icon={Landmark}
             />
             <KpiCard
               label="Reconciliados"
@@ -98,31 +110,14 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* === QUICK UPLOAD === */}
-      <div className="mt-4">
-        <DashboardQuickUpload />
-      </div>
-
-      {/* === DETAILED PANELS (collapsible) === */}
+      {/* === DETAIL PANELS (always visible when data exists) === */}
       {hasData && (
-        <div className="mt-6">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            aria-expanded={showDetails}
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
-            Ver detalhes
-          </button>
-          {showDetails && (
-            <div className="mt-4 space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <FinancialOverviewPanel />
-                <ReconciliationHealthPanel />
-              </div>
-              <RecentDocumentsFeed />
-            </div>
-          )}
+        <div className="mt-6 space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <FinancialOverviewPanel />
+            <ReconciliationHealthPanel />
+          </div>
+          <RecentDocumentsFeed />
         </div>
       )}
     </PageContainer>
