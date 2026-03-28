@@ -30,6 +30,10 @@ if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   $SSH "$HOST" "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
 fi
 
-$SSH "$HOST" "cd $DIR && docker compose pull app && docker compose up -d --force-recreate --remove-orphans"
+if ! $SSH "$HOST" "cd $DIR && docker compose pull app && docker compose up -d --force-recreate --remove-orphans"; then
+  echo "✗ deploy failed — fetching app logs:"
+  $SSH "$HOST" "cd $DIR && docker compose logs --tail=50 app" || true
+  exit 1
+fi
 
 echo "✓ deployed to $HOST"
