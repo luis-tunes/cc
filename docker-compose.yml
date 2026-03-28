@@ -52,11 +52,11 @@ services:
       - paperless_media:/usr/src/paperless/media
       - ./bin:/opt/bin:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000')\""]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 20
-      start_period: 90s
+      start_period: 120s
     depends_on:
       db:
         condition: service_healthy

@@ -43,7 +43,10 @@ if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
 fi
 
 if ! $SSH "$HOST" "cd $DIR && docker compose --env-file .env.production pull app && docker compose --env-file .env.production up -d --force-recreate --remove-orphans"; then
-  echo "✗ deploy failed — fetching app logs:"
+  echo "✗ deploy failed — fetching logs:"
+  echo "--- paperless logs ---"
+  $SSH "$HOST" "cd $DIR && docker compose --env-file .env.production logs --tail=80 paperless" || true
+  echo "--- app logs ---"
   $SSH "$HOST" "cd $DIR && docker compose --env-file .env.production logs --tail=50 app" || true
   exit 1
 fi
