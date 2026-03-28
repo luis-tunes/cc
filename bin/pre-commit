@@ -1,0 +1,20 @@
+#!/bin/bash
+# Pre-commit hook: lint + type-check + test + build.
+# Install: cp bin/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Or:      make hooks
+set -e
+cd "$(dirname "$0")/../.."
+
+echo "pre-commit: lint"
+cd app && ruff check . && cd ..
+
+echo "pre-commit: type-check"
+cd app && python3 -m mypy . --ignore-missing-imports && cd ..
+
+echo "pre-commit: frontend build"
+cd frontend && npx vite build --logLevel error && cd ..
+
+echo "pre-commit: frontend tests"
+cd frontend && npx vitest run --reporter=dot && cd ..
+
+echo "pre-commit: ok"

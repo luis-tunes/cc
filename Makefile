@@ -1,4 +1,4 @@
-.PHONY: dev test ship deploy sync-env clean backup lint format type-check logs db frontend
+.PHONY: dev test ship deploy sync-env clean backup lint format type-check logs db frontend hooks
 
 dev:
 	bin/dev
@@ -27,3 +27,6 @@ db:
 	docker compose exec db psql -U cc cc
 frontend:
 	cd frontend && npm test -- --run && npm run build
+hooks:
+	cp bin/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+	@echo "pre-commit hook installed"
