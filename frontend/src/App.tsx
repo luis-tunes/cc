@@ -41,6 +41,7 @@ const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
 const LandingPage = lazy(() => import("@/pages/Landing"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const AdminPage = lazy(() => import("@/pages/Admin"));
+const MonitoringPage = lazy(() => import("@/pages/Monitoring"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="/guia" element={<GuidePage />} />
             <Route path="/perfil" element={<UserProfile />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/monitoring" element={<MonitoringPage />} />
           </Route>
 
           {/* 404 */}

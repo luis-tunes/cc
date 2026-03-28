@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const EXTRA_TITLES: Record<string, string> = {
   "/perfil": "Perfil",
+  "/monitoring": "Monitorização",
 };
 
 function getPageTitle(pathname: string): string {
