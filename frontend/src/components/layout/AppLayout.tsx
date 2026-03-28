@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -6,6 +7,7 @@ import { MobileNav } from "./MobileNav";
 import { CommandMenu } from "@/components/shared/CommandMenu";
 import { navigation } from "@/lib/navigation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Loader2 } from "lucide-react";
 
 const EXTRA_TITLES: Record<string, string> = {
   "/perfil": "Perfil",
@@ -33,7 +35,13 @@ export function AppLayout() {
         <main className="flex flex-1 flex-col">
           <AppTopbar title={pageTitle} />
           <div className={isMobile ? "pb-[calc(4rem+env(safe-area-inset-bottom))]" : ""}>
-            <Outlet />
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>
