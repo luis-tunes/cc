@@ -25,6 +25,18 @@ $SSH "$HOST" "mkdir -p $DIR/bin"
 $SCP docker-compose.yml Caddyfile "$HOST:$DIR/"
 $SCP bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
 
+# Ensure .env.production exists on remote
+if ! $SSH "$HOST" "test -f $DIR/.env.production"; then
+  if [ -f .env.production ]; then
+    echo "→ syncing .env.production to $HOST"
+    $SCP .env.production "$HOST:$DIR/.env.production"
+  else
+    echo "✗ $DIR/.env.production not found on remote." >&2
+    echo "  Run: bin/sync-env $HOST" >&2
+    exit 1
+  fi
+fi
+
 # Registry login (CI provides GHCR_TOKEN)
 if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   $SSH "$HOST" "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
