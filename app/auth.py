@@ -137,12 +137,19 @@ async def require_auth(request: Request) -> AuthInfo:
         # In dev/test, return a dummy auth if no token
         auth = _extract_auth(request)
         if auth:
+            request.state.tenant_id = auth.tenant_id
+            request.state.user_id = auth.user_id
             return auth
-        return AuthInfo(user_id="dev-user", tenant_id="dev-tenant", email="dev@tim.pt", session_id=None)
+        auth = AuthInfo(user_id="dev-user", tenant_id="dev-tenant", email="dev@tim.pt", session_id=None)
+        request.state.tenant_id = auth.tenant_id
+        request.state.user_id = auth.user_id
+        return auth
 
     auth = _extract_auth(request)
     if not auth:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
+    request.state.tenant_id = auth.tenant_id
+    request.state.user_id = auth.user_id
     return auth
 
 
@@ -152,7 +159,11 @@ async def optional_auth(request: Request) -> AuthInfo | None:
     if not auth_header.startswith("Bearer "):
         return None
     # Token is present — invalid/expired tokens should still raise 401
-    return _extract_auth(request)
+    auth = _extract_auth(request)
+    if auth:
+        request.state.tenant_id = auth.tenant_id
+        request.state.user_id = auth.user_id
+    return auth
 
 
 def check_auth_config() -> None:

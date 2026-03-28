@@ -78,6 +78,17 @@ def _auto_reconcile(tenant_id: str) -> None:
     except Exception:
         logger.exception("auto-reconcile failed for tenant=%s", tenant_id)
 
+
+def _auto_classify(tenant_id: str) -> None:
+    """Background task: classify movements after CSV upload."""
+    try:
+        from app.classify_movements import classify_all_movements
+        result = classify_all_movements(tenant_id)
+        if result["classified"]:
+            logger.info("auto-classify: tenant=%s classified=%d/%d", tenant_id, result["classified"], result["total"])
+    except Exception:
+        logger.exception("auto-classify failed for tenant=%s", tenant_id)
+
 # --- Models ---
 
 class DocumentOut(BaseModel):
@@ -115,6 +126,10 @@ class BankTransactionOut(BaseModel):
     date: datetime.date
     description: str
     amount: Decimal
+    category: str | None = None
+    snc_account: str | None = None
+    entity_nif: str | None = None
+    classification_source: str | None = None
 
 # --- Webhook ---
 
@@ -787,6 +802,7 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
     if errors and count == 0:
         raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:5]))
     cache_invalidate(f"dashboard:{tid}")
+    background_tasks.add_task(_auto_classify, tid)
     background_tasks.add_task(_auto_reconcile, tid)
     return {"imported": count, "errors": errors[:10]}
 
@@ -810,10 +826,48 @@ async def list_bank_transactions(
     params.extend([limit, offset])
     with get_conn() as conn:
         rows = conn.execute(
-            f"SELECT id, date, description, amount FROM bank_transactions {where} ORDER BY date DESC LIMIT %s OFFSET %s",
+            f"SELECT id, date, description, amount, category, snc_account, entity_nif, classification_source FROM bank_transactions {where} ORDER BY date DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall()
     return rows
+
+
+class ManualClassification(BaseModel):
+    category: str | None = None
+    snc_account: str | None = None
+    entity_nif: str | None = None
+
+
+@router.patch("/bank-transactions/{tx_id}")
+async def update_bank_transaction(tx_id: int, body: ManualClassification, auth: AuthInfo = Depends(require_auth)):
+    """Manual classification override for a bank transaction."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM bank_transactions WHERE id = %s AND tenant_id = %s",
+            (tx_id, auth.tenant_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        conn.execute(
+            """UPDATE bank_transactions
+               SET category = %s, snc_account = %s, entity_nif = %s, classification_source = 'manual'
+               WHERE id = %s""",
+            (body.category, body.snc_account, body.entity_nif, tx_id),
+        )
+        conn.commit()
+    cache_invalidate(f"dashboard:{auth.tenant_id}")
+    return {"ok": True}
+
+
+@router.post("/bank-transactions/classify-all")
+@limiter.limit(EXPENSIVE_RATE)
+async def classify_all(request: Request, auth: AuthInfo = Depends(require_auth)):
+    """Classify all unclassified bank transactions using movement rules."""
+    from app.classify_movements import classify_all_movements
+    result = classify_all_movements(auth.tenant_id)
+    cache_invalidate(f"dashboard:{auth.tenant_id}")
+    return result
+
 
 # --- Reconciliation ---
 

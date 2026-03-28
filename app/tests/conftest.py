@@ -393,6 +393,10 @@ class FakeConn:
                 "description": params[1],
                 "amount": Decimal(str(params[2])) if not isinstance(params[2], Decimal) else params[2],
                 "tenant_id": params[3] if len(params) > 3 else None,
+                "category": None,
+                "snc_account": None,
+                "entity_nif": None,
+                "classification_source": None,
                 "created_at": "2025-01-01T00:00:00+00:00",
             }
             _tables["bank_transactions"].append(tx)
@@ -432,6 +436,25 @@ class FakeConn:
                     tid = params[tid_pos]
                     txs = [t for t in txs if t.get("tenant_id") == tid]
             return FakeCursor(txs)
+        if sql_lower.startswith("update"):
+            # UPDATE bank_transactions SET category=..., snc_account=..., entity_nif=..., classification_source=... WHERE id=%s
+            tx_id = params[-1]  # id is always last param
+            for t in _tables["bank_transactions"]:
+                if t["id"] == tx_id:
+                    if "category" in sql_lower:
+                        t["category"] = params[0]
+                        t["snc_account"] = params[1]
+                        t["entity_nif"] = params[2]
+                        t["classification_source"] = "manual" if "manual" in sql_lower else "rule"
+                    elif "entity_nif" in sql_lower:
+                        t["entity_nif"] = params[0]
+                        t["classification_source"] = "rule"
+                    break
+            return FakeCursor([])
+        if sql_lower.startswith("delete"):
+            tx_id = params[0] if params else None
+            _tables["bank_transactions"] = [t for t in _tables["bank_transactions"] if t["id"] != tx_id]
+            return FakeCursor([])
         return FakeCursor([])
 
     # ────── Reconciliations ──────

@@ -92,20 +92,38 @@ def find_duplicates(tenant_id: str) -> list[dict]:
 
 
 def classify_all_movements(tenant_id: str) -> dict:
-    """Classify all unclassified movements for a tenant. Returns summary."""
+    """Classify all unclassified movements for a tenant and persist results."""
+    rules = _fetch_rules(tenant_id)
+    suppliers = _fetch_suppliers(tenant_id)
     with get_conn() as conn:
         txs = conn.execute(
-            "SELECT id, description FROM bank_transactions WHERE tenant_id = %s",
+            """SELECT id, description FROM bank_transactions
+               WHERE tenant_id = %s
+                 AND (classification_source IS NULL OR classification_source = 'rule')""",
             (tenant_id,),
         ).fetchall()
 
-    classified = 0
-    entities = 0
-    for tx in txs:
-        result = classify_movement(tx["description"], tenant_id)
-        if result:
-            classified += 1
-        entity = detect_entity(tx["description"], tenant_id)
-        if entity:
-            entities += 1
+        classified = 0
+        entities = 0
+        for tx in txs:
+            cls = classify_movement(tx["description"], tenant_id, _rules=rules)
+            entity = detect_entity(tx["description"], tenant_id, _suppliers=suppliers)
+            entity_nif = (cls["entity_nif"] if cls and cls.get("entity_nif") else None) or (entity["nif"] if entity else None)
+            if cls:
+                conn.execute(
+                    """UPDATE bank_transactions
+                       SET category = %s, snc_account = %s, entity_nif = %s, classification_source = 'rule'
+                       WHERE id = %s""",
+                    (cls["category"], cls["snc_account"], entity_nif, tx["id"]),
+                )
+                classified += 1
+            elif entity_nif:
+                conn.execute(
+                    """UPDATE bank_transactions SET entity_nif = %s, classification_source = 'rule'
+                       WHERE id = %s""",
+                    (entity_nif, tx["id"]),
+                )
+            if entity:
+                entities += 1
+        conn.commit()
     return {"classified": classified, "entities": entities, "total": len(txs)}

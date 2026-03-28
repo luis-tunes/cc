@@ -64,12 +64,16 @@ def _init_db_schema():
             );
 
             CREATE TABLE IF NOT EXISTS bank_transactions (
-                id          SERIAL PRIMARY KEY,
-                tenant_id   TEXT NOT NULL,
-                date        DATE NOT NULL,
-                description TEXT NOT NULL,
-                amount      NUMERIC(12,2) NOT NULL,
-                created_at  TIMESTAMPTZ DEFAULT now()
+                id                    SERIAL PRIMARY KEY,
+                tenant_id             TEXT NOT NULL,
+                date                  DATE NOT NULL,
+                description           TEXT NOT NULL,
+                amount                NUMERIC(12,2) NOT NULL,
+                category              TEXT,
+                snc_account           VARCHAR(16),
+                entity_nif            VARCHAR(9),
+                classification_source VARCHAR(16),
+                created_at            TIMESTAMPTZ DEFAULT now()
             );
 
             CREATE TABLE IF NOT EXISTS reconciliations (
@@ -105,6 +109,19 @@ def _init_db_schema():
             EXCEPTION WHEN duplicate_column THEN NULL;
             END $$;
         """)
+        # Bank transactions classification columns (migration)
+        for col, typ in [
+            ("category", "TEXT"),
+            ("snc_account", "VARCHAR(16)"),
+            ("entity_nif", "VARCHAR(9)"),
+            ("classification_source", "VARCHAR(16)"),
+        ]:
+            conn.execute(f"""
+                DO $$ BEGIN
+                    ALTER TABLE bank_transactions ADD COLUMN {col} {typ};
+                EXCEPTION WHEN duplicate_column THEN NULL;
+                END $$;
+            """)
         # Make date nullable and set defaults (old DBs had NOT NULL without defaults)
         conn.execute("""
             ALTER TABLE documents ALTER COLUMN date DROP NOT NULL;

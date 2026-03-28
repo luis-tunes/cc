@@ -169,7 +169,7 @@ async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
     if not auth:
         return {"plan": "free", "status": "trialing", "trial_days_left": 14}
     if _is_master(auth):
-        return {"plan": "pro", "status": "active"}
+        return {"plan": "pro", "status": "active", "is_master": True}
     tid = auth.tenant_id or auth.user_id
     info = _get_or_create_tenant_plan(tid)
     return _compute_trial_status(info)

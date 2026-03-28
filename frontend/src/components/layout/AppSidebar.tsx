@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Lock, Crown } from "lucide-react";
 import { sidebarOrgSwitcherAppearance } from "@/lib/clerk-appearance";
 import { useIsFreePlan } from "@/hooks/use-trial";
+import { useBillingStatus } from "@/hooks/use-billing";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -28,6 +29,8 @@ export function AppSidebar() {
   const location = useLocation();
   const { user } = useUser();
   const isFreePlan = useIsFreePlan();
+  const { data: billing } = useBillingStatus();
+  const isMaster = billing?.is_master ?? false;
 
   const initials = (user?.fullName || user?.primaryEmailAddress?.emailAddress || "U")
     .split(" ")
@@ -59,7 +62,7 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => {
+                {group.items.filter((item) => !item.masterOnly || isMaster).map((item) => {
                   const active = location.pathname === item.path;
                   const isComingSoon = item.status === "coming-soon";
                   const isLocked = isFreePlan && item.proOnly;

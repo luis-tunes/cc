@@ -213,6 +213,10 @@ export interface BankTransaction {
   date: string;
   description: string;
   amount: number;
+  category: string | null;
+  snc_account: string | null;
+  entity_nif: string | null;
+  classification_source: string | null;
 }
 
 export interface Reconciliation {
@@ -452,6 +456,7 @@ export interface BillingStatus {
   stripe_customer?: string;
   trial_days_left?: number;
   trial_end?: string;
+  is_master?: boolean;
 }
 
 export async function fetchBillingPlans(): Promise<BillingPlan[]> {
@@ -992,6 +997,21 @@ export async function fetchEnrichedMovements(): Promise<EnrichedMovement[]> {
 
 export async function fetchDuplicateMovements(): Promise<any[]> {
   return request<any[]>("/bank-transactions/duplicates");
+}
+
+export async function classifyAllMovements(): Promise<{ classified: number; entities: number; total: number }> {
+  return request("/bank-transactions/classify-all", { method: "POST" });
+}
+
+export async function updateBankTransaction(
+  id: number,
+  data: { category?: string | null; snc_account?: string | null; entity_nif?: string | null },
+): Promise<{ ok: boolean }> {
+  return request(`/bank-transactions/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 }
 
 // ── CSV Export URLs ──────────────────────────────────────────────────

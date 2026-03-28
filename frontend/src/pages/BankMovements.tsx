@@ -8,30 +8,33 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { Button } from "@/components/ui/button";
-import { Upload, Landmark } from "lucide-react";
+import { Upload, Landmark, Sparkles } from "lucide-react";
 import { type BankMovement } from "@/lib/movements-data";
-import { useBankTransactions, useEnrichedMovements, useUploadBankCSV } from "@/hooks/use-bank-transactions";
-import type { EnrichedMovement } from "@/lib/api";
+import { useBankTransactions, useEnrichedMovements, useUploadBankCSV, useClassifyAll } from "@/hooks/use-bank-transactions";
+import type { BankTransaction, EnrichedMovement } from "@/lib/api";
 import { toast } from "sonner";
 
-/** Map backend enriched transaction → frontend BankMovement shape */
+/** Map backend transaction → frontend BankMovement shape.
+ *  Uses persisted classification from bank_transactions columns,
+ *  falls back to enriched data for entity_name (not persisted). */
 function toMovement(
-  tx: { id: number; date: string; description: string; amount: number },
+  tx: BankTransaction,
   enriched?: Map<number, EnrichedMovement>,
 ): BankMovement {
   const e = enriched?.get(tx.id);
+  const classified = !!tx.category || !!tx.snc_account;
   return {
     id: String(tx.id),
     date: tx.date,
     description: tx.description,
     amount: tx.amount,
     type: tx.amount < 0 ? "debito" : "credito",
-    suggestedAccount: e?.snc_account || undefined,
-    sncClass: e?.snc_account || undefined,
+    suggestedAccount: tx.snc_account || e?.snc_account || undefined,
+    sncClass: tx.snc_account || e?.snc_account || undefined,
     detectedEntity: e?.entity_name || undefined,
-    classificationStatus: e?.classified ? "classificado" : "pendente",
+    classificationStatus: classified ? "classificado" : "pendente",
     reconciliationStatus: "pendente",
-    confidence: e?.classified ? 85 : 30,
+    confidence: classified ? 85 : 30,
     origin: "csv",
   };
 }
@@ -40,6 +43,7 @@ export default function BankMovements() {
   const { data: rawTransactions = [], isLoading, isError, refetch } = useBankTransactions();
   const { data: enrichedList = [] } = useEnrichedMovements();
   const uploadCSV = useUploadBankCSV();
+  const classifyAll = useClassifyAll();
 
   const movements = useMemo(() => {
     const enrichedMap = new Map(enrichedList.map((e) => [e.id, e]));
@@ -123,9 +127,21 @@ export default function BankMovements() {
       title="Movimentos Bancários"
       subtitle="Importação, classificação e reconciliação de transações"
       actions={
-        <Button size="sm" className="h-8 text-xs" onClick={() => setShowImport((v) => !v)}>
-          <Upload className="mr-1.5 h-3.5 w-3.5" /> Importar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={() => classifyAll.mutate()}
+            disabled={classifyAll.isPending || movements.length === 0}
+          >
+            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+            {classifyAll.isPending ? "A classificar..." : "Classificar tudo"}
+          </Button>
+          <Button size="sm" className="h-8 text-xs" onClick={() => setShowImport((v) => !v)}>
+            <Upload className="mr-1.5 h-3.5 w-3.5" /> Importar
+          </Button>
+        </div>
       }
     >
       {isLoading ? (

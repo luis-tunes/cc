@@ -5,6 +5,8 @@ import {
   deleteBankTransaction,
   fetchEnrichedMovements,
   fetchDuplicateMovements,
+  classifyAllMovements,
+  updateBankTransaction,
   type BankTransaction,
   type EnrichedMovement,
 } from "@/lib/api";
@@ -61,6 +63,35 @@ export function useDeleteBankTransaction() {
     },
     onError: (err: Error) => {
       toast.error(`Erro ao eliminar: ${err.message}`);
+    },
+  });
+}
+
+export function useClassifyAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: classifyAllMovements,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["bank-transactions"] });
+      toast.success(`${data.classified} de ${data.total} movimentos classificados`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao classificar: ${err.message}`);
+    },
+  });
+}
+
+export function useUpdateBankTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; category?: string | null; snc_account?: string | null; entity_nif?: string | null }) =>
+      updateBankTransaction(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bank-transactions"] });
+      toast.success("Classificação atualizada");
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro: ${err.message}`);
     },
   });
 }

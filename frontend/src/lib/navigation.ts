@@ -35,6 +35,8 @@ export interface NavItem {
   status: RouteStatus;
   /** Requires paid plan — locked during free trial */
   proOnly?: boolean;
+  /** Only visible to master/admin users */
+  masterOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -79,7 +81,7 @@ export const navigation: NavGroup[] = [
       { title: "Entidade", path: "/entidade", icon: Building2, status: "active" },
       { title: "Guia", path: "/guia", icon: BookOpen, status: "active" },
       { title: "Definições", path: "/definicoes", icon: Settings, status: "active" },
-      { title: "Admin", path: "/admin", icon: Shield, status: "active", proOnly: true },
+      { title: "Admin", path: "/admin", icon: Shield, status: "active", proOnly: true, masterOnly: true },
     ],
   },
 ];
