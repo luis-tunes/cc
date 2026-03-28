@@ -23,8 +23,8 @@ def _key_func(request: Request) -> str:
     """Use tenant_id from auth state if available, else client IP."""
     auth = getattr(request.state, "auth", None)
     if auth and hasattr(auth, "tenant_id"):
-        return auth.tenant_id
-    return get_remote_address(request)
+        return str(auth.tenant_id)
+    return str(get_remote_address(request))
 
 
 limiter = Limiter(key_func=_key_func, default_limits=[DEFAULT_RATE])

@@ -57,9 +57,9 @@ def _matches(rule: dict, doc: dict) -> bool:
     expected_lower = expected.strip().lower()
 
     if op == "equals":
-        return actual_str == expected_lower
+        return bool(actual_str == expected_lower)
     if op == "not_equals":
-        return actual_str != expected_lower
+        return bool(actual_str != expected_lower)
     if op == "contains":
         return expected_lower in actual_str
     if op == "not_contains":

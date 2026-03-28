@@ -62,7 +62,7 @@ def _extract_paperless(pdf_bytes: bytes, paperless_id: int | None) -> str:
     try:
         r = httpx.get(url, headers=headers, timeout=30)
         r.raise_for_status()
-        text = r.json().get("content", "")
+        text: str = r.json().get("content", "")
         if text:
             return text
     except Exception as e:

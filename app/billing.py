@@ -130,7 +130,7 @@ def _stripe(method: str, path: str, data: dict | None = None) -> dict:
     )
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.json().get("error", {}).get("message", r.text))
-    return r.json()
+    return r.json()  # type: ignore[no-any-return]
 
 
 @router.get("/plans")

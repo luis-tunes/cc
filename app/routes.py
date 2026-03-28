@@ -125,7 +125,7 @@ class WebhookRequest(BaseModel):
 
 @router.post("/webhook")
 @limiter.limit(WEBHOOK_RATE)
-async def paperless_webhook(request: Request, payload: WebhookRequest, background_tasks: BackgroundTasks = None):
+async def paperless_webhook(request: Request, payload: WebhookRequest, background_tasks: BackgroundTasks = None):  # type: ignore[assignment]
     import hmac
     if not WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="webhook secret not configured")
@@ -2423,7 +2423,7 @@ async def tax_audit_flags(auth: AuthInfo = Depends(require_auth)):
 
 # --- Obligations ---
 
-PT_OBLIGATIONS = [
+PT_OBLIGATIONS: list[dict[str, object]] = [
     {"id": "iva_q1", "type": "IVA", "period": "T1", "deadline_month": 5, "deadline_day": 20, "description": "Declaração IVA 1º Trimestre"},
     {"id": "iva_q2", "type": "IVA", "period": "T2", "deadline_month": 8, "deadline_day": 20, "description": "Declaração IVA 2º Trimestre"},
     {"id": "iva_q3", "type": "IVA", "period": "T3", "deadline_month": 11, "deadline_day": 20, "description": "Declaração IVA 3º Trimestre"},
@@ -2446,26 +2446,30 @@ async def list_obligations(year: int | None = None, _auth: AuthInfo = Depends(re
     target_year = year or today.year
     result = []
     for ob in PT_OBLIGATIONS:
-        if ob["deadline_month"] is None:
+        dl_month = ob["deadline_month"]
+        dl_day = int(ob["deadline_day"])  # type: ignore[call-overload]
+        ob_id = str(ob["id"])
+        if dl_month is None:
             # Monthly — generate for next 3 months
             for offset in range(3):
                 m = (today.month + offset - 1) % 12 + 1
                 y = target_year + ((today.month + offset - 1) // 12)
-                deadline = datetime.date(y, m, min(ob["deadline_day"], 28))
+                deadline = datetime.date(y, m, min(dl_day, 28))
                 days_left = (deadline - today).days
                 result.append({
                     **ob,
-                    "id": f"{ob['id']}_{y}_{m:02d}",
+                    "id": f"{ob_id}_{y}_{m:02d}",
                     "deadline": deadline.isoformat(),
                     "days_left": days_left,
                     "status": "overdue" if days_left < 0 else "urgent" if days_left <= 7 else "upcoming" if days_left <= 30 else "future",
                 })
         else:
-            dl_year = target_year if ob["deadline_month"] >= 3 else target_year + 1
+            dl_month_int = int(dl_month)  # type: ignore[call-overload]
+            dl_year = target_year if dl_month_int >= 3 else target_year + 1
             try:
-                deadline = datetime.date(dl_year, ob["deadline_month"], ob["deadline_day"])
+                deadline = datetime.date(dl_year, dl_month_int, dl_day)
             except ValueError:
-                deadline = datetime.date(dl_year, ob["deadline_month"], 28)
+                deadline = datetime.date(dl_year, dl_month_int, 28)
             days_left = (deadline - today).days
             result.append({
                 **ob,
@@ -2473,7 +2477,7 @@ async def list_obligations(year: int | None = None, _auth: AuthInfo = Depends(re
                 "days_left": days_left,
                 "status": "overdue" if days_left < 0 else "urgent" if days_left <= 7 else "upcoming" if days_left <= 30 else "future",
             })
-    result.sort(key=lambda x: x["deadline"])
+    result.sort(key=lambda x: str(x.get("deadline", "")))
     return result
 
 

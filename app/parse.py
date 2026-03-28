@@ -212,7 +212,7 @@ def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
             log.info("Vision extraction succeeded: total=%s vat=%s type=%s supplier=%s client=%s",
                      parsed.get("total"), parsed.get("vat"), parsed.get("type"),
                      parsed.get("supplier_nif"), parsed.get("client_nif"))
-            return parsed
+            return parsed  # type: ignore[no-any-return]
         except Exception as exc:
             if _attempt < 2:
                 _time.sleep(2 ** _attempt)
@@ -257,7 +257,7 @@ def _extract_with_llm(text: str) -> dict | None:
             parsed = json.loads(content)
             log.info("LLM text extraction succeeded: total=%s vat=%s type=%s",
                      parsed.get("total"), parsed.get("vat"), parsed.get("type"))
-            return parsed
+            return parsed  # type: ignore[no-any-return]
         except Exception as exc:
             if _attempt < 2:
                 _time.sleep(2 ** _attempt)
@@ -376,12 +376,12 @@ def fetch_document_metadata(paperless_id: int) -> dict:
     headers = {"Authorization": f"Token {PAPERLESS_TOKEN}"}
     r = httpx.get(url, headers=headers, timeout=30)
     r.raise_for_status()
-    return r.json()
+    return r.json()  # type: ignore[no-any-return]
 
 def fetch_document_text(paperless_id: int) -> str:
     """Fetch the OCR plain-text content from Paperless (fallback parser)."""
     meta = fetch_document_metadata(paperless_id)
-    return meta.get("content", "")
+    return meta.get("content", "")  # type: ignore[no-any-return]
 
 
 # -- Amount patterns (ordered by specificity) --
@@ -560,10 +560,10 @@ def _parse_date_from_text(text: str) -> date:
         day = int(m.group(1))
         month_str = m.group(2).lower()
         year = int(m.group(3))
-        month = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
-        if month:
+        month_num = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
+        if month_num:
             try:
-                return date(year, month, day)
+                return date(year, month_num, day)
             except ValueError:
                 pass
 
@@ -579,10 +579,10 @@ def _parse_date_from_text(text: str) -> date:
         day = int(m.group(1))
         month_str = m.group(2).lower()
         year = int(m.group(3))
-        month = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
-        if month:
+        month_num = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
+        if month_num:
             try:
-                return date(year, month, day)
+                return date(year, month_num, day)
             except ValueError:
                 pass
 
@@ -683,7 +683,7 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
     finally:
         if path:
             os.unlink(path)
-    return result
+    return result  # type: ignore[no-any-return]
 
 
 _VALID_DOC_TYPES = frozenset({
@@ -972,4 +972,4 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
             )
             conn.commit()
 
-    return doc_id
+    return doc_id  # type: ignore[no-any-return]
