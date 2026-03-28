@@ -50,7 +50,7 @@ Caddy reverse proxy in front. Redis for Paperless cache. All Docker.
 | PostgreSQL 16 | Database |
 | Redis 7 | Paperless cache + rate limit state |
 | Caddy 2 | Reverse proxy, TLS, security headers, gzip |
-| Docker Compose | Orchestration (same file everywhere, only .env changes) |
+| Docker Compose | Orchestration (same file everywhere, only .env.production changes) |
 
 ## How It Flows
 
@@ -157,13 +157,13 @@ bin/                          # Scripts (source of truth for all operations)
   post-consume                # Paperless webhook trigger
   setup-paperless-token       # Generate Paperless API token
   setup-server                # Server provisioning
-  sync-env                    # Sync .env to remote
+  sync-env                    # Sync .env.production to remote
   clean                       # docker compose down -v + purge caches
 mcp/                          # MCP server for GitHub Copilot (AI tooling layer)
   src/server.ts               # Exposes codebase as tools via stdio
 .github/workflows/ci.yml      # CI: ruff + mypy + pytest + npm test → ghcr.io → deploy
 Dockerfile                    # Multi-stage: Node build → Python runtime (non-root user)
-docker-compose.yml            # Full stack (same file everywhere, only .env changes)
+docker-compose.yml            # Full stack (same file everywhere, only .env.production changes)
 Caddyfile                     # Reverse proxy, gzip, HSTS, security headers
 Makefile                      # Thin wrapper: dev, test, ship, deploy, lint, format, type-check, logs, db, frontend
 pyproject.toml                # Tool config only (ruff, mypy, pytest)
@@ -192,7 +192,7 @@ cd frontend && npm run dev   # Vite on :3000, proxies /api → :8080
 ## Environment Variables
 
 ```bash
-# .env (backend — see .env.example)
+# .env.production (backend — see .env.example)
 DATABASE_URL=postgresql://cc:cc@db:5432/cc
 PAPERLESS_URL=http://paperless:8000
 PAPERLESS_TOKEN=...
@@ -208,7 +208,7 @@ CORS_ORIGINS=http://localhost:3000   # comma-separated
 SENTRY_DSN=...                       # optional
 SENTRY_TRACES_SAMPLE_RATE=0.1       # optional
 
-# frontend/.env
+# frontend/.env.production
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
@@ -242,8 +242,8 @@ invoice2data templates in app/ for structured extraction. Fallback: LLM vision �
 - One function, one job. Extract on third repeat.
 - bin/ scripts are the source of truth. Makefile calls bin/. CI calls make.
 - UI text in Portuguese. Code, comments, commits in English.
-- Same docker-compose.yml everywhere. Only .env changes.
-- .env.example in repo. .env is local, never committed.
+- Same docker-compose.yml everywhere. Only .env.production changes.
+- .env.example in repo. .env.production is local, never committed.
 - Rate limit expensive endpoints (10/min). Auth endpoints not rate-limited.
 - Batch DB queries. Never N+1. Fetch rules/suppliers once, pass to functions.
 

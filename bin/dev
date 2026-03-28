@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")/.."
-exec docker compose up --build "$@"
+exec docker compose --env-file .env.production up --build "$@"

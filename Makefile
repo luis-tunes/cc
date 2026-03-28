@@ -22,9 +22,9 @@ format:
 type-check:
 	cd app && python -m mypy . --ignore-missing-imports
 logs:
-	docker compose logs -f --tail=100
+	docker compose --env-file .env.production logs -f --tail=100
 db:
-	docker compose exec db psql -U cc cc
+	docker compose --env-file .env.production exec db psql -U cc cc
 frontend:
 	cd frontend && npm test -- --run && npm run build
 hooks:

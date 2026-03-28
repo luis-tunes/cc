@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIM — Monitoring Dashboard</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #f59e0b; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 360px; }
+  .login-card h1 { font-size: 1.25rem; margin-bottom: 1rem; text-align: center; }
+  .login-card input { width: 100%; padding: .6rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: .875rem; margin-bottom: .75rem; }
+  .login-card button { width: 100%; padding: .6rem; background: var(--accent); color: #000; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; font-size: .875rem; }
+  .login-card button:hover { opacity: .9; }
+  .login-card .error { color: var(--red); font-size: .8rem; margin-top: .5rem; text-align: center; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: .75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 1rem; font-weight: 600; }
+  header .meta { font-size: .75rem; color: var(--muted); }
+  .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+  .grid { display: grid; gap: 1rem; }
+  .grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+  .grid-1 { grid-template-columns: 1fr; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+  .card h3 { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .5rem; }
+  .card .value { font-size: 1.75rem; font-weight: 700; }
+  .card .sub { font-size: .75rem; color: var(--muted); margin-top: .25rem; }
+  .section { margin-top: 1.5rem; }
+  .section h2 { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  th { text-align: left; padding: .5rem; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  td { padding: .5rem; border-bottom: 1px solid var(--border); }
+  .badge { display: inline-block; padding: .125rem .5rem; border-radius: 9999px; font-size: .7rem; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--accent); }
+  .badge-blue { background: rgba(59,130,246,.15); color: var(--blue); }
+  .badge-gray { background: rgba(148,163,184,.15); color: var(--muted); }
+  .health-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: .375rem; }
+  .health-ok { background: var(--green); }
+  .health-degraded { background: var(--accent); }
+  .health-error { background: var(--red); }
+  .refresh-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: .375rem .75rem; border-radius: 6px; cursor: pointer; font-size: .75rem; }
+  .refresh-btn:hover { background: var(--border); color: var(--text); }
+  .loading { text-align: center; padding: 2rem; color: var(--muted); }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen" class="login">
+  <div class="login-card">
+    <h1>🔒 TIM Monitoring</h1>
+    <input type="password" id="token-input" placeholder="Admin Token" autocomplete="off" />
+    <button onclick="doLogin()">Entrar</button>
+    <div id="login-error" class="error" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none">
+  <header>
+    <h1>📊 TIM Monitoring</h1>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <span class="meta" id="last-refresh">—</span>
+      <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- KPIs -->
+    <div class="grid grid-4" id="kpis">
+      <div class="card"><h3>Tenants</h3><div class="value" id="kpi-tenants">—</div><div class="sub" id="kpi-tenants-sub"></div></div>
+      <div class="card"><h3>MRR</h3><div class="value" id="kpi-mrr">—</div><div class="sub" id="kpi-mrr-sub"></div></div>
+      <div class="card"><h3>Documentos (30d)</h3><div class="value" id="kpi-docs">—</div><div class="sub" id="kpi-docs-sub"></div></div>
+      <div class="card"><h3>Sistema</h3><div class="value" id="kpi-health">—</div><div class="sub" id="kpi-health-sub"></div></div>
+    </div>
+
+    <!-- System Health -->
+    <div class="section">
+      <h2>Saúde do Sistema</h2>
+      <div class="grid grid-4" id="health-cards"></div>
+    </div>
+
+    <!-- Revenue -->
+    <div class="section">
+      <h2>Receita</h2>
+      <div class="grid grid-4" id="revenue-cards"></div>
+    </div>
+
+    <!-- Endpoints Performance -->
+    <div class="section">
+      <h2>Performance de Endpoints (últimos 5 min)</h2>
+      <div class="card">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Requests</th><th>Errors</th><th>Error %</th><th>P50</th><th>P95</th><th>P99</th></tr></thead>
+          <tbody id="endpoints-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tenants -->
+    <div class="section">
+      <h2>Tenants</h2>
+      <div class="card" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Tenant</th><th>Plano</th><th>Estado</th><th>Docs</th><th>Transações</th><th>Reconc.</th><th>Última Atividade</th></tr></thead>
+          <tbody id="tenants-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Errors -->
+    <div class="section">
+      <h2>Últimos Erros (5xx)</h2>
+      <div class="card">
+        <table>
+          <thead><tr><th>Hora</th><th>Método</th><th>Path</th><th>Status</th><th>Duração</th><th>Tenant</th></tr></thead>
+          <tbody id="errors-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Churn Risk -->
+    <div class="section">
+      <h2>Risco de Churn</h2>
+      <div class="card">
+        <table>
+          <thead><tr><th>Tenant</th><th>Plano</th><th>Score</th><th>Razões</th><th>Última Atividade</th></tr></thead>
+          <tbody id="churn-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let TOKEN = localStorage.getItem('tim_admin_token') || '';
+const API = '/api';
+
+function headers() { return { 'x-admin-token': TOKEN, 'Content-Type': 'application/json' }; }
+
+async function api(path) {
+  const r = await fetch(API + path, { headers: headers() });
+  if (r.status === 403) { logout(); throw new Error('Forbidden'); }
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+function doLogin() {
+  TOKEN = document.getElementById('token-input').value.trim();
+  if (!TOKEN) return;
+  localStorage.setItem('tim_admin_token', TOKEN);
+  api('/admin/system-health').then(() => {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    refreshAll();
+  }).catch(() => {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-error').textContent = 'Token inválido';
+    localStorage.removeItem('tim_admin_token');
+  });
+}
+
+function logout() {
+  TOKEN = '';
+  localStorage.removeItem('tim_admin_token');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('token-input').value = '';
+}
+
+function statusBadge(status) {
+  const m = { active: 'green', trialing: 'blue', trial_expired: 'yellow', past_due: 'red', cancelled: 'gray' };
+  return `<span class="badge badge-${m[status]||'gray'}">${status}</span>`;
+}
+
+function planBadge(plan) {
+  return plan === 'pro' ? '<span class="badge badge-green">PRO</span>' : '<span class="badge badge-gray">FREE</span>';
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-PT') + ' ' + d.toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtMs(ms) { return ms != null ? `${Math.round(ms)}ms` : '—'; }
+
+async function loadHealth() {
+  try {
+    const d = await api('/admin/system-health');
+    const dot = `<span class="health-dot health-${d.status}"></span>`;
+    document.getElementById('kpi-health').innerHTML = dot + (d.status === 'ok' ? 'Healthy' : 'Degraded');
+    let html = '';
+    for (const [name, svc] of Object.entries(d.services)) {
+      const s = svc.status === 'ok' ? 'green' : svc.status === 'degraded' ? 'yellow' : 'red';
+      html += `<div class="card"><h3>${name}</h3><div class="value"><span class="health-dot health-${svc.status === 'ok' ? 'ok' : 'error'}"></span>${svc.status}</div><div class="sub">${fmtMs(svc.latency_ms)}</div></div>`;
+    }
+    document.getElementById('health-cards').innerHTML = html;
+  } catch(e) { console.error('health', e); }
+}
+
+async function loadMetrics() {
+  try {
+    const d = await api('/admin/metrics');
+    document.getElementById('kpi-tenants').textContent = d.total_tenants;
+    document.getElementById('kpi-tenants-sub').textContent = `${d.pro_tenants} pro · ${d.trialing_tenants} trial · ${d.expired_tenants} expired`;
+    document.getElementById('kpi-docs').textContent = d.docs_last_30d;
+    document.getElementById('kpi-docs-sub').textContent = `${d.docs_last_7d} últimos 7d · ${d.total_documents} total`;
+  } catch(e) { console.error('metrics', e); }
+}
+
+async function loadRevenue() {
+  try {
+    const d = await api('/admin/revenue');
+    document.getElementById('kpi-mrr').textContent = `€${d.mrr_eur}`;
+    document.getElementById('kpi-mrr-sub').textContent = `ARR €${d.arr_eur} · ${d.trial_conversion_rate}% conv.`;
+    let html = '';
+    html += `<div class="card"><h3>Pro Ativos</h3><div class="value">${d.pro_active}</div></div>`;
+    html += `<div class="card"><h3>Em Trial</h3><div class="value">${d.trialing}</div></div>`;
+    html += `<div class="card"><h3>Trial Expirado</h3><div class="value">${d.trial_expired}</div></div>`;
+    html += `<div class="card"><h3>ARR em Risco</h3><div class="value" style="color:var(--red)">€${d.at_risk_arr_eur}</div><div class="sub">${d.past_due} past due</div></div>`;
+    document.getElementById('revenue-cards').innerHTML = html;
+  } catch(e) { console.error('revenue', e); }
+}
+
+async function loadEndpoints() {
+  try {
+    const d = await api('/admin/endpoints?window=300');
+    let html = '';
+    for (const ep of (d.endpoints || [])) {
+      const errColor = ep.error_rate > 5 ? 'color:var(--red)' : '';
+      html += `<tr><td><code>${ep.endpoint}</code></td><td>${ep.requests}</td><td style="${errColor}">${ep.errors}</td><td style="${errColor}">${ep.error_rate}%</td><td>${fmtMs(ep.p50_ms)}</td><td>${fmtMs(ep.p95_ms)}</td><td>${fmtMs(ep.p99_ms)}</td></tr>`;
+    }
+    if (!html) html = '<tr><td colspan="7" style="text-align:center;color:var(--muted)">Sem dados (servidor acabou de iniciar)</td></tr>';
+    document.getElementById('endpoints-table').innerHTML = html;
+  } catch(e) { console.error('endpoints', e); }
+}
+
+async function loadTenants() {
+  try {
+    const rows = await api('/admin/tenants');
+    let html = '';
+    for (const t of rows) {
+      html += `<tr><td title="${t.tenant_id}">${t.tenant_id.substring(0,16)}…</td><td>${planBadge(t.plan)}</td><td>${statusBadge(t.status)}</td><td>${t.doc_count}</td><td>${t.tx_count}</td><td>${t.recon_count}</td><td>${fmtTime(t.last_activity)}</td></tr>`;
+    }
+    if (!html) html = '<tr><td colspan="7" style="text-align:center;color:var(--muted)">Nenhum tenant</td></tr>';
+    document.getElementById('tenants-table').innerHTML = html;
+  } catch(e) { console.error('tenants', e); }
+}
+
+async function loadErrors() {
+  try {
+    const rows = await api('/admin/errors?limit=20');
+    let html = '';
+    for (const e of rows) {
+      html += `<tr><td>${fmtTime(e.timestamp)}</td><td>${e.method}</td><td><code>${e.path}</code></td><td><span class="badge badge-red">${e.status}</span></td><td>${fmtMs(e.duration_ms)}</td><td>${e.tenant_id||'—'}</td></tr>`;
+    }
+    if (!html) html = '<tr><td colspan="6" style="text-align:center;color:var(--green)">✓ Sem erros recentes</td></tr>';
+    document.getElementById('errors-table').innerHTML = html;
+  } catch(e) { console.error('errors', e); }
+}
+
+async function loadChurn() {
+  try {
+    const rows = await api('/admin/churn-risk');
+    let html = '';
+    for (const t of rows) {
+      html += `<tr><td title="${t.tenant_id}">${t.tenant_id.substring(0,16)}…</td><td>${planBadge(t.plan)}</td><td><span class="badge badge-red">${t.risk_score}</span></td><td>${(t.risk_reasons||[]).join(', ')}</td><td>${fmtTime(t.last_activity)}</td></tr>`;
+    }
+    if (!html) html = '<tr><td colspan="5" style="text-align:center;color:var(--green)">✓ Nenhum tenant em risco</td></tr>';
+    document.getElementById('churn-table').innerHTML = html;
+  } catch(e) { console.error('churn', e); }
+}
+
+async function refreshAll() {
+  document.getElementById('last-refresh').textContent = 'A carregar…';
+  await Promise.all([loadHealth(), loadMetrics(), loadRevenue(), loadEndpoints(), loadTenants(), loadErrors(), loadChurn()]);
+  document.getElementById('last-refresh').textContent = 'Último refresh: ' + new Date().toLocaleTimeString('pt-PT');
+}
+
+// Auto-login if token saved
+if (TOKEN) {
+  api('/admin/system-health').then(() => {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    refreshAll();
+  }).catch(() => { localStorage.removeItem('tim_admin_token'); TOKEN = ''; });
+}
+
+// Auto-refresh every 30 seconds
+setInterval(() => { if (TOKEN) refreshAll(); }, 30000);
+
+// Enter key on token input
+document.getElementById('token-input').addEventListener('keyup', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>

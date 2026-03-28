@@ -19,7 +19,7 @@ $MARKER
 0 3 * * * cd $DIR && bin/backup >> /var/log/xtim-backup.log 2>&1
 
 # Health check every 5 min — restart app if unhealthy
-*/5 * * * * curl -sf --max-time 10 http://localhost:8080/health > /dev/null || (cd $DIR && docker compose restart app && echo "\$(date): app restarted" >> /var/log/xtim-health.log)
+*/5 * * * * curl -sf --max-time 10 http://localhost:8080/health > /dev/null || (cd $DIR && docker compose --env-file .env.production restart app && echo "\$(date): app restarted" >> /var/log/xtim-health.log)
 $MARKER
 EOF
 )

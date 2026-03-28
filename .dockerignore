@@ -1,8 +1,7 @@
 .git/
 __pycache__/
 *.pyc
-.env
-.env.*
+.env.production
 !.env.example
 *.egg-info/
 app/tests/

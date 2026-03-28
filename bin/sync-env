@@ -10,10 +10,10 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-echo "syncing $ENV_FILE → $HOST:$DIR/.env"
-scp "$ENV_FILE" "$HOST:$DIR/.env"
+echo "syncing $ENV_FILE → $HOST:$DIR/.env.production"
+scp "$ENV_FILE" "$HOST:$DIR/.env.production"
 
 echo "restarting containers to pick up new env…"
-ssh "$HOST" "cd $DIR && docker compose up -d --force-recreate --remove-orphans"
+ssh "$HOST" "cd $DIR && docker compose --env-file .env.production up -d --force-recreate --remove-orphans"
 
 echo "done ✓"

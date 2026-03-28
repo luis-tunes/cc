@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.assistant import answer_question as _answer_question
-from app.auth import AuthInfo, require_auth
+from app.auth import AUTH_DISABLED, AuthInfo, optional_auth, require_auth
 from app.cache import cache_get, cache_invalidate, cache_set
 from app.db import get_conn, log_activity
 from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
@@ -2942,9 +2942,10 @@ async def assistant_chat(request: Request, body: ChatRequest, auth: AuthInfo = D
 
 
 # ── Admin / Monitoring ─────────────────────────────────────────────────
-# Restricted to MASTER_USER_IDS (set in env).
+# Restricted to MASTER_USER_IDS (set in env) OR ADMIN_TOKEN header.
 
 _MASTER_USER_IDS = {uid.strip().lower() for uid in os.environ.get("MASTER_USER_IDS", "").split(",") if uid.strip()}
+_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 
 def _require_admin(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:
@@ -2954,8 +2955,26 @@ def _require_admin(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:
     return auth
 
 
+def _require_admin_or_token(request: Request, auth: AuthInfo | None = Depends(optional_auth)) -> AuthInfo | None:
+    """Allow MASTER_USER_IDS (via Clerk JWT) or X-Admin-Token header."""
+    # Check token first (standalone dashboard)
+    token = request.headers.get("x-admin-token", "")
+    if _ADMIN_TOKEN and token and token == _ADMIN_TOKEN:
+        return None  # token auth — no AuthInfo needed
+    # Fall back to Clerk auth
+    if auth:
+        if auth.user_id.lower() in _MASTER_USER_IDS or (auth.email and auth.email.lower() in _MASTER_USER_IDS):
+            return auth
+    # Dev/test mode: AUTH_DISABLED gives dev-user which should be in MASTER_USER_IDS
+    if AUTH_DISABLED and not auth:
+        dev_auth = AuthInfo(user_id="dev-user", tenant_id="dev-tenant", email="dev@tim.pt", session_id=None)
+        if dev_auth.user_id.lower() in _MASTER_USER_IDS:
+            return dev_auth
+    raise HTTPException(status_code=403, detail="Admin access required")
+
+
 @router.get("/admin/tenants")
-async def admin_tenants(auth: AuthInfo = Depends(_require_admin)):
+async def admin_tenants(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """List all tenants with billing status, doc counts, last activity."""
     with get_conn() as conn:
         rows = conn.execute("""
@@ -2995,7 +3014,7 @@ async def admin_tenants(auth: AuthInfo = Depends(_require_admin)):
 
 
 @router.get("/admin/system-health")
-async def admin_system_health(auth: AuthInfo = Depends(_require_admin)):
+async def admin_system_health(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """Check health of DB, Redis, and Paperless."""
     import time as _time
     health: dict = {"status": "ok", "services": {}}
@@ -3046,7 +3065,7 @@ async def admin_system_health(auth: AuthInfo = Depends(_require_admin)):
 
 
 @router.get("/admin/metrics")
-async def admin_metrics(auth: AuthInfo = Depends(_require_admin)):
+async def admin_metrics(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """System-wide metrics for admin dashboard."""
     with get_conn() as conn:
         row = conn.execute("""
@@ -3072,7 +3091,7 @@ async def admin_metrics(auth: AuthInfo = Depends(_require_admin)):
 # ── Admin: revenue metrics ─────────────────────────────────────────────
 
 @router.get("/admin/revenue")
-async def admin_revenue(auth: AuthInfo = Depends(_require_admin)):
+async def admin_revenue(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """Revenue metrics: MRR, trial conversion, churn indicators."""
     with get_conn() as conn:
         plans = conn.execute(
@@ -3111,7 +3130,7 @@ async def admin_revenue(auth: AuthInfo = Depends(_require_admin)):
 @router.get("/admin/endpoints")
 async def admin_endpoints(
     window: int = 300,
-    auth: AuthInfo = Depends(_require_admin),
+    auth: AuthInfo | None = Depends(_require_admin_or_token),
 ):
     """Per-endpoint latency and error rates from in-memory metrics."""
     from app.monitoring import metrics
@@ -3127,7 +3146,7 @@ async def admin_endpoints(
 @router.get("/admin/errors")
 async def admin_errors(
     limit: int = 100,
-    auth: AuthInfo = Depends(_require_admin),
+    auth: AuthInfo | None = Depends(_require_admin_or_token),
 ):
     """Recent 5xx errors from in-memory ring buffer."""
     from app.monitoring import metrics
@@ -3137,7 +3156,7 @@ async def admin_errors(
 # ── Admin: tenant activity (live) ─────────────────────────────────────
 
 @router.get("/admin/tenant-activity")
-async def admin_tenant_activity(auth: AuthInfo = Depends(_require_admin)):
+async def admin_tenant_activity(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """Per-tenant request counts and last-seen timestamps from current process."""
     from app.monitoring import metrics
     return metrics.get_tenant_activity()
@@ -3146,7 +3165,7 @@ async def admin_tenant_activity(auth: AuthInfo = Depends(_require_admin)):
 # ── Admin: churn risk ─────────────────────────────────────────────────
 
 @router.get("/admin/churn-risk")
-async def admin_churn_risk(auth: AuthInfo = Depends(_require_admin)):
+async def admin_churn_risk(auth: AuthInfo | None = Depends(_require_admin_or_token)):
     """Tenants at risk of churning — inactive >7d, past_due, trial expiring soon."""
     now = datetime.datetime.now(datetime.UTC)
     with get_conn() as conn:
@@ -3189,3 +3208,15 @@ async def admin_churn_risk(auth: AuthInfo = Depends(_require_admin)):
 
     at_risk.sort(key=lambda x: x["risk_score"], reverse=True)
     return at_risk
+
+
+# ── Standalone Monitoring Dashboard ───────────────────────────────────
+
+@router.get("/monitoring")
+async def monitoring_dashboard():
+    """Serve standalone monitoring dashboard HTML (auth via token inside)."""
+    import pathlib
+    html_path = pathlib.Path(__file__).parent / "monitoring_dashboard.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="dashboard not found")
+    return FileResponse(str(html_path), media_type="text/html")

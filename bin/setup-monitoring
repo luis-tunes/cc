@@ -64,7 +64,7 @@ check() {
 		# Auto-restart after 5 consecutive failures
 		if [ "$FAILS" -ge 5 ]; then
 			cd __DIR__
-			docker compose restart app
+			docker compose --env-file .env.production restart app
 			echo "$(date -Iseconds) ACTION restarted app after $FAILS failures" >> "$LOG"
 			echo 0 > "$STATE"
 		fi

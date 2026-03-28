@@ -9,7 +9,7 @@ Python 3.11 · FastAPI · PostgreSQL 16 · Paperless-ngx · React 18 · Vite · 
 ## Desenvolvimento
 
 ```
-cp .env.example .env          # preencher chaves Clerk/Stripe
+cp .env.example .env.production   # preencher chaves Clerk/Stripe
 make dev                      # docker compose up --build
 make test                     # pytest + vite build + vitest
 make clean                    # docker compose down -v
@@ -28,7 +28,7 @@ cd frontend && npm run dev    # Vite :3000, proxy /api → :8080
 ssh root@IP 'bash -s' < bin/setup-server
 ```
 
-Instala Docker, firewall, swap, cria user `cc`, gera `.env` com passwords aleatórias, gera chave SSH para CI.
+Instala Docker, firewall, swap, cria user `cc`, gera `.env.production` com passwords aleatórias, gera chave SSH para CI.
 
 ### 2. Primeiro deploy (manual)
 
@@ -44,8 +44,8 @@ Envia `docker-compose.yml`, `Caddyfile`, `bin/post-consume` para `/opt/cc/`, pux
 ssh cc@IP
 cd /opt/cc && docker compose exec paperless python3 manage.py shell -c \
   "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; t,_=Token.objects.get_or_create(user=User.objects.get(username='admin')); print(t.key)"
-# colar em /opt/cc/.env como PAPERLESS_TOKEN=...
-docker compose restart app
+# colar em /opt/cc/.env.production como PAPERLESS_TOKEN=...
+docker compose --env-file .env.production restart app
 ```
 
 ### 4. CI automático
@@ -79,7 +79,7 @@ make deploy HOST=cc@IP    # manual (mesma coisa, sem build)
 /opt/cc/
   docker-compose.yml      # enviado por deploy
   Caddyfile               # enviado por deploy
-  .env                    # gerado pelo setup-server (nunca sai do servidor)
+  .env.production           # gerado pelo setup-server (nunca sai do servidor)
   bin/post-consume        # webhook Paperless → app
 ```
 

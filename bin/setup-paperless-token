@@ -6,11 +6,11 @@ DIR="/home/cc/cc"
 ADMIN="${2:-admin}"
 
 echo "waiting for paperless to be healthy…"
-ssh "$HOST" "cd $DIR && docker compose exec paperless curl -sf http://localhost:8000 > /dev/null" \
+ssh "$HOST" "cd $DIR && docker compose --env-file .env.production exec paperless curl -sf http://localhost:8000 > /dev/null" \
   || { echo "paperless not ready — try again in a minute"; exit 1; }
 
 echo "creating API token for user '$ADMIN'…"
-TOKEN=$(ssh "$HOST" "cd $DIR && docker compose exec paperless python3 manage.py drf_create_token $ADMIN" \
+TOKEN=$(ssh "$HOST" "cd $DIR && docker compose --env-file .env.production exec paperless python3 manage.py drf_create_token $ADMIN" \
   | grep -oP '[\da-f]{40}')
 
 if [ -z "$TOKEN" ]; then
@@ -18,11 +18,11 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-echo "writing PAPERLESS_TOKEN to server .env…"
-ssh "$HOST" "cd $DIR && sed -i 's/^PAPERLESS_TOKEN=.*/PAPERLESS_TOKEN=$TOKEN/' .env \
-  || echo 'PAPERLESS_TOKEN=$TOKEN' >> .env"
+echo "writing PAPERLESS_TOKEN to server .env.production…"
+ssh "$HOST" "cd $DIR && sed -i 's/^PAPERLESS_TOKEN=.*/PAPERLESS_TOKEN=$TOKEN/' .env.production \
+  || echo 'PAPERLESS_TOKEN=$TOKEN' >> .env.production"
 
 echo "recreating app (so new env is picked up)…"
-ssh "$HOST" "cd $DIR && docker compose up -d app"
+ssh "$HOST" "cd $DIR && docker compose --env-file .env.production up -d app"
 
 echo "done — token: ${TOKEN:0:8}…"

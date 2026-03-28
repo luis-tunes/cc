@@ -1,7 +1,7 @@
 # TIM reverse proxy
 # ─────────────────────────────────────────────────────────
 # Dev:  DOMAIN=:80 (HTTP only, via docker-compose default)
-# Prod: DOMAIN=xtim.ai in .env → Caddy auto-provisions Let's Encrypt cert
+# Prod: DOMAIN=xtim.ai in .env.production → Caddy auto-provisions Let's Encrypt cert
 
 {$DOMAIN::443} {
 

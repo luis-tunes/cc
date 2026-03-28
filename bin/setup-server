@@ -48,13 +48,13 @@ usermod -aG docker "$APP_USER" 2>/dev/null || true
 mkdir -p "$DIR/bin"
 chown -R "$APP_USER:$APP_USER" "$DIR"
 
-# Generate .env with random passwords
-if [ ! -f "$DIR/.env" ]; then
-  log "a gerar .env..."
+# Generate .env.production with random passwords
+if [ ! -f "$DIR/.env.production" ]; then
+  log "a gerar .env.production..."
   PG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
   PL_SECRET=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
   PL_ADMIN_PASS=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-  cat > "$DIR/.env" << EOF
+  cat > "$DIR/.env.production" << EOF
 POSTGRES_DB=cc
 POSTGRES_USER=cc
 POSTGRES_PASSWORD=${PG_PASS}
@@ -65,8 +65,8 @@ PAPERLESS_TOKEN=
 AUTH_DISABLED=0
 DOMAIN=:80
 EOF
-  chown "$APP_USER:$APP_USER" "$DIR/.env"
-  chmod 600 "$DIR/.env"
+  chown "$APP_USER:$APP_USER" "$DIR/.env.production"
+  chmod 600 "$DIR/.env.production"
 fi
 
 # SSH key for CI deploy
@@ -80,7 +80,7 @@ if [ ! -f "/home/$APP_USER/.ssh/deploy" ]; then
 fi
 
 IP=$(curl -sf https://api.ipify.org || hostname -I | awk '{print $1}')
-PL_PASS=$(grep PAPERLESS_ADMIN_PASSWORD "$DIR/.env" | cut -d= -f2)
+PL_PASS=$(grep PAPERLESS_ADMIN_PASSWORD "$DIR/.env.production" | cut -d= -f2)
 
 echo ""
 echo "--------------------------------------"
@@ -92,10 +92,10 @@ echo "    make deploy HOST=$APP_USER@$IP"
 echo ""
 echo "  Depois de arrancar, gerar token paperless:"
 echo "    ssh $APP_USER@$IP"
-echo "    cd $DIR && docker compose exec paperless python3 manage.py shell -c \\"
+echo "    cd $DIR && docker compose --env-file .env.production exec paperless python3 manage.py shell -c \\"
 echo "      \"from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; t,_=Token.objects.get_or_create(user=User.objects.get(username='admin')); print(t.key)\""
-echo "    # colar o token em $DIR/.env como PAPERLESS_TOKEN=..."
-echo "    docker compose restart app"
+echo "    # colar o token em $DIR/.env.production como PAPERLESS_TOKEN=..."
+echo "    docker compose --env-file .env.production restart app"
 echo ""
 echo "  Paperless admin: admin / $PL_PASS"
 echo ""

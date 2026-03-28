@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
-.env
 .env.production
 !.env.example
 *.egg-info/

@@ -16,14 +16,14 @@ cd "$(dirname "$0")/.."
 BACKUP_DIR="${1:-./backups}"
 RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-7}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-DB_CONTAINER=$(docker compose ps -q db 2>/dev/null || true)
+DB_CONTAINER=$(docker compose --env-file .env.production ps -q db 2>/dev/null || true)
 
 mkdir -p "$BACKUP_DIR"
 
 # ── PostgreSQL dump ───────────────────────────────────────────────────
 if [ -n "$DB_CONTAINER" ]; then
   echo "→ Backing up PostgreSQL…"
-  docker compose exec -T db pg_dump \
+  docker compose --env-file .env.production exec -T db pg_dump \
     -U "${POSTGRES_USER:-cc}" \
     --format=custom \
     "${POSTGRES_DB:-cc}" \
@@ -34,12 +34,12 @@ else
 fi
 
 # ── Paperless media export ────────────────────────────────────────────
-PL_CONTAINER=$(docker compose ps -q paperless 2>/dev/null || true)
+PL_CONTAINER=$(docker compose --env-file .env.production ps -q paperless 2>/dev/null || true)
 if [ -n "$PL_CONTAINER" ]; then
   echo "→ Backing up Paperless media…"
-  docker compose exec -T paperless \
+  docker compose --env-file .env.production exec -T paperless \
     document_exporter /tmp/export --no-progress-bar 2>/dev/null || true
-  docker compose cp paperless:/tmp/export - \
+  docker compose --env-file .env.production cp paperless:/tmp/export - \
     | gzip > "$BACKUP_DIR/xtim-paperless-$TIMESTAMP.tar.gz" 2>/dev/null || true
   if [ -f "$BACKUP_DIR/xtim-paperless-$TIMESTAMP.tar.gz" ]; then
     echo "  ✓ $BACKUP_DIR/xtim-paperless-$TIMESTAMP.tar.gz"
