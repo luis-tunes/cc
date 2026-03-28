@@ -2,9 +2,11 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSystemHealth, useAdminMetrics, useRevenue, useEndpoints, useErrorLog } from "@/hooks/use-admin";
-import { Loader2, Activity, Database, Server, RefreshCw, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { useBillingStatus } from "@/hooks/use-billing";
+import { Loader2, Activity, Database, Server, RefreshCw, AlertTriangle, CheckCircle2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 function StatusDot({ status }: { status: string }) {
   const color = status === "ok" ? "bg-green-500" : status === "degraded" ? "bg-yellow-500" : "bg-red-500";
@@ -47,13 +49,35 @@ function KpiCard({ label, value, sub }: { label: string; value: string | number;
 
 export default function Monitoring() {
   const queryClient = useQueryClient();
-  const { data: health, isLoading: healthLoading } = useSystemHealth();
+  const navigate = useNavigate();
+  const { data: billing, isLoading: billingLoading } = useBillingStatus();
+  const { data: health, isLoading: healthLoading, isError: healthError } = useSystemHealth();
   const { data: metrics, isLoading: metricsLoading } = useAdminMetrics();
   const { data: revenue } = useRevenue();
   const { data: endpoints } = useEndpoints(300);
   const { data: errors } = useErrorLog(20);
 
-  const loading = healthLoading || metricsLoading;
+  const loading = billingLoading || healthLoading || metricsLoading;
+
+  // Only master users (is_master from billing status)
+  if (!billingLoading && billing && !billing.is_master) {
+    return (
+      <PageContainer title="Monitorização">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="rounded-full bg-red-500/10 p-4 mb-4">
+            <ShieldX className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-lg font-semibold">Acesso restrito</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Esta página é apenas para administradores.
+          </p>
+          <Button variant="outline" size="sm" className="mt-6" onClick={() => navigate("/painel")}>
+            Voltar ao painel
+          </Button>
+        </div>
+      </PageContainer>
+    );
+  }
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["admin"] });

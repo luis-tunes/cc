@@ -2948,9 +2948,20 @@ _MASTER_USER_IDS = {uid.strip().lower() for uid in os.environ.get("MASTER_USER_I
 _ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 
+def _is_admin_user(auth: AuthInfo) -> bool:
+    """Check if user is in MASTER_USER_IDS (by user_id, JWT email, or Clerk API email)."""
+    if auth.user_id.lower() in _MASTER_USER_IDS:
+        return True
+    if auth.email and auth.email.lower() in _MASTER_USER_IDS:
+        return True
+    from app.billing import _fetch_clerk_email
+    email = _fetch_clerk_email(auth.user_id)
+    return bool(email and email.lower() in _MASTER_USER_IDS)
+
+
 def _require_admin(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:
     """Only allow MASTER_USER_IDS to access admin endpoints."""
-    if auth.user_id.lower() not in _MASTER_USER_IDS and not (auth.email and auth.email.lower() in _MASTER_USER_IDS):
+    if not _is_admin_user(auth):
         raise HTTPException(status_code=403, detail="Admin access required")
     return auth
 
@@ -2962,9 +2973,8 @@ def _require_admin_or_token(request: Request, auth: AuthInfo | None = Depends(op
     if _ADMIN_TOKEN and token and token == _ADMIN_TOKEN:
         return None  # token auth — no AuthInfo needed
     # Fall back to Clerk auth
-    if auth:
-        if auth.user_id.lower() in _MASTER_USER_IDS or (auth.email and auth.email.lower() in _MASTER_USER_IDS):
-            return auth
+    if auth and _is_admin_user(auth):
+        return auth
     # Dev/test mode: AUTH_DISABLED gives dev-user which should be in MASTER_USER_IDS
     if AUTH_DISABLED and not auth:
         dev_auth = AuthInfo(user_id="dev-user", tenant_id="dev-tenant", email="dev@tim.pt", session_id=None)
