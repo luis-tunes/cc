@@ -32,17 +32,49 @@ CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@xtim.ai")
 
 TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "14"))
 
+CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
+
 # Comma-separated Clerk user IDs or emails that always get pro access
 MASTER_USER_IDS = {uid.strip().lower() for uid in os.environ.get("MASTER_USER_IDS", "").split(",") if uid.strip()}
+
+# Cache: user_id -> email (fetched from Clerk Backend API)
+_clerk_email_cache: dict[str, str | None] = {}
+
+
+def _fetch_clerk_email(user_id: str) -> str | None:
+    """Fetch user email from Clerk Backend API (cached)."""
+    if user_id in _clerk_email_cache:
+        return _clerk_email_cache[user_id]
+    if not CLERK_SECRET_KEY:
+        return None
+    try:
+        r = httpx.get(
+            f"https://api.clerk.com/v1/users/{user_id}",
+            headers={"Authorization": f"Bearer {CLERK_SECRET_KEY}"},
+            timeout=5,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            addrs = data.get("email_addresses", [])
+            email = addrs[0].get("email_address") if addrs else None
+            _clerk_email_cache[user_id] = email
+            return email
+    except Exception as e:
+        logger.debug("Clerk email lookup failed for %s: %s", user_id, e)
+    _clerk_email_cache[user_id] = None
+    return None
 
 
 def _is_master(auth: AuthInfo) -> bool:
     if not MASTER_USER_IDS:
         return False
-    return (
-        auth.user_id.lower() in MASTER_USER_IDS
-        or (auth.email is not None and auth.email.lower() in MASTER_USER_IDS)
-    )
+    if auth.user_id.lower() in MASTER_USER_IDS:
+        return True
+    if auth.email is not None and auth.email.lower() in MASTER_USER_IDS:
+        return True
+    # Email not in JWT — fetch from Clerk Backend API
+    email = _fetch_clerk_email(auth.user_id)
+    return bool(email and email.lower() in MASTER_USER_IDS)
 
 
 PLANS = [
