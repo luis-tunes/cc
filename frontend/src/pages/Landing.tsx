@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@clerk/react";
 import {
@@ -23,6 +23,121 @@ import {
   Lock,
   CreditCard,
 } from "lucide-react";
+
+/* ── Animation utilities ─────────────────────────────────────────────── */
+
+function useInView(options?: { threshold?: number; rootMargin?: string; once?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const { threshold = 0.15, rootMargin = "0px 0px -60px 0px", once = true } = options ?? {};
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisible(true);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setVisible(true);
+          if (once) obs.disconnect();
+        }
+      },
+      { threshold, rootMargin },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold, rootMargin, once]);
+
+  return { ref, visible };
+}
+
+function FadeIn({
+  children,
+  className = "",
+  delay = 0,
+  direction = "up",
+  duration = 700,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  direction?: "up" | "down" | "left" | "right" | "none";
+  duration?: number;
+}) {
+  const { ref, visible } = useInView();
+
+  const base = "transition-all ease-out";
+  const transforms: Record<string, string> = {
+    up: "translate-y-8",
+    down: "-translate-y-8",
+    left: "translate-x-8",
+    right: "-translate-x-8",
+    none: "",
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={`${base} ${visible ? "opacity-100 translate-y-0 translate-x-0" : `opacity-0 ${transforms[direction]}`} ${className}`}
+      style={{ transitionDuration: `${duration}ms`, transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CountUp({ value, suffix = "" }: { value: string; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [display, setDisplay] = useState(value);
+  const triggered = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(num)) return;
+
+    const prefix = value.match(/^[^0-9]*/)?.[0] ?? "";
+    const postfix = value.match(/[^0-9]*$/)?.[0] ?? "";
+
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting || triggered.current) return;
+        triggered.current = true;
+        obs.disconnect();
+
+        const duration = 1800;
+        const start = performance.now();
+
+        const tick = (now: number) => {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = Math.round(num * eased);
+          setDisplay(`${prefix}${current}${postfix}`);
+          if (progress < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [value]);
+
+  return (
+    <span ref={ref}>
+      {display}
+      {suffix}
+    </span>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
   return (
@@ -64,7 +179,9 @@ function Nav() {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
@@ -73,9 +190,7 @@ function Nav() {
   return (
     <nav
       className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "border-b bg-card/90 backdrop-blur-xl shadow-sm"
-          : "bg-transparent"
+        scrolled ? "border-b bg-card/90 backdrop-blur-xl shadow-sm" : "bg-transparent"
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
@@ -86,7 +201,6 @@ function Nav() {
           </span>
         </Link>
 
-        {/* Desktop nav */}
         <div className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((l) => (
             <a
@@ -115,7 +229,6 @@ function Nav() {
             {ctaLabel}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-          {/* Mobile hamburger */}
           <button
             onClick={() => setOpen(!open)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
@@ -174,104 +287,170 @@ function Hero() {
   const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
   const ctaLabel = isSignedIn ? "Ir para o painel" : "Começar grátis";
 
+  // Sequential pipeline animation
+  const [activeStep, setActiveStep] = useState(-1);
+  const pipelineRef = useRef<HTMLDivElement>(null);
+  const pipelineTriggered = useRef(false);
+
+  useEffect(() => {
+    const el = pipelineRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting || pipelineTriggered.current) return;
+        pipelineTriggered.current = true;
+        obs.disconnect();
+        // Stagger each step
+        [0, 1, 2, 3].forEach((i) => {
+          setTimeout(() => setActiveStep(i), 800 + i * 400);
+        });
+      },
+      { threshold: 0.3 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const PIPELINE = [
+    { icon: Upload, label: "Fatura digitalizada", status: "Extraído", color: "text-tim-info" },
+    { icon: Bot, label: "Classificação IA", status: "Conta 62", color: "text-primary" },
+    { icon: Receipt, label: "Movimento bancário", status: "Associado", color: "text-tim-warning" },
+    { icon: Check, label: "Reconciliação", status: "Confirmado", color: "text-tim-success" },
+  ];
+
   return (
     <section className="relative overflow-hidden">
-      {/* Background effects */}
+      {/* Animated background effects */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-transparent to-transparent" />
-      <div className="absolute -top-32 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-primary/[0.06] blur-3xl sm:-top-40 sm:h-[500px] sm:w-[800px]" />
-      <div className="absolute -right-20 top-40 hidden h-[300px] w-[300px] rounded-full bg-primary/[0.03] blur-3xl lg:block" />
+      <div className="absolute -top-32 left-1/2 h-[400px] w-[600px] rounded-full bg-primary/[0.06] blur-3xl animate-hero-glow sm:-top-40 sm:h-[500px] sm:w-[800px]" />
+      <div className="absolute -right-20 top-40 hidden h-[300px] w-[300px] rounded-full bg-primary/[0.03] blur-3xl animate-hero-glow-right lg:block" />
 
       <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-20 md:pb-28 md:pt-28">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 sm:mb-8 sm:px-4 sm:py-2">
-            <Clock className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              Comece grátis — sem cartão de crédito
-            </span>
-          </div>
+          <FadeIn delay={0}>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 sm:mb-8 sm:px-4 sm:py-2">
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Comece grátis — sem cartão de crédito
+              </span>
+            </div>
+          </FadeIn>
 
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
-            A contabilidade do seu{" "}
-            <span className="relative text-primary">
-              negócio
-              <svg className="absolute -bottom-1 left-0 w-full" viewBox="0 0 200 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 5.5C47 2 153 2 199 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.3" />
-              </svg>
-            </span>
-            , no piloto automático
-          </h1>
+          <FadeIn delay={150}>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+              A contabilidade do seu{" "}
+              <span className="relative text-primary">
+                negócio
+                <svg
+                  className="absolute -bottom-1 left-0 w-full"
+                  viewBox="0 0 200 8"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M1 5.5C47 2 153 2 199 5.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    opacity="0.3"
+                  />
+                </svg>
+              </span>
+              , no piloto automático
+            </h1>
+          </FadeIn>
 
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:text-base md:text-lg">
-            Digitalize faturas, reconcilie movimentos bancários e tenha sempre
-            a visão financeira da sua empresa — tudo automatizado, em português.
-          </p>
+          <FadeIn delay={300}>
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:text-base md:text-lg">
+              Digitalize faturas, reconcilie movimentos bancários e tenha sempre a visão financeira da sua
+              empresa — tudo automatizado, em português.
+            </p>
+          </FadeIn>
 
-          <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4">
-            <Link
-              to={ctaTo}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
-            >
-              {ctaLabel}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href="#como-funciona"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-6 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-muted/50 sm:w-auto sm:py-4"
-            >
-              <Play className="h-4 w-4 text-primary" />
-              Ver como funciona
-            </a>
-          </div>
+          <FadeIn delay={400}>
+            <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4">
+              <Link
+                to={ctaTo}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
+              >
+                {ctaLabel}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a
+                href="#como-funciona"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-6 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-muted/50 sm:w-auto sm:py-4"
+              >
+                <Play className="h-4 w-4 text-primary" />
+                Ver como funciona
+              </a>
+            </div>
+          </FadeIn>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
-            <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Sem cartão de crédito</span>
-            <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Cancele quando quiser</span>
-            <span className="flex items-center gap-1"><Check className="h-3 w-3" /> Suporte em português</span>
-          </div>
+          <FadeIn delay={500} direction="none">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3" /> Sem cartão de crédito
+              </span>
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3" /> Cancele quando quiser
+              </span>
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3" /> Suporte em português
+              </span>
+            </div>
+          </FadeIn>
         </div>
 
         {/* App preview */}
-        <div className="mx-auto mt-12 max-w-4xl sm:mt-16">
-          <div className="relative rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/[0.08] sm:rounded-2xl sm:p-2">
-            {/* Browser chrome */}
-            <div className="flex items-center gap-1.5 rounded-t-lg bg-muted/50 px-3 py-2 sm:gap-2 sm:px-4 sm:py-2.5">
-              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
-              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
-              <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
-              <div className="ml-2 flex-1 rounded-md bg-background/80 px-3 py-1">
-                <span className="text-xs text-muted-foreground/40">app.xtim.ai/painel</span>
+        <FadeIn delay={600} duration={900}>
+          <div className="mx-auto mt-12 max-w-4xl sm:mt-16">
+            <div className="relative rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/[0.08] sm:rounded-2xl sm:p-2">
+              {/* Browser chrome */}
+              <div className="flex items-center gap-1.5 rounded-t-lg bg-muted/50 px-3 py-2 sm:gap-2 sm:px-4 sm:py-2.5">
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/20 sm:h-2.5 sm:w-2.5" />
+                <div className="ml-2 flex-1 rounded-md bg-background/80 px-3 py-1">
+                  <span className="text-xs text-muted-foreground/40">app.xtim.ai/painel</span>
+                </div>
               </div>
-            </div>
-            <div className="rounded-b-lg bg-muted/30 p-4 sm:p-6 md:p-8 lg:p-12">
-              {/* KPI row */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-                <PreviewKpi label="Faturação" value="€42.580" trend="+12%" icon={TrendingUp} />
-                <PreviewKpi label="Documentos" value="284" trend="Este mês" icon={FileText} />
-                <PreviewKpi label="Reconciliação" value="96%" trend="Automática" icon={Check} />
-              </div>
-              {/* Pipeline flow */}
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-4">
-                {[
-                  { icon: Upload, label: "Fatura digitalizada", status: "Extraído", color: "text-tim-info" },
-                  { icon: Bot, label: "Classificação IA", status: "Conta 62", color: "text-primary" },
-                  { icon: Receipt, label: "Movimento bancário", status: "Associado", color: "text-tim-warning" },
-                  { icon: Check, label: "Reconciliação", status: "Confirmado", color: "text-tim-success" },
-                ].map((item, i) => (
-                  <div key={item.label} className="group relative rounded-lg border bg-card p-3 transition-all hover:shadow-md sm:p-4">
-                    {i < 3 && (
-                      <div className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 md:block">
-                        <ChevronRight className="h-3 w-3 text-muted-foreground/30" />
-                      </div>
-                    )}
-                    <item.icon className={`h-4 w-4 ${item.color}`} />
-                    <p className="mt-2 text-xs font-medium text-foreground">{item.label}</p>
-                    <p className={`mt-0.5 text-xs font-medium ${item.color}`}>{item.status}</p>
-                  </div>
-                ))}
+              <div className="rounded-b-lg bg-muted/30 p-4 sm:p-6 md:p-8 lg:p-12">
+                {/* KPI row */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                  <PreviewKpi label="Faturação" value="42.580" trend="+12%" icon={TrendingUp} />
+                  <PreviewKpi label="Documentos" value="284" trend="Este mês" icon={FileText} />
+                  <PreviewKpi label="Reconciliação" value="96%" trend="Automática" icon={Check} />
+                </div>
+                {/* Pipeline flow — animated */}
+                <div ref={pipelineRef} className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-4">
+                  {PIPELINE.map((item, i) => (
+                    <div
+                      key={item.label}
+                      className={`group relative rounded-lg border bg-card p-3 transition-all duration-500 sm:p-4 ${
+                        activeStep >= i
+                          ? "border-primary/30 shadow-md animate-step-highlight"
+                          : "hover:shadow-md"
+                      }`}
+                    >
+                      {i < 3 && (
+                        <div className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 md:block">
+                          <ChevronRight
+                            className={`h-3 w-3 transition-colors duration-500 ${
+                              activeStep >= i ? "text-primary/60" : "text-muted-foreground/30"
+                            }`}
+                          />
+                        </div>
+                      )}
+                      <item.icon className={`h-4 w-4 ${item.color}`} />
+                      <p className="mt-2 text-xs font-medium text-foreground">{item.label}</p>
+                      <p className={`mt-0.5 text-xs font-medium ${item.color}`}>{item.status}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </FadeIn>
       </div>
     </section>
   );
@@ -310,21 +489,19 @@ function Logos() {
   return (
     <section className="border-y bg-muted/20 py-8 sm:py-10">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-          Pensado para negócios portugueses
-        </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:mt-6 sm:gap-x-10">
-          {SECTORS.map((sector, i) => (
-            <div key={sector} className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground/40">
-                {sector}
-              </span>
-              {i < SECTORS.length - 1 && (
-                <span className="hidden text-muted-foreground/15 sm:inline">|</span>
-              )}
-            </div>
-          ))}
-        </div>
+        <FadeIn>
+          <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+            Pensado para negócios portuguêses
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:mt-6 sm:gap-x-10">
+            {SECTORS.map((sector, i) => (
+              <div key={sector} className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground/40">{sector}</span>
+                {i < SECTORS.length - 1 && <span className="hidden text-muted-foreground/15 sm:inline">|</span>}
+              </div>
+            ))}
+          </div>
+        </FadeIn>
       </div>
     </section>
   );
@@ -344,7 +521,7 @@ const FEATURES = [
     icon: Bot,
     title: "Classificação por IA",
     description:
-      "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
+      "O xtim.ai aprende com o seu histórico e sugere contas SNC automáticamente. Aprovação com um clique.",
     highlight: "Aprende consigo",
   },
   {
@@ -381,33 +558,34 @@ function Features() {
   return (
     <section id="funcionalidades" className="py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Funcionalidades</p>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Tudo o que precisa, nada que não precise
-          </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Ferramentas profissionais, desenhadas para serem simples.
-          </p>
-        </div>
+        <FadeIn>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Funcionalidades</p>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Tudo o que precisa, nada que não precise
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ferramentas profissionais, desenhadas para serem simples.
+            </p>
+          </div>
+        </FadeIn>
 
         <div className="mt-10 grid gap-4 sm:mt-14 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="group rounded-xl border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 sm:p-6"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
-                  <f.icon className="h-5 w-5 text-primary" />
+          {FEATURES.map((f, i) => (
+            <FadeIn key={f.title} delay={i * 100}>
+              <div className="group h-full rounded-xl border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
+                    <f.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="rounded-full border border-primary/15 bg-primary/[0.04] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary/80">
+                    {f.highlight}
+                  </span>
                 </div>
-                <span className="rounded-full border border-primary/15 bg-primary/[0.04] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary/80">
-                  {f.highlight}
-                </span>
+                <h3 className="mt-4 text-base font-semibold text-foreground">{f.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
               </div>
-              <h3 className="mt-4 text-base font-semibold text-foreground">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
-            </div>
+            </FadeIn>
           ))}
         </div>
       </div>
@@ -426,12 +604,12 @@ const STEPS = [
   {
     number: "02",
     title: "Revisão inteligente",
-    description: "O xtim.ai extrai valores, NIF e IVA automaticamente. A IA sugere a classificação contabilística.",
+    description: "O xtim.ai extrai valores, NIF e IVA automáticamente. A IA sugere a classificação contabilística.",
   },
   {
     number: "03",
     title: "Importe os movimentos bancários",
-    description: "Carregue o extrato CSV do seu banco. Os movimentos são associados aos documentos automaticamente.",
+    description: "Carregue o extrato CSV do seu banco. Os movimentos são associados aos documentos automáticamente.",
   },
   {
     number: "04",
@@ -444,45 +622,54 @@ function HowItWorks() {
   return (
     <section id="como-funciona" className="border-y bg-muted/20 py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Como funciona</p>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Do papel ao digital em 4 passos
-          </h2>
-        </div>
+        <FadeIn>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Como funciona</p>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Do papel ao digital em 4 passos
+            </h2>
+          </div>
+        </FadeIn>
 
-        {/* Desktop: horizontal grid */}
         <div className="mt-10 sm:mt-14">
+          {/* Desktop: horizontal grid */}
           <div className="hidden lg:grid lg:grid-cols-4 lg:gap-0">
             {STEPS.map((step, i) => (
-              <div key={step.number} className="relative px-4">
-                {i < STEPS.length - 1 && (
-                  <div className="absolute right-0 top-7 h-px w-full bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" style={{ left: "calc(56px + 1rem)" }} />
-                )}
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground shadow-lg shadow-primary/20">
-                  {step.number}
+              <FadeIn key={step.number} delay={i * 150}>
+                <div className="relative px-4">
+                  {i < STEPS.length - 1 && (
+                    <div
+                      className="absolute right-0 top-7 h-px w-full bg-gradient-to-r from-primary/20 via-primary/10 to-transparent"
+                      style={{ left: "calc(56px + 1rem)" }}
+                    />
+                  )}
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground shadow-lg shadow-primary/20">
+                    {step.number}
+                  </div>
+                  <h3 className="mt-5 text-base font-semibold text-foreground">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.description}</p>
                 </div>
-                <h3 className="mt-5 text-base font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.description}</p>
-              </div>
+              </FadeIn>
             ))}
           </div>
 
           {/* Mobile/Tablet: vertical timeline */}
           <div className="flex flex-col gap-0 lg:hidden">
             {STEPS.map((step, i) => (
-              <div key={step.number} className="relative flex gap-4 pb-8 sm:gap-6">
-                {i < STEPS.length - 1 && (
-                  <div className="absolute left-[23px] top-14 bottom-0 w-px bg-gradient-to-b from-primary/20 to-transparent sm:left-[27px]" />
-                )}
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 sm:h-14 sm:w-14 sm:rounded-2xl sm:text-lg">
-                  {step.number}
+              <FadeIn key={step.number} delay={i * 120}>
+                <div className="relative flex gap-4 pb-8 sm:gap-6">
+                  {i < STEPS.length - 1 && (
+                    <div className="absolute left-[23px] top-14 bottom-0 w-px bg-gradient-to-b from-primary/20 to-transparent sm:left-[27px]" />
+                  )}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 sm:h-14 sm:w-14 sm:rounded-2xl sm:text-lg">
+                    {step.number}
+                  </div>
+                  <div className="pt-1">
+                    <h3 className="text-sm font-semibold text-foreground sm:text-base">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.description}</p>
+                  </div>
                 </div>
-                <div className="pt-1">
-                  <h3 className="text-sm font-semibold text-foreground sm:text-base">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.description}</p>
-                </div>
-              </div>
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -493,11 +680,11 @@ function HowItWorks() {
 
 /* ── Stats ────────────────────────────────────────────────────────────── */
 
-const STATS = [
-  { value: "95%", label: "Taxa de reconciliação", icon: Receipt },
-  { value: "<30s", label: "Tempo de extração", icon: Zap },
-  { value: "100%", label: "Em português", icon: Shield },
-  { value: "0€", label: "Para começar a usar", icon: Clock },
+const STATS_DATA = [
+  { value: "95%", numericValue: "95", suffix: "%", label: "Taxa de reconciliação", icon: Receipt },
+  { value: "<30s", numericValue: "30", suffix: "s", prefix: "<", label: "Tempo de extração", icon: Zap },
+  { value: "100%", numericValue: "100", suffix: "%", label: "Em português", icon: Shield },
+  { value: "0", numericValue: "0", suffix: "", prefix: "", label: "Para comecar a usar", icon: Clock },
 ];
 
 function Stats() {
@@ -505,16 +692,24 @@ function Stats() {
     <section className="py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4 md:gap-8">
-          {STATS.map((stat) => (
-            <div
-              key={stat.label}
-              className="group relative overflow-hidden rounded-xl border bg-card p-5 text-center transition-all hover:border-primary/30 hover:shadow-lg sm:p-6"
-            >
-              <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-primary/[0.04] transition-transform group-hover:scale-150" />
-              <stat.icon className="mx-auto h-5 w-5 text-primary/60 sm:h-6 sm:w-6" />
-              <p className="mt-3 text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">{stat.value}</p>
-              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{stat.label}</p>
-            </div>
+          {STATS_DATA.map((stat, i) => (
+            <FadeIn key={stat.label} delay={i * 100}>
+              <div className="group relative overflow-hidden rounded-xl border bg-card p-5 text-center transition-all hover:border-primary/30 hover:shadow-lg sm:p-6">
+                <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-primary/[0.04] transition-transform group-hover:scale-150" />
+                <stat.icon className="mx-auto h-5 w-5 text-primary/60 sm:h-6 sm:w-6" />
+                <p className="mt-3 text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">
+                  {stat.numericValue === "0" ? (
+                    <>0&euro;</>
+                  ) : (
+                    <>
+                      {stat.prefix ?? ""}
+                      <CountUp value={stat.numericValue} suffix={stat.suffix} />
+                    </>
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{stat.label}</p>
+              </div>
+            </FadeIn>
           ))}
         </div>
       </div>
@@ -530,16 +725,18 @@ function Pricing() {
   return (
     <section id="precos" className="border-y bg-muted/20 py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Preços</p>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Comece grátis, pague só quando precisar de mais
-          </h2>
-          <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-            Crie a sua conta e carregue o primeiro documento grátis.
-            Veja o xtim.ai a extrair dados e sugerir classificações. Decida depois.
-          </p>
-        </div>
+        <FadeIn>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Preços</p>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Comece grátis, pague só quando precisar de mais
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+              Crie a sua conta e carregue o primeiro documento grátis. Veja o xtim.ai a extrair dados e sugerir
+              classificações. Decida depois.
+            </p>
+          </div>
+        </FadeIn>
 
         {/* How trial works */}
         <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:mt-12 sm:grid-cols-3 sm:gap-6">
@@ -553,7 +750,7 @@ function Pricing() {
             {
               step: "2",
               title: "Carregue um documento",
-              desc: "Envie uma fatura ou recibo. Veja a IA a extrair dados e classificar automaticamente.",
+              desc: "Envie uma fatura ou recibo. Veja a IA a extrair dados e classificar automáticamente.",
               icon: Zap,
             },
             {
@@ -562,79 +759,91 @@ function Pricing() {
               desc: "Gostou? Subscreva o plano Pro para documentos ilimitados, reconciliação e muito mais.",
               icon: Check,
             },
-          ].map((item) => (
-            <div key={item.step} className="rounded-xl border bg-card p-5 sm:p-6">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                {item.step}
+          ].map((item, i) => (
+            <FadeIn key={item.step} delay={i * 120}>
+              <div className="h-full rounded-xl border bg-card p-5 sm:p-6">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                  {item.step}
+                </div>
+                <h3 className="mt-3 text-sm font-semibold text-foreground">{item.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
               </div>
-              <h3 className="mt-3 text-sm font-semibold text-foreground">{item.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
-            </div>
+            </FadeIn>
           ))}
         </div>
 
         {/* Pricing card */}
-        <div className="mx-auto mt-10 max-w-md sm:mt-12">
-          <div className="relative overflow-hidden rounded-2xl border border-primary/40 bg-card p-6 shadow-lg shadow-primary/5 sm:p-8">
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/[0.04]" />
+        <FadeIn delay={200}>
+          <div className="mx-auto mt-10 max-w-md sm:mt-12">
+            <div className="relative overflow-hidden rounded-2xl border border-primary/40 bg-card p-6 shadow-lg shadow-primary/5 sm:p-8">
+              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/[0.04]" />
 
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-foreground">Profissional</h3>
-              <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary">
-                Recomendado
-              </span>
-            </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-foreground">Profissional</h3>
+                <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary">
+                  Recomendado
+                </span>
+              </div>
 
-            <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-foreground sm:text-4xl">€150</span>
-              <span className="text-sm text-muted-foreground">/mês + IVA</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Equivalente a ~€5/dia — menos do que um café e pastel de nata</p>
+              <div className="mt-4 flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-foreground sm:text-4xl">&euro;150</span>
+                <span className="text-sm text-muted-foreground">/mês + IVA</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Equivalente a ~&euro;5/dia — menos do que um cafe e pastel de nata
+              </p>
 
-            <div className="mt-5 h-px bg-border sm:mt-6" />
+              <div className="mt-5 h-px bg-border sm:mt-6" />
 
-            <ul className="mt-5 space-y-3 sm:mt-6">
-              {[
-                "Documentos e OCR ilimitados",
-                "Reconciliação automática",
-                "Classificação por IA",
-                "Dashboard e relatórios",
-                "Multi-utilizador",
-                "Suporte por email em português",
-                "Exportação para contabilista",
-              ].map((f) => (
-                <li key={f} className="flex items-start gap-2.5 text-sm">
-                  <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-tim-success/10">
-                    <Check className="h-3 w-3 text-tim-success" />
-                  </div>
-                  <span className="text-foreground/80">{f}</span>
-                </li>
-              ))}
-            </ul>
+              <ul className="mt-5 space-y-3 sm:mt-6">
+                {[
+                  "Documentos e OCR ilimitados",
+                  "Reconciliação automática",
+                  "Classificação por IA",
+                  "Dashboard e relatórios",
+                  "Multi-utilizador",
+                  "Suporte por email em português",
+                  "Exportação para contabilista",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-tim-success/10">
+                      <Check className="h-3 w-3 text-tim-success" />
+                    </div>
+                    <span className="text-foreground/80">{f}</span>
+                  </li>
+                ))}
+              </ul>
 
-            <Link
-              to={isSignedIn ? "/painel" : "/auth/sign-up"}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 hover:-translate-y-0.5 sm:mt-8"
-            >
-              {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+              <Link
+                to={isSignedIn ? "/painel" : "/auth/sign-up"}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 hover:-translate-y-0.5 sm:mt-8"
+              >
+                {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
 
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
-              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> Sem cartão necessário</span>
-              <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> Pagamento seguro via Stripe</span>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
+                <span className="flex items-center gap-1">
+                  <CreditCard className="h-3 w-3" /> Sem cartão necessário
+                </span>
+                <span className="flex items-center gap-1">
+                  <Lock className="h-3 w-3" /> Pagamento seguro via Stripe
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        </FadeIn>
 
-        <div className="mx-auto mt-6 max-w-md text-center sm:mt-8">
-          <p className="text-sm text-muted-foreground">
-            Empresa com necessidades específicas?{" "}
-            <a href="mailto:info@xtim.ai" className="font-medium text-primary hover:underline">
-              Fale connosco
-            </a>
-          </p>
-        </div>
+        <FadeIn delay={300} direction="none">
+          <div className="mx-auto mt-6 max-w-md text-center sm:mt-8">
+            <p className="text-sm text-muted-foreground">
+              Empresa com necessidades especificas?{" "}
+              <a href="mailto:info@xtim.ai" className="font-medium text-primary hover:underline">
+                Fale connosco
+              </a>
+            </p>
+          </div>
+        </FadeIn>
       </div>
     </section>
   );
@@ -644,17 +853,20 @@ function Pricing() {
 
 const TESTIMONIALS = [
   {
-    quote: "Passei de 2 horas por semana a organizar papéis para 15 minutos. O xtim.ai mudou a forma como vejo a contabilidade.",
+    quote:
+      "Passei de 2 horas por semana a organizar papéis para 15 minutos. O xtim.ai mudou a forma como vejo a contabilidade.",
     author: "Ricardo M.",
     role: "Dono de restaurante, Lisboa",
   },
   {
-    quote: "Finalmente uma ferramenta em português que não precisa de um contabilista para usar. Recomendo a todos os empresários.",
+    quote:
+      "Finalmente uma ferramenta em português que não precisa de um contabilista para usar. Recomendo a todos os empresários.",
     author: "Ana S.",
     role: "Gestora de loja, Porto",
   },
   {
-    quote: "A reconciliação automática é impressionante. Upload do extrato e está feito — quase tudo bate certo sem tocar em nada.",
+    quote:
+      "A reconciliação automática é impressionante. Upload do extrato e está feito — quase tudo bate certo sem tocar em nada.",
     author: "Miguel T.",
     role: "Freelancer, Braga",
   },
@@ -664,37 +876,39 @@ function Testimonials() {
   return (
     <section className="py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            O que dizem os nossos utilizadores
-          </h2>
-        </div>
+        <FadeIn>
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              O que dizem os nossos utilizadores
+            </h2>
+          </div>
+        </FadeIn>
 
-        {/* Mobile: horizontal scroll, Desktop: grid */}
         <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:mt-12 md:mx-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0">
-          {TESTIMONIALS.map((t) => (
-            <div
-              key={t.author}
-              className="min-w-[280px] max-w-[320px] shrink-0 snap-center rounded-xl border bg-card p-5 sm:p-6 md:min-w-0 md:max-w-none"
-            >
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <svg key={s} className="h-4 w-4 fill-primary text-primary" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/80 italic">&ldquo;{t.quote}&rdquo;</p>
-              <div className="mt-5 flex items-center gap-3 border-t pt-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {t.author[0]}
+          {TESTIMONIALS.map((t, i) => (
+            <FadeIn key={t.author} delay={i * 120}>
+              <div className="min-w-[280px] max-w-[320px] shrink-0 snap-center rounded-xl border bg-card p-5 sm:p-6 md:min-w-0 md:max-w-none">
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <svg key={s} className="h-4 w-4 fill-primary text-primary" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{t.author}</p>
-                  <p className="text-xs text-muted-foreground">{t.role}</p>
+                <p className="mt-4 text-sm leading-relaxed text-foreground/80 italic">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <div className="mt-5 flex items-center gap-3 border-t pt-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {t.author[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{t.author}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </FadeIn>
           ))}
         </div>
       </div>
@@ -710,20 +924,20 @@ const FAQS = [
     a: "Não. O xtim.ai foi desenhado para empresários, não para contabilistas. A interface explica tudo em linguagem simples.",
   },
   {
-    q: "Os meus dados estão seguros?",
+    q: "Os meus dados estao seguros?",
     a: "Sim. Utilizamos encriptação em trânsito e em repouso, em conformidade com o RGPD. Os seus dados nunca são partilhados com terceiros.",
   },
   {
     q: "Posso experimentar antes de pagar?",
-    a: "Sim! Crie uma conta gratuita e carregue o primeiro documento. Veja o xtim.ai a extrair dados automaticamente. Para desbloquear todas as funcionalidades, subscreva o plano Pro.",
+    a: "Sim! Crie uma conta gratuita e carregue o primeiro documento. Veja o xtim.ai a extrair dados automáticamente. Para desbloquear todas as funcionalidades, subscreva o plano Pro.",
   },
   {
     q: "Funciona com o meu banco?",
-    a: "O xtim.ai aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portugueses. Basta exportar e carregar.",
+    a: "O xtim.ai aceita extratos bancários em formato CSV, suportado pela maioria dos bancos portuguêses. Basta exportar e carregar.",
   },
   {
     q: "Preciso de inserir cartão de crédito?",
-    a: "Não. A conta gratuita não requer qualquer pagamento. Só insere dados de pagamento quando decidir subscrever o plano Pro.",
+    a: "Não. A conta gratuita não requer qualquer pagamento. So insere dados de pagamento quando decidir subscrever o plano Pro.",
   },
 ];
 
@@ -733,37 +947,41 @@ function FAQ() {
   return (
     <section className="border-t py-16 sm:py-20 md:py-28">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <div className="text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">FAQ</p>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Perguntas frequentes
-          </h2>
-        </div>
+        <FadeIn>
+          <div className="text-center">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">FAQ</p>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              Perguntas frequentes
+            </h2>
+          </div>
+        </FadeIn>
 
-        <div className="mt-10 divide-y">
-          {FAQS.map((faq, i) => (
-            <div key={i}>
-              <button
-                onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="flex w-full items-center justify-between gap-4 py-4 text-left sm:py-5"
-              >
-                <span className="text-sm font-semibold text-foreground sm:text-base">{faq.q}</span>
-                <ChevronRight
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-                    openIdx === i ? "rotate-90" : ""
+        <FadeIn delay={150}>
+          <div className="mt-10 divide-y">
+            {FAQS.map((faq, i) => (
+              <div key={i}>
+                <button
+                  onClick={() => setOpenIdx(openIdx === i ? null : i)}
+                  className="flex w-full items-center justify-between gap-4 py-4 text-left sm:py-5"
+                >
+                  <span className="text-sm font-semibold text-foreground sm:text-base">{faq.q}</span>
+                  <ChevronRight
+                    className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                      openIdx === i ? "rotate-90" : ""
+                    }`}
+                  />
+                </button>
+                <div
+                  className={`overflow-hidden transition-all duration-200 ${
+                    openIdx === i ? "max-h-40 pb-4" : "max-h-0"
                   }`}
-                />
-              </button>
-              <div
-                className={`overflow-hidden transition-all duration-200 ${
-                  openIdx === i ? "max-h-40 pb-4" : "max-h-0"
-                }`}
-              >
-                <p className="text-sm leading-relaxed text-muted-foreground">{faq.a}</p>
+                >
+                  <p className="text-sm leading-relaxed text-muted-foreground">{faq.a}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </FadeIn>
       </div>
     </section>
   );
@@ -781,31 +999,35 @@ function CTA() {
       <div className="absolute -right-20 top-0 h-[300px] w-[300px] rounded-full bg-primary/[0.04] blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl px-4 text-center sm:px-6">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 sm:h-16 sm:w-16">
-          <Building2 className="h-7 w-7 text-primary sm:h-8 sm:w-8" />
-        </div>
-        <h2 className="mt-6 text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
-          Pronto para simplificar a sua contabilidade?
-        </h2>
-        <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:text-base">
-          Carregue os seus documentos e extratos. Veja o xtim.ai a trabalhar. Decida depois.
-        </p>
-        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
-          <Link
-            to={isSignedIn ? "/painel" : "/auth/sign-up"}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
-          >
-            {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <a
-            href="mailto:info@xtim.ai"
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Falar com a equipa
-            <ChevronRight className="h-3.5 w-3.5" />
-          </a>
-        </div>
+        <FadeIn>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 sm:h-16 sm:w-16">
+            <Building2 className="h-7 w-7 text-primary sm:h-8 sm:w-8" />
+          </div>
+          <h2 className="mt-6 text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
+            Pronto para simplificar a sua contabilidade?
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:text-base">
+            Carregue os seus documentos e extratos. Veja o xtim.ai a trabalhar. Decida depois.
+          </p>
+        </FadeIn>
+        <FadeIn delay={200}>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+            <Link
+              to={isSignedIn ? "/painel" : "/auth/sign-up"}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-0.5 sm:w-auto sm:py-4"
+            >
+              {isSignedIn ? "Ir para o painel" : "Criar conta grátis"}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="mailto:info@xtim.ai"
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Falar com a equipa
+              <ChevronRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </FadeIn>
       </div>
     </section>
   );
@@ -820,48 +1042,83 @@ function Footer() {
     <footer className="border-t bg-card">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
-          {/* Brand */}
           <div className="sm:col-span-2 md:col-span-1">
             <Link to="/" className="flex items-center gap-2">
               <span className="text-xl font-bold tracking-tight text-primary">xtim.ai</span>
               <span className="text-xs text-muted-foreground">Contabilidade Inteligente</span>
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              Contabilidade automatizada para negócios portugueses. Simples, seguro e 100% em português.
+              Contabilidade automatizada para negócios portuguêses. Simples, seguro e 100% em português.
             </p>
           </div>
 
-          {/* Product */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">Produto</h4>
             <ul className="mt-3 space-y-2">
-              <li><a href="#funcionalidades" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Funcionalidades</a></li>
-              <li><a href="#como-funciona" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Como funciona</a></li>
-              <li><a href="#precos" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Preços</a></li>
+              <li>
+                <a
+                  href="#funcionalidades"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Funcionalidades
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#como-funciona"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Como funciona
+                </a>
+              </li>
+              <li>
+                <a href="#precos" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+                  Preços
+                </a>
+              </li>
             </ul>
           </div>
 
-          {/* Account */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">Conta</h4>
             <ul className="mt-3 space-y-2">
               {isSignedIn ? (
-                <li><Link to="/painel" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Painel</Link></li>
+                <li>
+                  <Link to="/painel" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+                    Painel
+                  </Link>
+                </li>
               ) : (
                 <>
-                  <li><Link to="/auth/sign-in" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Entrar</Link></li>
-                  <li><Link to="/auth/sign-up" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Criar conta</Link></li>
+                  <li>
+                    <Link
+                      to="/auth/sign-in"
+                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Entrar
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/auth/sign-up"
+                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Criar conta
+                    </Link>
+                  </li>
                 </>
               )}
             </ul>
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">Contacto</h4>
             <ul className="mt-3 space-y-2">
               <li>
-                <a href="mailto:info@xtim.ai" className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                <a
+                  href="mailto:info@xtim.ai"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
                   <Mail className="h-3 w-3" />
                   info@xtim.ai
                 </a>
@@ -870,11 +1127,10 @@ function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="mt-8 border-t pt-6 sm:mt-10 sm:pt-8">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <p className="text-xs text-muted-foreground/50">
-              © {new Date().getFullYear()} xtim.ai — Contabilidade Inteligente. Todos os direitos reservados.
+              &copy; {new Date().getFullYear()} xtim.ai — Contabilidade Inteligente. Todos os direitos reservados.
             </p>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1 text-xs text-muted-foreground/40">

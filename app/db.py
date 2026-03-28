@@ -321,7 +321,7 @@ def init_db():
         conn.execute("""
             DO $$ BEGIN
                 ALTER TABLE products ADD CONSTRAINT uq_products_tenant_code UNIQUE (tenant_id, code);
-            EXCEPTION WHEN duplicate_object THEN NULL;
+            EXCEPTION WHEN duplicate_table OR duplicate_object THEN NULL;
             END $$;
         """)
 
@@ -336,7 +336,7 @@ def init_db():
             conn.execute(f"""
                 DO $$ BEGIN
                     {sql};
-                EXCEPTION WHEN duplicate_object THEN NULL;
+                EXCEPTION WHEN duplicate_table OR duplicate_object THEN NULL;
                 END $$;
             """)
 

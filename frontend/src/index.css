@@ -225,6 +225,36 @@
   display: none !important;
 }
 
+/* Landing page hero glow animation */
+@keyframes hero-glow {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.06; }
+  50% { transform: translate(-50%, -15px) scale(1.08); opacity: 0.1; }
+}
+
+@keyframes hero-glow-right {
+  0%, 100% { transform: scale(1); opacity: 0.03; }
+  50% { transform: scale(1.12); opacity: 0.06; }
+}
+
+.animate-hero-glow {
+  animation: hero-glow 8s ease-in-out infinite;
+}
+
+.animate-hero-glow-right {
+  animation: hero-glow-right 10s ease-in-out infinite 2s;
+}
+
+/* Pipeline step highlight pulse */
+@keyframes step-highlight {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3); }
+  70% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+
+.animate-step-highlight {
+  animation: step-highlight 1.5s ease-out;
+}
+
 /* Respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
