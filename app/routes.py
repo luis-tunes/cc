@@ -2900,6 +2900,7 @@ async def admin_metrics(auth: AuthInfo = Depends(_require_admin)):
                 (SELECT count(*) FROM tenant_plans WHERE status = 'trialing') AS trialing_tenants,
                 (SELECT count(*) FROM tenant_plans WHERE status = 'trial_expired') AS expired_tenants,
                 (SELECT count(*) FROM tenant_plans WHERE status = 'cancelled') AS cancelled_tenants,
+                (SELECT count(*) FROM tenant_plans WHERE status = 'past_due') AS past_due_tenants,
                 (SELECT count(*) FROM documents) AS total_documents,
                 (SELECT count(*) FROM bank_transactions) AS total_transactions,
                 (SELECT count(*) FROM reconciliations) AS total_reconciliations,
@@ -2910,3 +2911,125 @@ async def admin_metrics(auth: AuthInfo = Depends(_require_admin)):
                 (SELECT count(*) FROM alerts WHERE read = false) AS unread_alerts_global
         """).fetchone()
         return dict(row)
+
+
+# ── Admin: revenue metrics ─────────────────────────────────────────────
+
+@router.get("/admin/revenue")
+async def admin_revenue(auth: AuthInfo = Depends(_require_admin)):
+    """Revenue metrics: MRR, trial conversion, churn indicators."""
+    with get_conn() as conn:
+        plans = conn.execute(
+            "SELECT plan, status, trial_start, trial_end, stripe_customer FROM tenant_plans"
+        ).fetchall()
+
+    pro_active = [p for p in plans if p["plan"] == "pro" and p["status"] == "active"]
+    trialing = [p for p in plans if p["status"] == "trialing"]
+    expired = [p for p in plans if p["status"] == "trial_expired"]
+    cancelled = [p for p in plans if p["status"] == "cancelled"]
+    past_due = [p for p in plans if p["status"] == "past_due"]
+
+    mrr = len(pro_active) * 150
+    arr = mrr * 12
+
+    converted = len([p for p in pro_active if p.get("trial_start")])
+    total_ever_trialed = converted + len(expired) + len(cancelled)
+    trial_conversion = round(converted / total_ever_trialed, 4) if total_ever_trialed else 0
+
+    return {
+        "mrr_eur": mrr,
+        "arr_eur": arr,
+        "pro_active": len(pro_active),
+        "trialing": len(trialing),
+        "trial_expired": len(expired),
+        "cancelled": len(cancelled),
+        "past_due": len(past_due),
+        "at_risk_arr_eur": len(past_due) * 150 * 12,
+        "trial_conversion_rate": trial_conversion,
+        "total_tenants": len(plans),
+    }
+
+
+# ── Admin: endpoint performance ────────────────────────────────────────
+
+@router.get("/admin/endpoints")
+async def admin_endpoints(
+    window: int = 300,
+    auth: AuthInfo = Depends(_require_admin),
+):
+    """Per-endpoint latency and error rates from in-memory metrics."""
+    from app.monitoring import metrics
+    return {
+        "window_seconds": window,
+        "endpoints": metrics.get_endpoint_stats(window),
+        "summary": metrics.get_global_summary(window),
+    }
+
+
+# ── Admin: error log ──────────────────────────────────────────────────
+
+@router.get("/admin/errors")
+async def admin_errors(
+    limit: int = 100,
+    auth: AuthInfo = Depends(_require_admin),
+):
+    """Recent 5xx errors from in-memory ring buffer."""
+    from app.monitoring import metrics
+    return metrics.get_error_log(limit)
+
+
+# ── Admin: tenant activity (live) ─────────────────────────────────────
+
+@router.get("/admin/tenant-activity")
+async def admin_tenant_activity(auth: AuthInfo = Depends(_require_admin)):
+    """Per-tenant request counts and last-seen timestamps from current process."""
+    from app.monitoring import metrics
+    return metrics.get_tenant_activity()
+
+
+# ── Admin: churn risk ─────────────────────────────────────────────────
+
+@router.get("/admin/churn-risk")
+async def admin_churn_risk(auth: AuthInfo = Depends(_require_admin)):
+    """Tenants at risk of churning — inactive >7d, past_due, trial expiring soon."""
+    now = datetime.datetime.now(datetime.UTC)
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                tp.tenant_id, tp.plan, tp.status, tp.trial_end, tp.stripe_customer,
+                (SELECT max(created_at) FROM audit_log WHERE tenant_id = tp.tenant_id) AS last_activity,
+                (SELECT count(*) FROM documents WHERE tenant_id = tp.tenant_id) AS doc_count
+            FROM tenant_plans tp
+            WHERE tp.status IN ('active', 'trialing', 'past_due')
+            ORDER BY last_activity ASC NULLS FIRST
+        """).fetchall()
+
+    at_risk = []
+    for r in rows:
+        reasons: list[str] = []
+        row = dict(r)
+
+        if row["status"] == "past_due":
+            reasons.append("payment_failed")
+
+        last = row.get("last_activity")
+        if last and (now - last).days > 7:
+            reasons.append(f"inactive_{(now - last).days}d")
+        elif not last:
+            reasons.append("never_active")
+
+        if row["status"] == "trialing" and row.get("trial_end"):
+            days_left = (row["trial_end"] - now).days
+            if days_left <= 3:
+                reasons.append(f"trial_expires_{days_left}d")
+
+        if row["doc_count"] == 0:
+            reasons.append("zero_documents")
+
+        if reasons:
+            row["risk_reasons"] = reasons
+            row["risk_score"] = len(reasons)
+            at_risk.append(row)
+
+    at_risk.sort(key=lambda x: x["risk_score"], reverse=True)
+    return at_risk

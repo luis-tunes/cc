@@ -1120,6 +1120,7 @@ export interface AdminMetrics {
   trialing_tenants: number;
   expired_tenants: number;
   cancelled_tenants: number;
+  past_due_tenants: number;
   total_documents: number;
   total_transactions: number;
   total_reconciliations: number;
@@ -1128,6 +1129,79 @@ export interface AdminMetrics {
   txs_last_30d: number;
   total_document_value: number;
   unread_alerts_global: number;
+}
+
+export interface RevenueMetrics {
+  mrr_eur: number;
+  arr_eur: number;
+  pro_active: number;
+  trialing: number;
+  trial_expired: number;
+  cancelled: number;
+  past_due: number;
+  at_risk_arr_eur: number;
+  trial_conversion_rate: number;
+  total_tenants: number;
+}
+
+export interface EndpointStat {
+  endpoint: string;
+  requests: number;
+  errors: number;
+  error_rate: number;
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+  avg_ms: number;
+  total_all_time: number;
+  errors_all_time: number;
+}
+
+export interface GlobalSummary {
+  window_seconds: number;
+  total_requests: number;
+  total_errors: number;
+  error_rate: number;
+  active_tenants: number;
+  p50_ms: number;
+  p95_ms: number;
+  uptime_seconds: number;
+}
+
+export interface EndpointsResponse {
+  window_seconds: number;
+  endpoints: EndpointStat[];
+  summary: GlobalSummary;
+}
+
+export interface ErrorLogEntry {
+  timestamp: string;
+  method: string;
+  path: string;
+  status: number;
+  duration_ms: number;
+  tenant_id: string;
+  user_id: string;
+  request_id: string;
+}
+
+export interface TenantActivity {
+  [tenantId: string]: {
+    last_seen: string;
+    request_count: number;
+  };
+}
+
+export interface ChurnRiskTenant {
+  tenant_id: string;
+  plan: string;
+  status: string;
+  trial_end: string | null;
+  stripe_customer: string | null;
+  last_activity: string | null;
+  doc_count: number;
+  risk_reasons: string[];
+  risk_score: number;
 }
 
 export async function fetchAdminTenants(): Promise<AdminTenant[]> {
@@ -1140,4 +1214,24 @@ export async function fetchSystemHealth(): Promise<SystemHealth> {
 
 export async function fetchAdminMetrics(): Promise<AdminMetrics> {
   return request<AdminMetrics>("/admin/metrics");
+}
+
+export async function fetchRevenue(): Promise<RevenueMetrics> {
+  return request<RevenueMetrics>("/admin/revenue");
+}
+
+export async function fetchEndpoints(window = 300): Promise<EndpointsResponse> {
+  return request<EndpointsResponse>(`/admin/endpoints?window=${window}`);
+}
+
+export async function fetchErrorLog(limit = 100): Promise<ErrorLogEntry[]> {
+  return request<ErrorLogEntry[]>(`/admin/errors?limit=${limit}`);
+}
+
+export async function fetchTenantActivity(): Promise<TenantActivity> {
+  return request<TenantActivity>("/admin/tenant-activity");
+}
+
+export async function fetchChurnRisk(): Promise<ChurnRiskTenant[]> {
+  return request<ChurnRiskTenant[]>("/admin/churn-risk");
 }

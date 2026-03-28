@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,7 @@ from app.billing import init_billing_db
 from app.billing import router as billing_router
 from app.db import close_pool, init_db
 from app.limiter import limiter
+from app.monitoring import RequestSample, metrics
 from app.routes import router
 
 # ── Structured logging ─────────────────────────────────────────────────
@@ -81,18 +83,76 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
-# ── Request ID middleware ──────────────────────────────────────────────
+# ── Request tracking middleware (ID + logging + metrics) ───────────────
+_SKIP_LOG_PREFIXES = ("/assets/", "/health")
+
+
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next):
+async def request_tracking_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     request.state.request_id = request_id
+    t0 = time.monotonic()
+
     response = await call_next(request)
+
+    duration_ms = (time.monotonic() - t0) * 1000
     response.headers["X-Request-ID"] = request_id
+
+    path = request.url.path
+    if not any(path.startswith(p) for p in _SKIP_LOG_PREFIXES):
+        # Extract auth info if available
+        tenant_id = getattr(request.state, "tenant_id", "") or ""
+        user_id = getattr(request.state, "user_id", "") or ""
+
+        logger.info(
+            "request: %s %s %d %.0fms tenant=%s user=%s req=%s",
+            request.method, path, response.status_code, duration_ms,
+            tenant_id or "-", user_id or "-", request_id[:8],
+        )
+
+        metrics.record(RequestSample(
+            timestamp=time.time(),
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            duration_ms=round(duration_ms, 2),
+            tenant_id=tenant_id,
+            user_id=user_id,
+            request_id=request_id,
+        ))
+
     return response
+
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """Deep health check — probes DB and Redis."""
+    status = "ok"
+    checks: dict = {}
+
+    # PostgreSQL
+    try:
+        from app.db import get_conn
+        with get_conn() as conn:
+            conn.execute("SELECT 1").fetchone()
+        checks["db"] = "ok"
+    except Exception:
+        checks["db"] = "error"
+        status = "degraded"
+
+    # Redis (optional)
+    try:
+        from app.cache import _get_redis
+        r = _get_redis()
+        if r:
+            r.ping()
+            checks["redis"] = "ok"
+        else:
+            checks["redis"] = "unavailable"
+    except Exception:
+        checks["redis"] = "error"
+
+    return {"status": status, "checks": checks}
 
 # All API routes under /api
 app.include_router(router, prefix="/api")

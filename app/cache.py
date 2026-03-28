@@ -72,8 +72,12 @@ def cache_invalidate(pattern: str) -> None:
     if r is None:
         return
     try:
-        keys = r.keys(pattern)
-        if keys:
-            r.delete(*keys)
+        cursor = 0
+        while True:
+            cursor, keys = r.scan(cursor=cursor, match=pattern, count=100)
+            if keys:
+                r.delete(*keys)
+            if cursor == 0:
+                break
     except Exception as exc:
         logger.debug("cache_invalidate error: %s", exc)

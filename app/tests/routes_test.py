@@ -16,7 +16,9 @@ client = TestClient(app, raise_server_exceptions=False)
 def test_health():
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    data = r.json()
+    assert data["status"] == "ok"
+    assert "checks" in data
 
 
 # ── Documents CRUD ────────────────────────────────────────────────────

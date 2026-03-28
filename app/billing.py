@@ -10,6 +10,7 @@ Plans:
 import hashlib
 import hmac
 import json
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -18,6 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth import AuthInfo, optional_auth, require_auth
 from app.db import get_conn
+
+logger = logging.getLogger(__name__)
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -251,6 +254,43 @@ async def stripe_webhook(request: Request):
             with get_conn() as conn:
                 conn.execute(
                     "UPDATE tenant_plans SET plan = 'free', status = 'cancelled', updated_at = now() WHERE stripe_customer = %s",
+                    (customer,),
+                )
+                conn.commit()
+
+    elif event_type == "customer.subscription.updated":
+        customer = data.get("customer", "")
+        sub_status = data.get("status", "")  # active, past_due, unpaid, canceled
+        if customer:
+            plan_status = "active"
+            if sub_status in ("past_due", "unpaid"):
+                plan_status = "past_due"
+            elif sub_status == "canceled":
+                plan_status = "cancelled"
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE tenant_plans SET status = %s, updated_at = now() WHERE stripe_customer = %s AND plan = 'pro'",
+                    (plan_status, customer),
+                )
+                conn.commit()
+
+    elif event_type == "invoice.payment_failed":
+        customer = data.get("customer", "")
+        if customer:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE tenant_plans SET status = 'past_due', updated_at = now() WHERE stripe_customer = %s AND plan = 'pro'",
+                    (customer,),
+                )
+                conn.commit()
+            logger.warning("Payment failed for customer %s", customer)
+
+    elif event_type == "invoice.paid":
+        customer = data.get("customer", "")
+        if customer:
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE tenant_plans SET status = 'active', updated_at = now() WHERE stripe_customer = %s AND plan = 'pro'",
                     (customer,),
                 )
                 conn.commit()

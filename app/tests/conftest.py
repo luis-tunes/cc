@@ -102,8 +102,8 @@ class FakeConn:
         if sql_lower.startswith("select") and ("count(" in sql_lower or ("sum(" in sql_lower and "coalesce" in sql_lower)):
             # Only route to aggregate handler for top-level COUNT/SUM queries
             # (not subqueries like "WHERE id NOT IN (SELECT ...)")
-            # Also skip LATERAL join queries and admin metrics (multi-subselect)
-            if "lateral" not in sql_lower and sql_lower.count("select count(*)") < 3:
+            # Also skip LATERAL join queries, admin metrics (multi-subselect), and admin churn-risk
+            if "lateral" not in sql_lower and "tenant_plans" not in sql_lower and sql_lower.count("select count(*)") < 3:
                 if "from documents" in sql_lower or "from bank_transactions" in sql_lower or "from reconciliations" in sql_lower:
                     return self._handle_aggregate(sql, params)
 
@@ -114,6 +114,10 @@ class FakeConn:
         # ── Admin metrics (multiple subselects on tenant_plans) ──
         if "tenant_plans" in sql_lower and sql_lower.count("select count(*)") >= 3:
             return self._handle_admin_metrics(sql, params)
+
+        # ── Admin churn-risk (tenant_plans + audit_log correlated subquery) ──
+        if "tenant_plans" in sql_lower and "audit_log" in sql_lower:
+            return self._handle_admin_churn_risk(sql, params)
 
         # ── Tenant plans (billing) ──
         if "tenant_plans" in sql_lower:
@@ -568,7 +572,11 @@ class FakeConn:
         sql_lower = sql.strip().lower()
         if sql_lower.startswith("select"):
             tid = params[0] if params else None
-            rows = [r for r in _tables["tenant_plans"] if r.get("tenant_id") == tid]
+            if tid:
+                rows = [r for r in _tables["tenant_plans"] if r.get("tenant_id") == tid]
+            else:
+                # No filter param: return all (used by admin/revenue, admin/churn-risk)
+                rows = list(_tables["tenant_plans"])
             return FakeCursor(rows)
         if sql_lower.startswith("insert"):
             now = datetime.now(UTC)
@@ -598,19 +606,25 @@ class FakeConn:
             _tables["tenant_plans"].append(entry)
             return FakeCursor([entry])
         if sql_lower.startswith("update"):
-            # Update by stripe_customer or tenant_id
-            if "stripe_customer = %s" in sql_lower:
+            # Detect SET clause values
+            if "stripe_customer = %s" in sql_lower or "where stripe_customer" in sql_lower:
                 customer = params[-1] if params else None
                 for plan in _tables["tenant_plans"]:
                     if plan.get("stripe_customer") == customer:
-                        plan["plan"] = "free"
-                        plan["status"] = "cancelled"
+                        if "status = 'cancelled'" in sql_lower or ("plan = 'free'" in sql_lower and "status = 'cancelled'" in sql_lower):
+                            plan["plan"] = "free"
+                            plan["status"] = "cancelled"
+                        elif "status = 'past_due'" in sql_lower:
+                            plan["status"] = "past_due"
+                        elif "status = 'active'" in sql_lower:
+                            plan["status"] = "active"
+                        elif "status = %s" in sql_lower and len(params) >= 2:
+                            plan["status"] = params[0]
                         return FakeCursor([plan])
             if "tenant_id = %s" in sql_lower:
                 tid = params[-1] if params else None
                 for plan in _tables["tenant_plans"]:
                     if plan.get("tenant_id") == tid:
-                        # Apply updates from SET clause
                         return FakeCursor([plan])
             return FakeCursor([])
         return FakeCursor([])
@@ -644,6 +658,7 @@ class FakeConn:
             "trialing_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "trialing"]),
             "expired_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "trial_expired"]),
             "cancelled_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "cancelled"]),
+            "past_due_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "past_due"]),
             "total_documents": len(_tables["documents"]),
             "total_transactions": len(_tables["bank_transactions"]),
             "total_reconciliations": len(_tables["reconciliations"]),
@@ -653,6 +668,24 @@ class FakeConn:
             "total_document_value": sum(d.get("total", Decimal("0")) for d in _tables["documents"]),
             "unread_alerts_global": len([a for a in _tables["alerts"] if not a.get("read", False)]),
         }])
+
+    def _handle_admin_churn_risk(self, sql, params):
+        """Handle the admin/churn-risk query with correlated subqueries."""
+        results = []
+        statuses = {"active", "trialing", "past_due"}
+        for tp in _tables["tenant_plans"]:
+            if tp.get("status") not in statuses:
+                continue
+            tid = tp["tenant_id"]
+            logs = [a for a in _tables.get("audit_log", []) if a.get("tenant_id") == tid]
+            last_activity = max((a.get("created_at") for a in logs), default=None) if logs else None
+            doc_count = len([d for d in _tables["documents"] if d.get("tenant_id") == tid])
+            results.append({
+                **tp,
+                "last_activity": last_activity,
+                "doc_count": doc_count,
+            })
+        return FakeCursor(results)
 
     # ────── Unit families ──────
 

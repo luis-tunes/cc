@@ -72,21 +72,21 @@ class TestCacheWithRedis:
 
     def test_cache_invalidate_deletes_matching_keys(self):
         mock_redis = MagicMock()
-        mock_redis.keys.return_value = ["dashb:1", "dashb:2"]
+        mock_redis.scan.return_value = (0, ["dashb:1", "dashb:2"])
         with patch.object(cache_module, "_get_redis", return_value=mock_redis):
             _real_cache_invalidate("dashb:*")
-        mock_redis.keys.assert_called_once_with("dashb:*")
+        mock_redis.scan.assert_called_once_with(cursor=0, match="dashb:*", count=100)
         mock_redis.delete.assert_called_once_with("dashb:1", "dashb:2")
 
     def test_cache_invalidate_no_keys(self):
         mock_redis = MagicMock()
-        mock_redis.keys.return_value = []
+        mock_redis.scan.return_value = (0, [])
         with patch.object(cache_module, "_get_redis", return_value=mock_redis):
             _real_cache_invalidate("nothing:*")
         mock_redis.delete.assert_not_called()
 
     def test_cache_invalidate_handles_error(self):
         mock_redis = MagicMock()
-        mock_redis.keys.side_effect = Exception("conn error")
+        mock_redis.scan.side_effect = Exception("conn error")
         with patch.object(cache_module, "_get_redis", return_value=mock_redis):
             _real_cache_invalidate("any:*")

@@ -1,8 +1,12 @@
+import logging
 import os
+import time
 from contextlib import contextmanager
 
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 _pool = None
@@ -22,7 +26,25 @@ def get_conn():
         yield conn
 
 
+_DB_RETRY_ATTEMPTS = 5
+_DB_RETRY_DELAY = 2  # seconds
+
+
 def init_db():
+    """Initialize database schema with retries for cold boot resilience."""
+    for attempt in range(1, _DB_RETRY_ATTEMPTS + 1):
+        try:
+            _init_db_schema()
+            return
+        except Exception as e:
+            if attempt == _DB_RETRY_ATTEMPTS:
+                logger.error("DB init failed after %d attempts: %s", _DB_RETRY_ATTEMPTS, e)
+                raise
+            logger.warning("DB init attempt %d/%d failed: %s — retrying in %ds", attempt, _DB_RETRY_ATTEMPTS, e, _DB_RETRY_DELAY)
+            time.sleep(_DB_RETRY_DELAY)
+
+
+def _init_db_schema():
     with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
