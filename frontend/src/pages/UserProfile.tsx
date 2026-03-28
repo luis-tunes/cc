@@ -16,11 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Camera, Save, User, Bell, Globe } from "lucide-react";
+import { Loader2, Camera, Save, User, Bell, Globe, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function UserProfile() {
   const { user } = useUser();
   const { profile, isLoading, updateProfile, uploadAvatar } = useProfile();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -76,19 +78,30 @@ export default function UserProfile() {
       title="O Meu Perfil"
       subtitle="Gerir informações pessoais e preferências"
       actions={
-        <Button
-          size="sm"
-          className="h-8 text-xs"
-          onClick={handleSave}
-          disabled={updateProfile.isPending}
-        >
-          {updateProfile.isPending ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Save className="mr-1.5 h-3.5 w-3.5" />
-          )}
-          Guardar alterações
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Voltar
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleSave}
+            disabled={updateProfile.isPending}
+          >
+            {updateProfile.isPending ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Guardar alterações
+          </Button>
+        </div>
       }
     >
       <div className="mx-auto max-w-2xl space-y-6">
