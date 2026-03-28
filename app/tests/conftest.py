@@ -301,8 +301,8 @@ class FakeConn:
             # Find doc_id from WHERE id = %s by counting SET params
             set_part = sql.split("SET")[1].split("WHERE")[0] if "WHERE" in sql else ""
             set_param_count = set_part.count("%s")
-            doc_id = params[set_param_count] if set_param_count < len(params) else (params[-1] if params else None)
-            doc = next((d for d in _tables["documents"] if d["id"] == doc_id), None)
+            doc_id: int = params[set_param_count] if set_param_count < len(params) else (params[-1] if params else 0)
+            doc = next((d for d in _tables["documents"] if d["id"] == doc_id), {})  # type: ignore[arg-type]
             if not doc:
                 return FakeCursor([])
             field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
@@ -532,7 +532,7 @@ class FakeConn:
         if sql_lower.startswith("update"):
             rule_id = params[-2] if len(params) >= 2 else None
             tid = params[-1] if params else None
-            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), None)
+            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), {})  # type: ignore[arg-type]
             if not rule:
                 return FakeCursor([])
             set_part = sql.split("SET")[1].split("WHERE")[0]
@@ -544,7 +544,7 @@ class FakeConn:
         if sql_lower.startswith("delete"):
             rule_id = params[0] if params else None
             tid = params[1] if len(params) > 1 else None
-            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), None)
+            rule = next((r for r in _tables["classification_rules"] if r["id"] == rule_id and r.get("tenant_id") == tid), {})  # type: ignore[arg-type]
             if rule:
                 _tables["classification_rules"].remove(rule)
                 return FakeCursor([rule])
