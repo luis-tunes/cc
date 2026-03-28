@@ -11,117 +11,164 @@ User → Clerk Auth → React SPA → /api/* → FastAPI → PostgreSQL
                             Stripe Billing    Paperless-ngx (OCR)
 ```
 
+Caddy reverse proxy in front. Redis for Paperless cache. All Docker.
+
 ## Dependencies
 
 ### Backend (Python 3.11)
-| Package | Purpose | Cost |
-|---------|---------|------|
-| FastAPI + uvicorn | HTTP API | Free |
-| psycopg[binary,pool] | PostgreSQL driver, no ORM | Free |
-| invoice2data | Invoice parsing (templates) | Free |
-| httpx | HTTP client (Paperless API) | Free |
-| Paperless-ngx | OCR, runs as separate container | Free (self-hosted) |
-| pytest | Tests | Free |
-| pytest-asyncio | Async test support | Free |
+| Package | Purpose |
+|---------|---------|
+| FastAPI + uvicorn | HTTP API |
+| psycopg[binary,pool] | PostgreSQL driver, no ORM |
+| invoice2data | Invoice parsing (templates) |
+| httpx | HTTP client (Paperless, LLM APIs) |
+| Paperless-ngx | OCR, runs as separate container |
+| slowapi | Rate limiting (per-tenant + per-IP) |
+| sentry-sdk[fastapi] | Error tracking (optional) |
+| python-json-logger | Structured JSON logging |
+| redis | Cache backend |
+| Pydantic v2 | Request validation (API boundaries only) |
 
 ### Frontend (Node 20 / React 18)
-| Package | Purpose | Cost |
-|---------|---------|------|
-| React 18 + ReactDOM | UI framework | Free |
-| Vite 7 | Build tool + dev server | Free |
-| TypeScript 5.9 | Type safety | Free |
-| @clerk/react | Auth (SSO, multi-tenant, Stripe-ready) | Free <10k MAU, $25/mo 10k+ |
-| Tailwind CSS 3 | Utility-first styles | Free |
-| Radix UI (16 primitives) | Accessible UI components (shadcn/ui) | Free |
-| TanStack React Query | Data fetching + cache | Free |
-| React Router DOM | Client-side routing | Free |
-| Recharts | Charts & graphs | Free |
-| Lucide React | Icons | Free |
-| Sonner | Toast notifications | Free |
-| cmdk | Command palette | Free |
+| Package | Purpose |
+|---------|---------|
+| React 18 + Vite 7 + TypeScript 5.9 | Core stack |
+| @clerk/react | Auth (SSO, multi-tenant) |
+| Tailwind CSS 3 + shadcn/ui (Radix) | Styling + components |
+| TanStack React Query | Data fetching + cache |
+| React Router DOM | Client-side routing |
+| Recharts | Charts |
+| Lucide React | Icons |
+| Sonner | Toast notifications |
+| cmdk | Command palette |
 
 ### Infrastructure
-| Service | Purpose | Est. Cost |
-|---------|---------|-----------|
-| Clerk | Auth + user management | Free dev; $25/mo prod (10k MAU) |
-| Stripe | Billing + subscriptions | 1.4% + €0.25/tx |
-| PostgreSQL 16 | Database | Self-hosted (free) or $15/mo managed |
-| Redis 7 | Paperless cache | Self-hosted (free) |
-| VPS (Hetzner/DO) | Docker host | €5–20/mo |
-| Domain + DNS | tim.pt or similar | ~€10/year |
-| **Total monthly** | | **~€25–60/mo** |
+| Service | Purpose |
+|---------|---------|
+| Clerk | Auth + user management |
+| Stripe | Billing + subscriptions |
+| PostgreSQL 16 | Database |
+| Redis 7 | Paperless cache + rate limit state |
+| Caddy 2 | Reverse proxy, TLS, security headers, gzip |
+| Docker Compose | Orchestration (same file everywhere, only .env changes) |
 
 ## How It Flows
 
 ```
 doc arrives → Paperless (OCR) → post-consume script → curl webhook
-→ parse (invoice2data) → PostgreSQL → React UI shows result
+→ parse (invoice2data / LLM vision) → PostgreSQL → React UI shows result
+→ auto-reconcile with bank transactions
 ```
 
 ## Schema
 
 ```sql
-documents:            supplier_nif, client_nif, total, vat, date, type, status
+documents:            supplier_nif, client_nif, total, vat, date, type, status, notes
 bank_transactions:    date, description, amount
-reconciliations:      document_id, bank_transaction_id, match_confidence
+reconciliations:      document_id, bank_transaction_id, match_confidence (0-1)
 tenant_settings:      tenant_id, key, data (JSONB)
+classification_rules: field, operator, value, account, label, priority, active
+movement_rules:       pattern, category, snc_account, entity_nif, priority, active
+alerts:               type, severity, title, description, action_url, read
+audit_log:            entity_type, entity_id, action, details, timestamp
+assets:               name, purchase_date, cost, useful_life_years, depreciation_method
 
 -- Inventory / Operations
-unit_families:        name, base_unit
+unit_families:        name, base_unit (UNIQUE per tenant)
 unit_conversions:     unit_family_id FK, from_unit, to_unit, factor
 suppliers:            name, nif, category, avg_delivery_days, reliability
 ingredients:          name, category, unit, min_threshold, supplier_id FK, last_cost, avg_cost
-stock_events:         type (entrada/saída/desperdício/ajuste), ingredient_id FK, qty, unit, date, source, reference, cost
+stock_events:         type (entrada/saída/desperdício/ajuste), ingredient_id FK, qty, unit, date
 products:             code, name, category, recipe_version, estimated_cost, pvp, margin, active
 recipe_ingredients:   product_id FK, ingredient_id FK, qty, unit, wastage_percent
 price_history:        ingredient_id FK, supplier_id FK, price, date
 supplier_ingredients: supplier_id FK, ingredient_id FK (junction)
 ```
 
+### DB Constraints
+- `documents.total >= 0`, `documents.vat >= 0`
+- `reconciliations.match_confidence BETWEEN 0 AND 1`
+- `assets.useful_life_years > 0`
+- `unit_families(tenant_id, name)` UNIQUE
+- Indexes on `documents(tenant_id, supplier_nif)`, `documents(tenant_id, type)`
+
 ## Reconciliation
 
-`abs(total - amount) < 0.01 && abs(dates) <= 5 days`. That's it.
+Hash-map match by amount (±0.01) within ±5 days. Confidence = 70% amount + 30% date weighting. Advisory lock per tenant to prevent concurrent runs.
 
 ## Layout
 
 ```
-app/                          # Python backend
-  main.py                     # FastAPI app + SPA fallback
-  db.py                       # psycopg pool + schema
-  parse.py                    # invoice2data + Paperless OCR
-  reconcile.py                # Amount+date matching
-  routes.py                   # All API endpoints
-  pt_invoice.yml              # invoice2data template
+app/                          # Python backend (all .py files flat)
+  main.py                     # FastAPI app, CORS, security headers, Sentry, rate limiting
+  db.py                       # psycopg pool + schema + constraints
+  routes.py                   # All API endpoints + Pydantic request models
   auth.py                     # Clerk JWT middleware (require_auth, optional_auth)
   billing.py                  # Stripe billing (plans, checkout, webhooks)
-  tests/
+  parse.py                    # invoice2data + Paperless OCR + LLM vision extraction
+  ocr.py                      # OCR abstraction layer (Paperless / Google Doc AI)
+  reconcile.py                # Amount+date matching (hash-map O(n))
+  classify.py                 # Document auto-classification (rules engine)
+  classify_movements.py       # Bank movement classification + entity detection
+  alerts.py                   # Compliance alerts (IVA deadlines, unreconciled, gaps)
+  assistant.py                # AI assistant (natural language queries)
+  assets.py                   # Fixed asset depreciation
+  cache.py                    # Redis cache helpers
+  limiter.py                  # Rate limit config (default, upload, webhook, expensive)
+  pt_invoice.yml              # invoice2data template
+  tests/                      # pytest (thing_test.py convention)
 frontend/                     # React SPA
   src/
-    App.tsx                   # Router + Clerk auth
+    App.tsx                   # Router + Clerk auth (all pages lazy-loaded)
     main.tsx                  # Entry (ClerkProvider, QueryClient, BrowserRouter)
-    index.css                 # Tailwind + TIM theme CSS vars
+    index.css                 # Tailwind + TIM theme + reduced-motion
     components/
       layout/                 # AppLayout, Sidebar, Topbar, PageContainer
       auth/                   # ProtectedRoute
-      ui/                     # 49 shadcn/ui primitives
-      shared/                 # KpiCard, StatusBadge, EmptyState, CommandMenu...
-      documents/              # DocumentList, ReviewDrawer, FiltersBar
+      ui/                     # ~50 shadcn/ui primitives
+      shared/                 # KpiCard, StatusBadge, EmptyState, ErrorState, LoadingSkeletons
+      documents/              # DocumentList, ReviewDrawer, FiltersBar, BulkActionsBar
       movements/              # MovementLedger, ImportPanel
       reconciliation/         # MatchCard, ReconciliationCommandBar
       dashboard/              # FinancialOverview, ReconciliationHealth
       global/                 # GlobalUploadModal, QuickAddButton
       alerts/                 # TopbarAlertDropdown, AlertCenter
+      inventory/              # Stock, ingredients, unit families
+      products/               # Product management, recipes
+      suppliers/              # Supplier CRUD
+      billing/                # TrialGate, UpgradeGate
     hooks/                    # TanStack Query hooks (use-documents, use-billing, etc.)
     lib/
-      api.ts                  # FastAPI client (/api/*) + Stripe billing API
-      navigation.ts           # Sidebar nav config (3 groups, 13 items)
-      *-data.ts               # Mock data + TypeScript types
-    pages/                    # 20 page components
+      api.ts                  # Typed API client (/api/*), ApiError class, auth token management
+      navigation.ts           # Sidebar nav config
+      *-data.ts               # TypeScript types + mock scaffolds
+    pages/                    # ~25 lazy-loaded page components
+  public/
+    sw.js                     # Service worker (network-first API, cache-first statics)
+    manifest.json             # PWA manifest
+  vite.config.ts              # Proxy /api → :8080, manualChunks, es2020 target
   tailwind.config.ts          # TIM light theme
-  vite.config.ts              # Proxy /api → :8080
-bin/                          # Scripts
-Dockerfile                    # Multi-stage: Node build → Python runtime
-docker-compose.yml
+bin/                          # Scripts (source of truth for all operations)
+  dev                         # docker compose up --build
+  test                        # pytest + npm build + npm test
+  ship                        # test → build → deploy
+  deploy                      # rsync → docker compose up -d
+  init-db.sh                  # PostgreSQL schema init
+  post-consume                # Paperless webhook trigger
+  setup-paperless-token       # Generate Paperless API token
+  setup-server                # Server provisioning
+  sync-env                    # Sync .env to remote
+  clean                       # docker compose down -v + purge caches
+mcp/                          # MCP server for GitHub Copilot (AI tooling layer)
+  src/server.ts               # Exposes codebase as tools via stdio
+.github/workflows/ci.yml      # CI: ruff + mypy + pytest + npm test → ghcr.io → deploy
+Dockerfile                    # Multi-stage: Node build → Python runtime (non-root user)
+docker-compose.yml            # Full stack (same file everywhere, only .env changes)
+Caddyfile                     # Reverse proxy, gzip, HSTS, security headers
+Makefile                      # Thin wrapper: dev, test, ship, deploy, lint, format, type-check, logs, db, frontend
+pyproject.toml                # Tool config only (ruff, mypy, pytest)
+requirements.txt              # Runtime deps (pinned)
+requirements-test.txt         # Test + lint deps (-r requirements.txt + pytest + ruff + mypy)
 ```
 
 ## Run
@@ -129,6 +176,12 @@ docker-compose.yml
 ```bash
 make dev                     # docker compose up --build (full stack)
 make test                    # pytest + vite build
+make lint                    # ruff check app/
+make format                  # ruff format app/
+make type-check              # mypy app/
+make logs                    # docker compose logs -f
+make db                      # psql into database
+make frontend                # npm test + npm build
 make deploy HOST=user@ip     # test → rsync → docker compose up -d
 make clean                   # docker compose down -v + purge caches
 
@@ -150,9 +203,10 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_PRO=price_...     # Stripe price ID for 150€ + IVA/mês
 APP_URL=http://localhost:3000  # Stripe redirect URL
-CONTACT_EMAIL=info@tim.pt     # Contacto plano Empresa
-PARTNER_STRIPE_ACCOUNT=acct_... # Partner connected account (50/50 split)
-REVENUE_SPLIT_PERCENT=50       # Platform keeps 50%, partner gets 50%
+CONTACT_EMAIL=info@tim.pt
+CORS_ORIGINS=http://localhost:3000   # comma-separated
+SENTRY_DSN=...                       # optional
+SENTRY_TRACES_SAMPLE_RATE=0.1       # optional
 
 # frontend/.env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
@@ -172,7 +226,7 @@ Mobile-first responsive design is essential.
 
 Paperless-ngx uses Tesseract via ocrmypdf (PAPERLESS_OCR_LANGUAGE: por+eng).
 Abstraction layer in app/ocr.py allows swapping engine (e.g., Google Document AI) via env var.
-invoice2data templates in app/ for structured extraction. Fallback: regex on OCR text.
+invoice2data templates in app/ for structured extraction. Fallback: LLM vision → regex on OCR text.
 
 ## Rules
 
@@ -180,27 +234,39 @@ invoice2data templates in app/ for structured extraction. Fallback: regex on OCR
 - NIF: 9 digits, mod 11. Validate on input.
 - VAT: 23%, 13%, 6%.
 - UTC storage. Europe/Lisbon display.
-- Type hints on function signatures.
+- Type hints on function signatures. mypy must pass.
 - Pydantic for API request/response only.
 - Errors raise. Don't return None.
 - SQL strings in the module that uses them. No query builder.
-- Test with pytest. thing_test.py, not test_thing.py.
+- Test with pytest. thing_test.py, not test_thing.py. 373 backend + 132 frontend tests.
 - One function, one job. Extract on third repeat.
 - bin/ scripts are the source of truth. Makefile calls bin/. CI calls make.
 - UI text in Portuguese. Code, comments, commits in English.
 - Same docker-compose.yml everywhere. Only .env changes.
 - .env.example in repo. .env is local, never committed.
+- Rate limit expensive endpoints (10/min). Auth endpoints not rate-limited.
+- Batch DB queries. Never N+1. Fetch rules/suppliers once, pass to functions.
 
 ## UI Theme
 
 - **Light mode only**. Clean, professional light theme.
 - Colors: primary gold `hsl(40 75% 48%)`, success teal, danger red, info blue.
 - Sidebar: collapsible, 3 nav groups (Principal, Negócio, Definições), active indicator with gold bar.
-- Inter font. Smooth scrollbars. WCAG AA contrast.
+- Inter font. Smooth scrollbars. WCAG AA contrast. prefers-reduced-motion respected.
 - shadcn/ui components (Radix-based). No custom CSS except theme vars.
 - Min font size: `text-xs` (12px). Never use `text-[10px]` or `text-[11px]`.
 - Body text: `text-sm` (14px). Section headings: `text-base` (16px). Page titles: `text-2xl`.
 - Buttons: minimum `h-9 text-sm`. KPI values: `text-2xl`+.
+
+## Security
+
+- Non-root Docker user (appuser). HEALTHCHECK on /health.
+- CORS configurable via CORS_ORIGINS env var.
+- Security headers: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy.
+- Caddy: HSTS, gzip, hide Server header.
+- Redis authentication (requirepass).
+- Docker memory limits (app: 1G, redis: 256M, caddy: 128M).
+- Rate limiting: default 100/min, uploads 20/min, webhooks 30/min, expensive ops 10/min.
 
 ## AI Rules
 
