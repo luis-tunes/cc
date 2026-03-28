@@ -356,7 +356,7 @@ export async function fetchBankTransactions(params?: {
   return request<BankTransaction[]>(`/bank-transactions${query ? `?${query}` : ""}`);
 }
 
-export async function uploadBankCSV(file: File): Promise<{ imported: number }> {
+export async function uploadBankCSV(file: File): Promise<{ imported: number; skipped?: number }> {
   const form = new FormData();
   form.append("file", file);
   return requestFormData("/bank-transactions/upload", form);

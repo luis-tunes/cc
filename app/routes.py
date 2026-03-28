@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.assistant import answer_question as _answer_question
@@ -328,7 +328,7 @@ async def list_documents(
     status: str | None = None,
     search: str | None = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     clauses: list[str] = ["d.tenant_id = %s"]
@@ -600,7 +600,7 @@ async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
         row = conn.execute("SELECT id, paperless_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="document not found")
-        conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
+        conn.execute("DELETE FROM reconciliations WHERE document_id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
         conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
         log_activity(conn, auth.tenant_id, "document", doc_id, "deleted")
         conn.commit()
@@ -612,7 +612,8 @@ class BulkDeletePayload(BaseModel):
 
 
 @router.post("/documents/bulk-delete", status_code=204)
-async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def bulk_delete_documents(request: Request, payload: BulkDeletePayload, auth: AuthInfo = Depends(require_auth)):
     if not payload.ids:
         return None
     if len(payload.ids) > 500:
@@ -626,7 +627,7 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
         ).fetchall()
         existing_ids = [r["id"] for r in existing]
         if existing_ids:
-            conn.execute("DELETE FROM reconciliations WHERE document_id = ANY(%s)", (existing_ids,))
+            conn.execute("DELETE FROM reconciliations WHERE document_id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
             conn.execute("DELETE FROM documents WHERE id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
             for doc_id in existing_ids:
                 log_activity(conn, tid, "document", doc_id, "deleted")
@@ -680,9 +681,10 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
     if os.path.exists(local_path):
         from urllib.parse import quote
-        return StreamingResponse(
-            open(local_path, "rb"),
+        return FileResponse(
+            local_path,
             media_type=content_type,
+            filename=filename,
             headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}"},
         )
 
@@ -731,8 +733,8 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
         local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
         if os.path.exists(local_path):
             content_type = MIME_MAP.get(ext, "image/jpeg")
-            return StreamingResponse(
-                open(local_path, "rb"),
+            return FileResponse(
+                local_path,
                 media_type=content_type,
                 headers={"Cache-Control": "public, max-age=3600"},
             )
@@ -776,8 +778,16 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
         raise HTTPException(status_code=422, detail="CSV must have columns: date, description, amount")
     tid = auth.tenant_id
     count = 0
+    skipped = 0
     errors = []
     with get_conn() as conn:
+        # Load existing transactions for dedup (same date+description+amount)
+        existing = conn.execute(
+            "SELECT date, description, amount FROM bank_transactions WHERE tenant_id = %s",
+            (tid,),
+        ).fetchall()
+        existing_set = {(str(r["date"]), r["description"], r["amount"]) for r in existing}
+
         for line_num, row in enumerate(reader, start=2):
             if count >= MAX_CSV_ROWS:
                 errors.append(f"Limite de {MAX_CSV_ROWS} linhas atingido, restantes ignoradas")
@@ -793,25 +803,31 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
             except Exception:
                 errors.append(f"Linha {line_num}: valor inválido '{row.get('amount', '')}'")
                 continue
+            # Skip duplicates
+            key = (str(tx_date), description, amount)
+            if key in existing_set:
+                skipped += 1
+                continue
+            existing_set.add(key)
             conn.execute(
                 "INSERT INTO bank_transactions (date, description, amount, tenant_id) VALUES (%s, %s, %s, %s)",
                 (tx_date, description, amount, tid),
             )
             count += 1
         conn.commit()
-    if errors and count == 0:
+    if errors and count == 0 and skipped == 0:
         raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:5]))
     cache_invalidate(f"dashboard:{tid}")
     background_tasks.add_task(_auto_classify, tid)
     background_tasks.add_task(_auto_reconcile, tid)
-    return {"imported": count, "errors": errors[:10]}
+    return {"imported": count, "skipped": skipped, "errors": errors[:10]}
 
 @router.get("/bank-transactions", response_model=list[BankTransactionOut])
 async def list_bank_transactions(
     date_from: datetime.date | None = None,
     date_to: datetime.date | None = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     clauses: list[str] = ["tenant_id = %s"]
@@ -886,7 +902,7 @@ async def run_reconciliation(request: Request, auth: AuthInfo = Depends(require_
 @router.get("/reconciliations")
 async def list_reconciliations(
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     clauses: list[str] = ["r.tenant_id = %s"]
@@ -956,7 +972,7 @@ async def delete_bank_transaction(tx_id: int, auth: AuthInfo = Depends(require_a
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="transaction not found")
-        conn.execute("DELETE FROM reconciliations WHERE bank_transaction_id = %s", (tx_id,))
+        conn.execute("DELETE FROM reconciliations WHERE bank_transaction_id = %s AND tenant_id = %s", (tx_id, tid))
         conn.execute("DELETE FROM bank_transactions WHERE id = %s AND tenant_id = %s", (tx_id, tid))
         log_activity(conn, tid, "bank_transaction", tx_id, "deleted")
         conn.commit()
@@ -965,7 +981,7 @@ async def delete_bank_transaction(tx_id: int, auth: AuthInfo = Depends(require_a
 @router.get("/bank-transactions/enrich")
 async def enrich_movements(
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     """List bank transactions with classification and entity detection."""
@@ -1328,7 +1344,8 @@ async def delete_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
 # --- CSV Export (generic) ---
 
 @router.get("/export/bank-transactions/csv")
-async def export_bank_transactions_csv(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def export_bank_transactions_csv(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
@@ -1348,7 +1365,8 @@ async def export_bank_transactions_csv(auth: AuthInfo = Depends(require_auth)):
     )
 
 @router.get("/export/reconciliations/csv")
-async def export_reconciliations_csv(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def export_reconciliations_csv(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
@@ -1374,7 +1392,8 @@ async def export_reconciliations_csv(auth: AuthInfo = Depends(require_auth)):
     )
 
 @router.get("/export/assets/csv")
-async def export_assets_csv(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def export_assets_csv(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     with get_conn() as conn:
         rows = conn.execute(
@@ -1443,7 +1462,8 @@ async def monthly_summary(auth: AuthInfo = Depends(require_auth)):
              "total": str(r["total"]), "vat": str(r["vat"])} for r in rows]
 
 @router.get("/export/csv")
-async def export_csv(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def export_csv(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
@@ -1559,7 +1579,7 @@ async def create_unit_family(body: UnitFamilyBody, auth: AuthInfo = Depends(requ
 @router.get("/suppliers")
 async def list_suppliers(
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     tid = auth.tenant_id
@@ -1742,7 +1762,7 @@ async def list_ingredients(
     category: str | None = None,
     status_filter: str | None = None,
     limit: int = Query(default=200, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     tid = auth.tenant_id
@@ -1874,7 +1894,7 @@ async def list_stock_events(
     ingredient_id: int | None = None,
     event_type: str | None = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     tid = auth.tenant_id
@@ -1904,7 +1924,8 @@ async def list_stock_events(
 
 
 @router.post("/stock-events")
-async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def create_stock_event(request: Request, body: dict, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     event_type = body.get("type", "")
     ingredient_id = body.get("ingredient_id")
@@ -1976,7 +1997,7 @@ async def create_stock_event(body: dict, auth: AuthInfo = Depends(require_auth))
 @router.get("/products")
 async def list_products(
     limit: int = Query(default=200, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
     tid = auth.tenant_id
@@ -2166,7 +2187,8 @@ async def get_product_cost(product_id: int, auth: AuthInfo = Depends(require_aut
 
 
 @router.post("/products/{product_id}/produce")
-async def produce_product(product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def produce_product(request: Request, product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
     """Execute production: creates saída stock events for each recipe ingredient × quantity."""
     tid = auth.tenant_id
     qty_to_produce = body.get("qty", 1)
@@ -2625,7 +2647,8 @@ async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require
 # --- Price History ---
 
 @router.post("/price-history")
-async def add_price_point(body: dict, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def add_price_point(request: Request, body: dict, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     ingredient_id = body.get("ingredient_id")
     supplier_id = body.get("supplier_id")

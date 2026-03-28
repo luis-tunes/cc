@@ -43,7 +43,10 @@ export function useUploadBankCSV() {
       qc.invalidateQueries({ queryKey: ["bank-transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["reconciliations"] });
-      toast.success(`${data.imported} movimentos importados`);
+      const msg = data.skipped
+        ? `${data.imported} importados, ${data.skipped} duplicados ignorados`
+        : `${data.imported} movimentos importados`;
+      toast.success(msg);
     },
     onError: (err: Error) => {
       toast.error(`Erro ao importar CSV: ${err.message}`);
