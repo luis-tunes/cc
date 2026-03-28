@@ -22,6 +22,7 @@ import {
   Brain,
   Activity,
   BookOpen,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,16 +54,16 @@ export const navigation: NavGroup[] = [
       { title: "Auto-Classificação", path: "/auto-classificacao", icon: Brain, status: "active", proOnly: true },
       { title: "Classificações", path: "/classificacoes", icon: Tags, status: "active" },
       { title: "Assistente IA", path: "/assistente", icon: Bot, status: "active", proOnly: true },
-      { title: "Atividade", path: "/atividade", icon: Activity, status: "active" },
+      { title: "Atividade", path: "/atividade", icon: Activity, status: "active", proOnly: true },
     ],
   },
   {
     label: "Negócio",
     items: [
-      { title: "Inventário", path: "/inventario", icon: Package, status: "active" },
-      { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active" },
-      { title: "Produtos", path: "/produtos", icon: UtensilsCrossed, status: "active" },
-      { title: "Lista de Compras", path: "/lista-compras", icon: ShoppingCart, status: "active" },
+      { title: "Inventário", path: "/inventario", icon: Package, status: "active", proOnly: true },
+      { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active", proOnly: true },
+      { title: "Produtos", path: "/produtos", icon: UtensilsCrossed, status: "active", proOnly: true },
+      { title: "Lista de Compras", path: "/lista-compras", icon: ShoppingCart, status: "active", proOnly: true },
       { title: "Ativos", path: "/ativos", icon: Lock, status: "active", proOnly: true },
       { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active", proOnly: true },
       { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active", proOnly: true },
@@ -78,6 +79,7 @@ export const navigation: NavGroup[] = [
       { title: "Entidade", path: "/entidade", icon: Building2, status: "active" },
       { title: "Guia", path: "/guia", icon: BookOpen, status: "active" },
       { title: "Definições", path: "/definicoes", icon: Settings, status: "active" },
+      { title: "Admin", path: "/admin", icon: Shield, status: "active", proOnly: true },
     ],
   },
 ];

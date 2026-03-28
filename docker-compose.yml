@@ -88,6 +88,7 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      MASTER_USER_IDS: ${MASTER_USER_IDS:-filipeferreira@evolsign.com,luistunes0@gmail.com}
       SENTRY_DSN: ${SENTRY_DSN:-}
       LOG_FORMAT: ${LOG_FORMAT:-text}
       WEB_DIR: /opt/tim/web

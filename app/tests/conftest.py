@@ -39,6 +39,7 @@ ALL_TABLES = (
     "price_history", "supplier_ingredients",
     "classification_rules",
     "movement_rules", "alerts", "assets",
+    "audit_log",
 )
 
 ALL_SEQ_TABLES = (
@@ -101,8 +102,18 @@ class FakeConn:
         if sql_lower.startswith("select") and ("count(" in sql_lower or ("sum(" in sql_lower and "coalesce" in sql_lower)):
             # Only route to aggregate handler for top-level COUNT/SUM queries
             # (not subqueries like "WHERE id NOT IN (SELECT ...)")
-            if "from documents" in sql_lower or "from bank_transactions" in sql_lower or "from reconciliations" in sql_lower:
-                return self._handle_aggregate(sql, params)
+            # Also skip LATERAL join queries and admin metrics (multi-subselect)
+            if "lateral" not in sql_lower and sql_lower.count("select count(*)") < 3:
+                if "from documents" in sql_lower or "from bank_transactions" in sql_lower or "from reconciliations" in sql_lower:
+                    return self._handle_aggregate(sql, params)
+
+        # ── Admin queries (LATERAL joins on tenant_plans) ──
+        if "tenant_plans" in sql_lower and "lateral" in sql_lower:
+            return self._handle_admin_tenants(sql, params)
+
+        # ── Admin metrics (multiple subselects on tenant_plans) ──
+        if "tenant_plans" in sql_lower and sql_lower.count("select count(*)") >= 3:
+            return self._handle_admin_metrics(sql, params)
 
         # ── Tenant plans (billing) ──
         if "tenant_plans" in sql_lower:
@@ -603,6 +614,45 @@ class FakeConn:
                         return FakeCursor([plan])
             return FakeCursor([])
         return FakeCursor([])
+
+    # ────── Admin queries ──────
+
+    def _handle_admin_tenants(self, sql, params):
+        """Handle the admin/tenants LATERAL join query."""
+        results = []
+        for tp in _tables["tenant_plans"]:
+            tid = tp["tenant_id"]
+            docs = [d for d in _tables["documents"] if d.get("tenant_id") == tid]
+            txs = [t for t in _tables["bank_transactions"] if t.get("tenant_id") == tid]
+            recs = [r for r in _tables["reconciliations"] if r.get("tenant_id") == tid]
+            logs = [a for a in _tables.get("audit_log", []) if a.get("tenant_id") == tid]
+            results.append({
+                **tp,
+                "doc_count": len(docs),
+                "doc_total": sum(d.get("total", Decimal("0")) for d in docs),
+                "tx_count": len(txs),
+                "recon_count": len(recs),
+                "last_activity": max((a.get("created_at") for a in logs), default=None) if logs else None,
+            })
+        return FakeCursor(results)
+
+    def _handle_admin_metrics(self, sql, params):
+        """Handle the admin/metrics multi-subselect query."""
+        return FakeCursor([{
+            "total_tenants": len(_tables["tenant_plans"]),
+            "pro_tenants": len([t for t in _tables["tenant_plans"] if t.get("plan") == "pro" and t.get("status") == "active"]),
+            "trialing_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "trialing"]),
+            "expired_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "trial_expired"]),
+            "cancelled_tenants": len([t for t in _tables["tenant_plans"] if t.get("status") == "cancelled"]),
+            "total_documents": len(_tables["documents"]),
+            "total_transactions": len(_tables["bank_transactions"]),
+            "total_reconciliations": len(_tables["reconciliations"]),
+            "docs_last_30d": len(_tables["documents"]),
+            "docs_last_7d": len(_tables["documents"]),
+            "txs_last_30d": len(_tables["bank_transactions"]),
+            "total_document_value": sum(d.get("total", Decimal("0")) for d in _tables["documents"]),
+            "unread_alerts_global": len([a for a in _tables["alerts"] if not a.get("read", False)]),
+        }])
 
     # ────── Unit families ──────
 

@@ -24,6 +24,7 @@ COPY app/*.yml app/
 
 # Non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
+RUN mkdir -p /opt/tim/uploads && chown appuser:appuser /opt/tim/uploads
 USER appuser
 
 COPY --from=frontend-build /build/dist web/

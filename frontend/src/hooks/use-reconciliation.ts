@@ -3,6 +3,7 @@ import {
   fetchReconciliations,
   runReconciliation,
   patchReconciliation,
+  fetchReconciliationSuggestions,
   type Reconciliation,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -13,6 +14,14 @@ export function useReconciliations() {
   return useQuery<Reconciliation[]>({
     queryKey: ["reconciliations"],
     queryFn: fetchReconciliations,
+  });
+}
+
+export function useReconciliationSuggestions(docId: number | null) {
+  return useQuery({
+    queryKey: ["reconciliations", "suggestions", docId],
+    queryFn: () => fetchReconciliationSuggestions(docId!),
+    enabled: docId != null,
   });
 }
 

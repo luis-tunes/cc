@@ -27,11 +27,27 @@ CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@xtim.ai")
 
 TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "14"))
 
+# Comma-separated Clerk user IDs or emails that always get pro access
+MASTER_USER_IDS = {uid.strip().lower() for uid in os.environ.get("MASTER_USER_IDS", "").split(",") if uid.strip()}
+
+
+def _is_master(auth: AuthInfo) -> bool:
+    if not MASTER_USER_IDS:
+        return False
+    return (
+        auth.user_id.lower() in MASTER_USER_IDS
+        or (auth.email is not None and auth.email.lower() in MASTER_USER_IDS)
+    )
+
+
 PLANS = [
     {"id": "pro", "name": "Profissional", "price": 15000, "docs_per_month": -1, "seats": 5,
      "stripe_price_id": os.environ.get("STRIPE_PRICE_PRO", ""),
      "vat_note": "Acresce IVA à taxa legal",
-     "features": ["Documentos ilimitados", "5 utilizadores", "OCR automático", "Reconciliação bancária", "Exportação CSV", "Suporte por email"]},
+     "features": ["Documentos ilimitados", "5 utilizadores", "OCR automático",
+                   "Reconciliação bancária", "Inventário e fornecedores",
+                   "Relatórios e centro fiscal", "Assistente IA",
+                   "Insights e previsões", "Suporte por email"]},
     {"id": "custom", "name": "Empresa", "price": -1, "docs_per_month": -1, "seats": -1,
      "contact": CONTACT_EMAIL,
      "features": ["Tudo do Profissional", "Utilizadores ilimitados", "SLA com garantia", "Onboarding dedicado", "Integrações personalizadas", "Suporte prioritário"]},
@@ -149,6 +165,8 @@ async def billing_status(auth: AuthInfo | None = Depends(optional_auth)):
     """Return current billing status for tenant, including trial info."""
     if not auth:
         return {"plan": "free", "status": "trialing", "trial_days_left": 14}
+    if _is_master(auth):
+        return {"plan": "pro", "status": "active"}
     tid = auth.tenant_id or auth.user_id
     info = _get_or_create_tenant_plan(tid)
     return _compute_trial_status(info)
@@ -179,6 +197,21 @@ async def create_checkout(plan_id: str, auth: AuthInfo = Depends(require_auth)):
 
     session = _stripe("POST", "/checkout/sessions", checkout_data)
     return {"checkout_url": session["url"]}
+
+
+@router.post("/portal")
+async def create_portal(auth: AuthInfo = Depends(require_auth)):
+    """Create a Stripe Customer Portal session for managing subscription."""
+    tid = auth.tenant_id or auth.user_id
+    info = _get_or_create_tenant_plan(tid)
+    customer_id = info.get("stripe_customer")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="Sem subscrição Stripe ativa")
+    session = _stripe("POST", "/billing_portal/sessions", {
+        "customer": customer_id,
+        "return_url": f"{APP_URL}/definicoes",
+    })
+    return {"portal_url": session["url"]}
 
 
 @router.post("/webhook")
@@ -246,3 +279,15 @@ def _verify_stripe_signature(payload: bytes, sig_header: str) -> None:
     expected = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), signed, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, v1):
         raise ValueError("Signature mismatch")
+
+
+def require_pro(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:
+    """Billing enforcement — reject requests from expired/free tenants on pro-only endpoints."""
+    if auth.user_id in MASTER_USER_IDS:
+        return auth
+    tid = auth.tenant_id or auth.user_id
+    info = _get_or_create_tenant_plan(tid)
+    computed = _compute_trial_status(info)
+    if computed["status"] in ("active", "trialing"):
+        return auth
+    raise HTTPException(status_code=402, detail="Subscrição necessária para aceder a esta funcionalidade")

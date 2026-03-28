@@ -39,6 +39,7 @@ const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
 const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
 const LandingPage = lazy(() => import("@/pages/Landing"));
+const AdminPage = lazy(() => import("@/pages/Admin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -81,16 +82,16 @@ export default function App() {
             }
           >
             <Route path="/painel" element={<Dashboard />} />
-            <Route path="/atividade" element={<ActivityFeed />} />
+            <Route path="/atividade" element={<UpgradeGate title="Atividade" subtitle="Histórico de ações"><ActivityFeed /></UpgradeGate>} />
             <Route path="/caixa-entrada" element={<InboxPage />} />
             <Route path="/documentos" element={<Documents />} />
             <Route path="/movimentos" element={<BankMovements />} />
             <Route path="/reconciliacao" element={<UpgradeGate title="Reconciliação" subtitle="Correspondência entre documentos e movimentos bancários"><Reconciliation /></UpgradeGate>} />
-            <Route path="/inventario" element={<Inventory />} />
-            <Route path="/fornecedores" element={<Suppliers />} />
-            <Route path="/produtos" element={<Products />} />
+            <Route path="/inventario" element={<UpgradeGate title="Inventário" subtitle="Gestão de stock e ingredientes"><Inventory /></UpgradeGate>} />
+            <Route path="/fornecedores" element={<UpgradeGate title="Fornecedores" subtitle="Gestão de fornecedores"><Suppliers /></UpgradeGate>} />
+            <Route path="/produtos" element={<UpgradeGate title="Produtos" subtitle="Gestão de produtos e receitas"><Products /></UpgradeGate>} />
             <Route path="/marmitas" element={<Navigate to="/produtos" replace />} />
-            <Route path="/lista-compras" element={<ShoppingList />} />
+            <Route path="/lista-compras" element={<UpgradeGate title="Lista de Compras" subtitle="Lista de compras automática"><ShoppingList /></UpgradeGate>} />
             <Route path="/classificacoes" element={<Classifications />} />
             <Route path="/auto-classificacao" element={<UpgradeGate title="Auto-Classificação" subtitle="Classificação automática de documentos"><AutoClassification /></UpgradeGate>} />
             <Route path="/centro-fiscal" element={<UpgradeGate title="Centro Fiscal" subtitle="IVA, IRC e obrigações fiscais"><TaxCenter /></UpgradeGate>} />
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/definicoes" element={<SettingsPage />} />
             <Route path="/guia" element={<GuidePage />} />
             <Route path="/perfil" element={<UserProfile />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
 
           {/* 404 */}

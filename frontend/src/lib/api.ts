@@ -1074,3 +1074,70 @@ export interface ActivityEntry {
 export async function fetchActivity(limit = 50): Promise<ActivityEntry[]> {
   return request<ActivityEntry[]>(`/activity?limit=${limit}`);
 }
+
+// ── Billing Portal ───────────────────────────────────────────────────
+
+export async function createBillingPortal(): Promise<{ portal_url: string }> {
+  return request<{ portal_url: string }>("/billing/portal", { method: "POST" });
+}
+
+// ── Admin / Monitoring ───────────────────────────────────────────────
+
+export interface AdminTenant {
+  tenant_id: string;
+  plan: string;
+  status: string;
+  trial_start: string | null;
+  trial_end: string | null;
+  stripe_customer: string | null;
+  updated_at: string | null;
+  doc_count: number;
+  doc_total: number;
+  tx_count: number;
+  recon_count: number;
+  last_activity: string | null;
+}
+
+export interface ServiceHealth {
+  status: string;
+  latency_ms?: number;
+  detail?: string;
+  status_code?: number;
+}
+
+export interface SystemHealth {
+  status: string;
+  services: {
+    postgresql: ServiceHealth;
+    redis: ServiceHealth;
+    paperless: ServiceHealth;
+  };
+}
+
+export interface AdminMetrics {
+  total_tenants: number;
+  pro_tenants: number;
+  trialing_tenants: number;
+  expired_tenants: number;
+  cancelled_tenants: number;
+  total_documents: number;
+  total_transactions: number;
+  total_reconciliations: number;
+  docs_last_30d: number;
+  docs_last_7d: number;
+  txs_last_30d: number;
+  total_document_value: number;
+  unread_alerts_global: number;
+}
+
+export async function fetchAdminTenants(): Promise<AdminTenant[]> {
+  return request<AdminTenant[]>("/admin/tenants");
+}
+
+export async function fetchSystemHealth(): Promise<SystemHealth> {
+  return request<SystemHealth>("/admin/system-health");
+}
+
+export async function fetchAdminMetrics(): Promise<AdminMetrics> {
+  return request<AdminMetrics>("/admin/metrics");
+}

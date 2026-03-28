@@ -3,6 +3,7 @@ import {
   fetchBillingPlans,
   fetchBillingStatus,
   createCheckoutSession,
+  createBillingPortal,
   type BillingPlan,
   type BillingStatus,
 } from "@/lib/api";
@@ -28,6 +29,15 @@ export function useCheckout() {
     mutationFn: (planId: string) => createCheckoutSession(planId),
     onSuccess: (data) => {
       window.location.href = data.checkout_url;
+    },
+  });
+}
+
+export function useBillingPortal() {
+  return useMutation({
+    mutationFn: () => createBillingPortal(),
+    onSuccess: (data) => {
+      window.location.href = data.portal_url;
     },
   });
 }

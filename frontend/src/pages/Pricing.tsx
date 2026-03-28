@@ -99,7 +99,37 @@ export default function PricingPage() {
             <ErrorState onRetry={() => window.location.reload()} />
           </div>
         ) : (
-          <div className="mt-10 grid gap-8 md:grid-cols-2 max-w-3xl mx-auto">
+          <div className="mt-10 grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+            {/* Free plan card */}
+            <div className="relative rounded-xl border border-border bg-card p-8">
+              <h3 className="text-lg font-bold text-foreground">Gratuito</h3>
+              <div className="mt-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-foreground">€0</span>
+                  <span className="text-sm text-muted-foreground">/mês</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Para experimentar</p>
+              </div>
+              <div className="mt-6 h-px bg-border" />
+              <ul className="mt-6 space-y-3">
+                {["Painel e visão geral", "Caixa de entrada", "Documentos (consulta)", "Movimentos bancários", "Classificações básicas"].map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-tim-success" />
+                    <span className="text-foreground/80">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <button
+                  disabled
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground cursor-default"
+                >
+                  Plano atual
+                </button>
+              </div>
+            </div>
+
+            {/* Paid plans from API */}
             {plans.map((plan) => {
               const isCurrent = plan.id === currentPlan;
               const isCustom = plan.id === "custom";

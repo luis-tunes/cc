@@ -3,16 +3,33 @@ import {
   fetchBankTransactions,
   uploadBankCSV,
   deleteBankTransaction,
+  fetchEnrichedMovements,
+  fetchDuplicateMovements,
   type BankTransaction,
+  type EnrichedMovement,
 } from "@/lib/api";
 import { toast } from "sonner";
 
-export type { BankTransaction };
+export type { BankTransaction, EnrichedMovement };
 
 export function useBankTransactions() {
   return useQuery<BankTransaction[]>({
     queryKey: ["bank-transactions"],
     queryFn: () => fetchBankTransactions(),
+  });
+}
+
+export function useEnrichedMovements() {
+  return useQuery<EnrichedMovement[]>({
+    queryKey: ["bank-transactions", "enriched"],
+    queryFn: fetchEnrichedMovements,
+  });
+}
+
+export function useDuplicateMovements() {
+  return useQuery<any[]>({
+    queryKey: ["bank-transactions", "duplicates"],
+    queryFn: fetchDuplicateMovements,
   });
 }
 

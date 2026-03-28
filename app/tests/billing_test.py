@@ -1,7 +1,8 @@
 """Tests for billing module."""
 import pytest
 
-from app.billing import PLANS, _verify_stripe_signature
+from app.auth import AuthInfo
+from app.billing import MASTER_USER_IDS, PLANS, _is_master, _verify_stripe_signature
 
 
 def test_plans_have_required_fields():
@@ -41,3 +42,31 @@ def test_verify_stripe_signature_missing_parts():
 def test_verify_stripe_signature_no_v1():
     with pytest.raises(ValueError):
         _verify_stripe_signature(b"body", "t=123")
+
+
+def test_master_user_ids_is_set():
+    assert isinstance(MASTER_USER_IDS, set)
+
+
+def test_is_master_empty_set(monkeypatch):
+    monkeypatch.setattr("app.billing.MASTER_USER_IDS", set())
+    auth = AuthInfo(user_id="user_123", tenant_id="org_1", email="a@b.com", session_id=None)
+    assert _is_master(auth) is False
+
+
+def test_is_master_by_user_id(monkeypatch):
+    monkeypatch.setattr("app.billing.MASTER_USER_IDS", {"user_123"})
+    auth = AuthInfo(user_id="user_123", tenant_id="org_1", email="a@b.com", session_id=None)
+    assert _is_master(auth) is True
+
+
+def test_is_master_by_email(monkeypatch):
+    monkeypatch.setattr("app.billing.MASTER_USER_IDS", {"boss@example.com"})
+    auth = AuthInfo(user_id="user_999", tenant_id="org_1", email="Boss@Example.com", session_id=None)
+    assert _is_master(auth) is True
+
+
+def test_is_master_no_match(monkeypatch):
+    monkeypatch.setattr("app.billing.MASTER_USER_IDS", {"other@example.com"})
+    auth = AuthInfo(user_id="user_999", tenant_id="org_1", email="me@example.com", session_id=None)
+    assert _is_master(auth) is False

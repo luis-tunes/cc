@@ -10,29 +10,41 @@ import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { Button } from "@/components/ui/button";
 import { Upload, Landmark } from "lucide-react";
 import { type BankMovement } from "@/lib/movements-data";
-import { useBankTransactions, useUploadBankCSV } from "@/hooks/use-bank-transactions";
+import { useBankTransactions, useEnrichedMovements, useUploadBankCSV } from "@/hooks/use-bank-transactions";
+import type { EnrichedMovement } from "@/lib/api";
 import { toast } from "sonner";
 
-/** Map backend BankTransaction → frontend BankMovement shape */
-function toMovement(tx: { id: number; date: string; description: string; amount: number }): BankMovement {
+/** Map backend enriched transaction → frontend BankMovement shape */
+function toMovement(
+  tx: { id: number; date: string; description: string; amount: number },
+  enriched?: Map<number, EnrichedMovement>,
+): BankMovement {
+  const e = enriched?.get(tx.id);
   return {
     id: String(tx.id),
     date: tx.date,
     description: tx.description,
     amount: tx.amount,
     type: tx.amount < 0 ? "debito" : "credito",
-    classificationStatus: "pendente",
+    suggestedAccount: e?.snc_account || undefined,
+    sncClass: e?.snc_account || undefined,
+    detectedEntity: e?.entity_name || undefined,
+    classificationStatus: e?.classified ? "classificado" : "pendente",
     reconciliationStatus: "pendente",
-    confidence: 50,
+    confidence: e?.classified ? 85 : 30,
     origin: "csv",
   };
 }
 
 export default function BankMovements() {
   const { data: rawTransactions = [], isLoading, isError, refetch } = useBankTransactions();
+  const { data: enrichedList = [] } = useEnrichedMovements();
   const uploadCSV = useUploadBankCSV();
 
-  const movements = useMemo(() => rawTransactions.map(toMovement), [rawTransactions]);
+  const movements = useMemo(() => {
+    const enrichedMap = new Map(enrichedList.map((e) => [e.id, e]));
+    return rawTransactions.map((tx) => toMovement(tx, enrichedMap));
+  }, [rawTransactions, enrichedList]);
 
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);

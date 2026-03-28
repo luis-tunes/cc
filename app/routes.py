@@ -2783,3 +2783,130 @@ async def assistant_chat(request: Request, body: ChatRequest, auth: AuthInfo = D
         "intent": result["intent"],
         "answer": result["answer"],
     }
+
+
+# ── Admin / Monitoring ─────────────────────────────────────────────────
+# Restricted to MASTER_USER_IDS (set in env).
+
+_MASTER_USER_IDS = {uid.strip().lower() for uid in os.environ.get("MASTER_USER_IDS", "").split(",") if uid.strip()}
+
+
+def _require_admin(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:
+    """Only allow MASTER_USER_IDS to access admin endpoints."""
+    if auth.user_id.lower() not in _MASTER_USER_IDS and not (auth.email and auth.email.lower() in _MASTER_USER_IDS):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return auth
+
+
+@router.get("/admin/tenants")
+async def admin_tenants(auth: AuthInfo = Depends(_require_admin)):
+    """List all tenants with billing status, doc counts, last activity."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                tp.tenant_id,
+                tp.plan,
+                tp.status,
+                tp.trial_start,
+                tp.trial_end,
+                tp.stripe_customer,
+                tp.updated_at,
+                COALESCE(d.doc_count, 0)  AS doc_count,
+                COALESCE(d.doc_total, 0)  AS doc_total,
+                COALESCE(bt.tx_count, 0)  AS tx_count,
+                COALESCE(r.recon_count, 0) AS recon_count,
+                al.last_activity
+            FROM tenant_plans tp
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS doc_count, COALESCE(sum(total), 0) AS doc_total
+                FROM documents WHERE tenant_id = tp.tenant_id
+            ) d ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS tx_count
+                FROM bank_transactions WHERE tenant_id = tp.tenant_id
+            ) bt ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS recon_count
+                FROM reconciliations WHERE tenant_id = tp.tenant_id
+            ) r ON true
+            LEFT JOIN LATERAL (
+                SELECT max(created_at) AS last_activity
+                FROM audit_log WHERE tenant_id = tp.tenant_id
+            ) al ON true
+            ORDER BY al.last_activity DESC NULLS LAST
+        """).fetchall()
+        return [dict(row) for row in rows]
+
+
+@router.get("/admin/system-health")
+async def admin_system_health(auth: AuthInfo = Depends(_require_admin)):
+    """Check health of DB, Redis, and Paperless."""
+    import time as _time
+    health: dict = {"status": "ok", "services": {}}
+
+    # PostgreSQL
+    try:
+        t0 = _time.monotonic()
+        with get_conn() as conn:
+            conn.execute("SELECT 1").fetchone()
+        health["services"]["postgresql"] = {"status": "ok", "latency_ms": round((_time.monotonic() - t0) * 1000, 1)}
+    except Exception as e:
+        health["services"]["postgresql"] = {"status": "error", "detail": str(e)}
+        health["status"] = "degraded"
+
+    # Redis
+    try:
+        t0 = _time.monotonic()
+        from app.cache import _get_redis
+        r = _get_redis()
+        if r:
+            r.ping()
+            health["services"]["redis"] = {"status": "ok", "latency_ms": round((_time.monotonic() - t0) * 1000, 1)}
+        else:
+            health["services"]["redis"] = {"status": "unavailable", "detail": "not connected"}
+    except Exception as e:
+        health["services"]["redis"] = {"status": "error", "detail": str(e)}
+
+    # Paperless
+    try:
+        t0 = _time.monotonic()
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"{PAPERLESS_URL}/api/",
+                headers={"Authorization": f"Token {PAPERLESS_TOKEN}"} if PAPERLESS_TOKEN else {},
+            )
+        health["services"]["paperless"] = {
+            "status": "ok" if resp.status_code < 400 else "error",
+            "status_code": resp.status_code,
+            "latency_ms": round((_time.monotonic() - t0) * 1000, 1),
+        }
+    except Exception as e:
+        health["services"]["paperless"] = {"status": "error", "detail": str(e)}
+
+    if any(s.get("status") == "error" for s in health["services"].values()):
+        health["status"] = "degraded"
+
+    return health
+
+
+@router.get("/admin/metrics")
+async def admin_metrics(auth: AuthInfo = Depends(_require_admin)):
+    """System-wide metrics for admin dashboard."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT
+                (SELECT count(*) FROM tenant_plans) AS total_tenants,
+                (SELECT count(*) FROM tenant_plans WHERE plan = 'pro' AND status = 'active') AS pro_tenants,
+                (SELECT count(*) FROM tenant_plans WHERE status = 'trialing') AS trialing_tenants,
+                (SELECT count(*) FROM tenant_plans WHERE status = 'trial_expired') AS expired_tenants,
+                (SELECT count(*) FROM tenant_plans WHERE status = 'cancelled') AS cancelled_tenants,
+                (SELECT count(*) FROM documents) AS total_documents,
+                (SELECT count(*) FROM bank_transactions) AS total_transactions,
+                (SELECT count(*) FROM reconciliations) AS total_reconciliations,
+                (SELECT count(*) FROM documents WHERE created_at >= now() - interval '30 days') AS docs_last_30d,
+                (SELECT count(*) FROM documents WHERE created_at >= now() - interval '7 days') AS docs_last_7d,
+                (SELECT count(*) FROM bank_transactions WHERE created_at >= now() - interval '30 days') AS txs_last_30d,
+                (SELECT COALESCE(sum(total), 0) FROM documents) AS total_document_value,
+                (SELECT count(*) FROM alerts WHERE read = false) AS unread_alerts_global
+        """).fetchone()
+        return dict(row)
