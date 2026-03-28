@@ -1,0 +1,36 @@
+#!/bin/sh
+# bin/setup-cron — install backup + health check cron on the remote server.
+# Idempotent. Re-running replaces the crontab block, nothing else.
+# Usage: bin/setup-cron <user@host>
+set -eu
+
+HOST="${1:?usage: bin/setup-cron <user@host>}"
+DIR="/home/cc/cc"
+MARKER="# --- xtim-managed ---"
+
+ssh "$HOST" /bin/sh -s "$DIR" "$MARKER" <<'REMOTE'
+DIR="$1"
+MARKER="$2"
+
+# Build the cron block
+BLOCK=$(cat <<EOF
+$MARKER
+# Daily backup at 03:00
+0 3 * * * cd $DIR && bin/backup >> /var/log/xtim-backup.log 2>&1
+
+# Health check every 5 min — restart app if unhealthy
+*/5 * * * * curl -sf --max-time 10 http://localhost:8080/health > /dev/null || (cd $DIR && docker compose restart app && echo "\$(date): app restarted" >> /var/log/xtim-health.log)
+$MARKER
+EOF
+)
+
+# Remove old block if present, then append new one
+EXISTING=$(crontab -l 2>/dev/null || true)
+CLEANED=$(printf '%s\n' "$EXISTING" | sed "/$MARKER/,/$MARKER/d")
+printf '%s\n%s\n' "$CLEANED" "$BLOCK" | crontab -
+
+echo "Cron installed:"
+crontab -l | grep -A3 "xtim"
+REMOTE
+
+echo "Done."

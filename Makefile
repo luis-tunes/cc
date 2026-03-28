@@ -1,4 +1,4 @@
-.PHONY: dev test ship deploy sync-env clean backup lint format type-check logs db frontend hooks
+.PHONY: dev test ship deploy sync-env clean backup lint format type-check logs db frontend hooks setup-prod setup-cron setup-monitoring
 
 dev:
 	bin/dev
@@ -30,3 +30,9 @@ frontend:
 hooks:
 	cp bin/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 	@echo "pre-commit hook installed"
+setup-prod:
+	bin/setup-production
+setup-cron:
+	bin/setup-cron $(HOST)
+setup-monitoring:
+	bin/setup-monitoring $(HOST) $(WEBHOOK)

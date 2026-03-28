@@ -1,0 +1,97 @@
+#!/bin/sh
+# bin/setup-monitoring — install lightweight uptime monitoring on the server.
+# Checks /health every 2 min, logs failures, alerts via webhook or email.
+# Idempotent. Re-running replaces the monitoring script + cron entry.
+# Usage: bin/setup-monitoring <user@host> [webhook_url]
+set -eu
+
+HOST="${1:?usage: bin/setup-monitoring <user@host> [webhook_url]}"
+WEBHOOK="${2:-}"
+DIR="/home/cc/cc"
+
+ssh "$HOST" /bin/sh -s "$DIR" "$WEBHOOK" <<'REMOTE'
+DIR="$1"
+WEBHOOK="$2"
+SCRIPT="$DIR/bin/healthcheck"
+
+cat > "$SCRIPT" <<'CHECKER'
+#!/bin/sh
+# Lightweight health checker. Run via cron every 2 minutes.
+# Logs to /var/log/xtim-monitor.log. Alerts on consecutive failures.
+set -eu
+
+URL="http://localhost:8080/health"
+LOG="/var/log/xtim-monitor.log"
+STATE="/tmp/xtim-health-state"
+MAX_FAILS=3
+WEBHOOK="__WEBHOOK__"
+
+check() {
+	BODY=$(curl -sf --max-time 10 "$URL" 2>&1) && STATUS="ok" || STATUS="fail"
+	DEGRADED=""
+	if [ "$STATUS" = "ok" ]; then
+		# Parse JSON minimally — check for "degraded"
+		echo "$BODY" | grep -q '"degraded"' && DEGRADED="degraded"
+	fi
+
+	if [ "$STATUS" = "ok" ] && [ -z "$DEGRADED" ]; then
+		# Healthy — reset counter
+		echo 0 > "$STATE"
+		return
+	fi
+
+	# Increment failure counter
+	FAILS=0
+	[ -f "$STATE" ] && FAILS=$(cat "$STATE")
+	FAILS=$((FAILS + 1))
+	echo "$FAILS" > "$STATE"
+
+	REASON="$STATUS"
+	[ -n "$DEGRADED" ] && REASON="degraded: $BODY"
+	echo "$(date -Iseconds) WARN fail=$FAILS reason=$REASON" >> "$LOG"
+
+	# Alert after MAX_FAILS consecutive failures
+	if [ "$FAILS" -ge "$MAX_FAILS" ]; then
+		MSG="xtim.ai health alert: $FAILS consecutive failures. Last: $REASON"
+		echo "$(date -Iseconds) ALERT $MSG" >> "$LOG"
+
+		# Webhook (Slack/Discord/generic)
+		if [ -n "$WEBHOOK" ]; then
+			curl -sf -X POST -H "Content-Type: application/json" \
+				-d "{\"text\":\"$MSG\"}" "$WEBHOOK" >/dev/null 2>&1 || true
+		fi
+
+		# Auto-restart after 5 consecutive failures
+		if [ "$FAILS" -ge 5 ]; then
+			cd __DIR__
+			docker compose restart app
+			echo "$(date -Iseconds) ACTION restarted app after $FAILS failures" >> "$LOG"
+			echo 0 > "$STATE"
+		fi
+	fi
+}
+
+check
+CHECKER
+
+# Replace placeholders
+sed -i "s|__WEBHOOK__|$WEBHOOK|g" "$SCRIPT"
+sed -i "s|__DIR__|$DIR|g" "$SCRIPT"
+chmod +x "$SCRIPT"
+
+# Add cron entry (idempotent — remove old, add new)
+MARKER="# xtim-monitor"
+EXISTING=$(crontab -l 2>/dev/null || true)
+CLEANED=$(printf '%s\n' "$EXISTING" | grep -v "$MARKER")
+printf '%s\n*/2 * * * * %s %s\n' "$CLEANED" "$SCRIPT" "$MARKER" | crontab -
+
+# Init state + log
+echo 0 > /tmp/xtim-health-state
+touch /var/log/xtim-monitor.log
+
+echo "Monitoring installed: $SCRIPT runs every 2min"
+echo "Webhook: ${WEBHOOK:-none (add later: bin/setup-monitoring host url)}"
+echo "Log: /var/log/xtim-monitor.log"
+REMOTE
+
+echo "Done."

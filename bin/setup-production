@@ -1,0 +1,29 @@
+#!/bin/sh
+# bin/setup-production — ensure .env.production has all required vars.
+# Idempotent. Only appends missing keys, never overwrites existing ones.
+# Usage: bin/setup-production [envfile]
+set -eu
+
+ENV="${1:-.env.production}"
+
+append_if_missing() {
+	key="$1" val="$2"
+	if grep -q "^${key}=" "$ENV" 2>/dev/null; then
+		return
+	fi
+	printf '%s=%s\n' "$key" "$val" >> "$ENV"
+	printf '  + %s\n' "$key"
+}
+
+[ -f "$ENV" ] || { echo "error: $ENV not found"; exit 1; }
+
+echo "Checking $ENV for missing vars..."
+
+append_if_missing MASTER_USER_IDS "filipeferreira@evolsign.com,luistunes0@gmail.com"
+append_if_missing REDIS_PASSWORD "$(openssl rand -base64 24)"
+append_if_missing LOG_FORMAT "json"
+append_if_missing CORS_ORIGINS "https://xtim.ai"
+append_if_missing SENTRY_DSN ""
+append_if_missing SENTRY_TRACES_SAMPLE_RATE "0.1"
+
+echo "Done. Review $ENV, then: bin/sync-env cc@<host>"
