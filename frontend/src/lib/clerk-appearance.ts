@@ -72,24 +72,30 @@ export const clerkAppearance = {
 /** Appearance for inline Organization Profile (Settings page - embedded, no chrome). */
 export const orgProfileAppearance = {
   elements: {
-    rootBox: "w-full",
-    card: "bg-transparent shadow-none border-0 p-0",
-    navbar: "hidden",
-    pageScrollBox: "p-0",
-    headerTitle: "text-foreground text-sm",
+    rootBox: "w-full [&_.cl-organizationProfile-root]:w-full",
+    card: "bg-transparent shadow-none border-0 p-0 m-0",
+    navbar: "!hidden",
+    navbarMobileMenuButton: "!hidden",
+    headerTitle: "text-foreground text-sm font-semibold",
     headerSubtitle: "text-muted-foreground text-xs",
+    page: "w-full gap-4",
+    pageScrollBox: "p-0",
+    profilePage: "w-full",
     profileSectionTitle:
-      "text-xs font-semibold text-foreground uppercase tracking-wider",
-    profileSectionContent: "text-sm",
-    profileSectionPrimaryButton: "text-xs text-primary hover:text-primary/80",
+      "text-xs font-semibold text-muted-foreground uppercase tracking-wider",
+    profileSectionContent: "text-sm text-foreground",
+    profileSectionPrimaryButton: "text-xs text-primary hover:text-primary/80 font-medium",
     formButtonPrimary:
-      "bg-primary text-primary-foreground hover:bg-primary/90 text-xs",
-    formFieldLabel: "text-xs text-muted-foreground",
-    formFieldInput: "bg-background border-border text-foreground text-sm",
+      "bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold",
+    formFieldLabel: "text-xs text-muted-foreground font-medium",
+    formFieldInput: "bg-background border-border text-foreground text-sm rounded-md",
     membersPageInviteButton:
-      "bg-primary text-primary-foreground hover:bg-primary/90 text-xs",
+      "bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold",
     tableHead: "text-xs uppercase tracking-wider text-muted-foreground",
     badge: "text-xs",
+    accordionTriggerButton: "text-sm text-foreground hover:bg-muted/50",
+    breadcrumbs: "hidden",
+    breadcrumbsItem: "hidden",
   },
 };
 
