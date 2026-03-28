@@ -3,8 +3,6 @@
 import datetime
 from decimal import Decimal
 
-import pytest
-
 from app.assets import compute_current_value, depreciation_schedule
 
 

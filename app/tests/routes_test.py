@@ -221,6 +221,24 @@ def test_bank_transactions_date_filter():
     assert r.status_code == 200
 
 
+def test_delete_bank_transaction():
+    csv_data = "date;description;amount\n2026-06-01;To Delete;-10,00\n"
+    client.post(
+        "/api/bank-transactions/upload",
+        files={"file": ("bank.csv", csv_data.encode(), "text/csv")},
+    )
+    txs = client.get("/api/bank-transactions").json()
+    assert len(txs) > 0
+    tx_id = txs[0]["id"]
+    r = client.delete(f"/api/bank-transactions/{tx_id}")
+    assert r.status_code == 204
+
+
+def test_delete_bank_transaction_not_found():
+    r = client.delete("/api/bank-transactions/999999")
+    assert r.status_code == 404
+
+
 # ── Reconciliation ────────────────────────────────────────────────────
 
 def test_list_reconciliations():

@@ -20,6 +20,7 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    target: "es2020",
     sourcemap: false,
     rollupOptions: {
       output: {
@@ -27,6 +28,16 @@ export default defineConfig({
           react: ["react", "react-dom", "react-router-dom"],
           clerk: ["@clerk/react"],
           charts: ["recharts"],
+          radix: [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-tooltip",
+          ],
+          icons: ["lucide-react"],
+          query: ["@tanstack/react-query"],
         },
       },
     },

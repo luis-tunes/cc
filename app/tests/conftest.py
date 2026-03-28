@@ -20,6 +20,11 @@ import app.auth
 
 app.auth.AUTH_DISABLED = True
 
+# Disable rate limiting in tests
+from app.limiter import limiter as _limiter  # noqa: E402
+
+_limiter.enabled = False
+
 
 # ══════════════════════════════════════════════════════════════════════
 # ── In-memory DB mock ────────────────────────────────────────────────

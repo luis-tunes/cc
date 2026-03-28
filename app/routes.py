@@ -8,13 +8,13 @@ from decimal import Decimal
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.assistant import answer_question as _answer_question
 from app.auth import AuthInfo, require_auth
 from app.cache import cache_get, cache_invalidate, cache_set
 from app.db import get_conn, log_activity
-from app.limiter import UPLOAD_RATE, WEBHOOK_RATE, limiter
+from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.parse import (
     _MIME_FROM_EXT,
     _extract_with_vision,
@@ -30,6 +30,40 @@ PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "/opt/tim/uploads")
+
+
+# ── Request models for loose endpoints ─────────────────────────────────
+
+class EntityProfileBody(BaseModel):
+    """Entity profile — known fields validated, extras preserved."""
+    model_config = ConfigDict(extra="allow")
+    nif: str = ""
+    name: str = ""
+    trade_name: str = ""
+    address: str = ""
+    postal_code: str = ""
+    city: str = ""
+    country: str = "PT"
+    phone: str = ""
+    email: str = ""
+    cae: str = ""
+    regime: str = ""
+    capital_social: str = ""
+    iban: str = ""
+    fiscal_start_month: int = 1
+
+
+class UnitFamilyConversion(BaseModel):
+    from_unit: str
+    to_unit: str
+    factor: float = Field(gt=0)
+
+
+class UnitFamilyBody(BaseModel):
+    name: str = Field(min_length=1)
+    base_unit: str = Field(min_length=1)
+    conversions: list[UnitFamilyConversion] = []
+
 
 router = APIRouter()
 
@@ -322,9 +356,10 @@ async def list_documents(
 
 
 @router.post("/documents/auto-classify")
-async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def auto_classify_documents(request: Request, auth: AuthInfo = Depends(require_auth)):
     """Run classification rules against all unclassified documents for the tenant."""
-    from app.classify import classify_document
+    from app.classify import classify_document, fetch_rules
     tid = auth.tenant_id
     with get_conn() as conn:
         docs = conn.execute(
@@ -335,22 +370,23 @@ async def auto_classify_documents(auth: AuthInfo = Depends(require_auth)):
             (tid,),
         ).fetchall()
 
+    rules = fetch_rules(tid)
     classified = 0
     skipped = 0
-    for doc in docs:
-        result = classify_document(dict(doc), tid)
-        if result:
-            with get_conn() as conn:
+    with get_conn() as conn:
+        for doc in docs:
+            result = classify_document(dict(doc), tid, _rules=rules)
+            if result:
                 conn.execute(
                     "UPDATE documents SET snc_account = %s, classification_source = %s WHERE id = %s AND tenant_id = %s",
                     (result["account"], result["source"], doc["id"], tid),
                 )
                 log_activity(conn, tid, "document", doc["id"], "auto_classified",
                              f"Conta {result['account']} via regra")
-                conn.commit()
-            classified += 1
-        else:
-            skipped += 1
+                classified += 1
+            else:
+                skipped += 1
+        conn.commit()
 
     with get_conn() as conn:
         total_classified = conn.execute(
@@ -568,11 +604,16 @@ async def bulk_delete_documents(payload: BulkDeletePayload, auth: AuthInfo = Dep
         raise HTTPException(status_code=400, detail="max 500 documents per request")
     tid = auth.tenant_id
     with get_conn() as conn:
-        for doc_id in payload.ids:
-            row = conn.execute("SELECT id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid)).fetchone()
-            if row:
-                conn.execute("DELETE FROM reconciliations WHERE document_id = %s", (doc_id,))
-                conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+        # Batch delete: single query per table instead of N+1
+        existing = conn.execute(
+            "SELECT id FROM documents WHERE id = ANY(%s) AND tenant_id = %s",
+            (payload.ids, tid),
+        ).fetchall()
+        existing_ids = [r["id"] for r in existing]
+        if existing_ids:
+            conn.execute("DELETE FROM reconciliations WHERE document_id = ANY(%s)", (existing_ids,))
+            conn.execute("DELETE FROM documents WHERE id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
+            for doc_id in existing_ids:
                 log_activity(conn, tid, "document", doc_id, "deleted")
         conn.commit()
     return None
@@ -777,7 +818,8 @@ async def list_bank_transactions(
 # --- Reconciliation ---
 
 @router.post("/reconcile")
-async def run_reconciliation(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def run_reconciliation(request: Request, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     matches = reconcile_all(tid)
     if matches:
@@ -850,6 +892,22 @@ async def reconciliation_suggestions(doc_id: int, auth: AuthInfo = Depends(requi
 
 # --- Movement Classification ---
 
+@router.delete("/bank-transactions/{tx_id}", status_code=204)
+async def delete_bank_transaction(tx_id: int, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM bank_transactions WHERE id = %s AND tenant_id = %s",
+            (tx_id, tid),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="transaction not found")
+        conn.execute("DELETE FROM reconciliations WHERE bank_transaction_id = %s", (tx_id,))
+        conn.execute("DELETE FROM bank_transactions WHERE id = %s AND tenant_id = %s", (tx_id, tid))
+        log_activity(conn, tid, "bank_transaction", tx_id, "deleted")
+        conn.commit()
+    return None
+
 @router.get("/bank-transactions/enrich")
 async def enrich_movements(
     limit: int = Query(default=100, le=1000),
@@ -857,7 +915,7 @@ async def enrich_movements(
     auth: AuthInfo = Depends(require_auth),
 ):
     """List bank transactions with classification and entity detection."""
-    from app.classify_movements import classify_movement, detect_entity
+    from app.classify_movements import _fetch_rules, _fetch_suppliers, classify_movement, detect_entity
     tid = auth.tenant_id
     clauses: list[str] = ["tenant_id = %s"]
     params: list = [tid]
@@ -868,10 +926,13 @@ async def enrich_movements(
             f"SELECT id, date, description, amount FROM bank_transactions {where} ORDER BY date DESC LIMIT %s OFFSET %s",
             params,
         ).fetchall()
+    # Fetch rules and suppliers once for the whole batch
+    rules = _fetch_rules(tid)
+    suppliers = _fetch_suppliers(tid)
     results = []
     for tx in rows:
-        cls = classify_movement(tx["description"], tid)
-        entity = detect_entity(tx["description"], tid)
+        cls = classify_movement(tx["description"], tid, _rules=rules)
+        entity = detect_entity(tx["description"], tid, _suppliers=suppliers)
         results.append({
             **dict(tx),
             "category": cls["category"] if cls else None,
@@ -1021,7 +1082,8 @@ async def patch_alert(alert_id: int, auth: AuthInfo = Depends(require_auth)):
     return {"id": alert_id, "read": True}
 
 @router.post("/alerts/generate")
-async def generate_alerts(auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def generate_alerts(request: Request, auth: AuthInfo = Depends(require_auth)):
     """Run the alerts engine to generate new compliance alerts."""
     from app.alerts import generate_compliance_alerts
     tid = auth.tenant_id
@@ -1371,10 +1433,10 @@ async def get_entity(auth: AuthInfo = Depends(require_auth)):
 
 
 @router.put("/entity")
-async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth)):
+async def put_entity(request_body: EntityProfileBody, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
     import json as _json
-    data_json = _json.dumps(request_body)
+    data_json = _json.dumps(request_body.model_dump())
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO tenant_settings (tenant_id, key, data) VALUES (%s, 'entity_profile', %s)
@@ -1382,7 +1444,7 @@ async def put_entity(request_body: dict, auth: AuthInfo = Depends(require_auth))
             (tid, data_json, data_json),
         )
         conn.commit()
-    return request_body
+    return request_body.model_dump()
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1418,13 +1480,11 @@ async def list_unit_families(auth: AuthInfo = Depends(require_auth)):
 
 
 @router.post("/unit-families")
-async def create_unit_family(body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_unit_family(body: UnitFamilyBody, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    name = body.get("name", "")
-    base_unit = body.get("base_unit", "")
-    conversions = body.get("conversions", [])
-    if not name or not base_unit:
-        raise HTTPException(status_code=422, detail="name and base_unit required")
+    name = body.name
+    base_unit = body.base_unit
+    conversions = [c.model_dump() for c in body.conversions]
     with get_conn() as conn:
         row = conn.execute(
             "INSERT INTO unit_families (tenant_id, name, base_unit) VALUES (%s, %s, %s) RETURNING id, name, base_unit",
@@ -2581,7 +2641,7 @@ class ClassificationRulePatch(BaseModel):
 
 
 VALID_FIELDS = {"supplier_nif", "description", "amount_gte", "amount_lte", "type"}
-VALID_OPERATORS = {"equals", "contains", "starts_with", "gte", "lte"}
+VALID_OPERATORS = {"equals", "not_equals", "contains", "not_contains", "starts_with", "regex", "gte", "lte"}
 
 
 @router.get("/classification-rules", response_model=list[ClassificationRuleOut])
@@ -2704,7 +2764,8 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/assistant/chat")
-async def assistant_chat(body: ChatRequest, auth: AuthInfo = Depends(require_auth)):
+@limiter.limit(EXPENSIVE_RATE)
+async def assistant_chat(request: Request, body: ChatRequest, auth: AuthInfo = Depends(require_auth)):
     """Answer a natural-language accounting question using live DB data."""
     question = body.question.strip()
     if not question:

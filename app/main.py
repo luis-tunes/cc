@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import sentry_sdk
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -32,7 +33,8 @@ logger = logging.getLogger(__name__)
 # ── Sentry (optional) ─────────────────────────────────────────────────
 _sentry_dsn = os.environ.get("SENTRY_DSN", "")
 if _sentry_dsn:
-    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.1, profiles_sample_rate=0.1, enable_tracing=True)
+    _traces_rate = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
+    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=_traces_rate, profiles_sample_rate=_traces_rate, enable_tracing=True)
     logger.info("startup: Sentry initialized")
 
 
@@ -53,9 +55,30 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="xtim.ai — Contabilidade Inteligente", lifespan=lifespan)
 
+# ── CORS (needed for local frontend dev with Vite proxy) ───────────────
+_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ── Rate limiting ──────────────────────────────────────────────────────
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# ── Security headers middleware ────────────────────────────────────────
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 # ── Request ID middleware ──────────────────────────────────────────────

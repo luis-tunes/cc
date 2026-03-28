@@ -9,4 +9,10 @@ app/tests/
 .github/
 .venv/
 frontend/node_modules/
+frontend/cypress/
 *.tsbuildinfo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backups/
+mcp/

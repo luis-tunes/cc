@@ -27,23 +27,43 @@ def reconcile_all(tenant_id: str) -> list[dict]:
             (tenant_id,),
         ).fetchall()
         matches = []
-        used_tx = set()
+        # Build hash-map of txs keyed by amount in cents for O(1) lookup
+        tx_by_cents: dict[int, list[dict]] = {}
+        for tx in txs:
+            key = int(round(abs(tx["amount"]) * 100))
+            tx_by_cents.setdefault(key, []).append(tx)
+
         for doc in docs:
-            for tx in txs:
-                if tx["id"] in used_tx:
-                    continue
-                amount_diff = abs(doc["total"] - abs(tx["amount"]))
-                date_diff = abs(doc["date"] - tx["date"])
-                if amount_diff < AMOUNT_TOLERANCE and date_diff <= DATE_TOLERANCE:
-                    confidence = Decimal("1") - amount_diff
-                    conn.execute(
-                        """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence, tenant_id)
-                           VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",
-                        (doc["id"], tx["id"], confidence, tenant_id),
-                    )
-                    used_tx.add(tx["id"])
-                    matches.append({"document_id": doc["id"], "bank_transaction_id": tx["id"], "confidence": float(confidence)})
-                    break
+            doc_cents = int(round(doc["total"] * 100))
+            # Check exact bucket and ±1 cent (covers 0.01 tolerance)
+            best = None
+            for key in (doc_cents - 1, doc_cents, doc_cents + 1):
+                for tx in tx_by_cents.get(key, []):
+                    amount_diff = abs(doc["total"] - abs(tx["amount"]))
+                    if amount_diff >= AMOUNT_TOLERANCE:
+                        continue
+                    date_diff = abs(doc["date"] - tx["date"])
+                    if date_diff > DATE_TOLERANCE:
+                        continue
+                    if best is None or date_diff < abs(doc["date"] - best["date"]):
+                        best = tx
+            if best is not None:
+                amount_diff = abs(doc["total"] - abs(best["amount"]))
+                date_diff = abs(doc["date"] - best["date"])
+                # Confidence: 70% weight on amount closeness, 30% on date closeness
+                amount_score = Decimal("1") - (amount_diff / max(doc["total"], Decimal("0.01")))
+                date_score = Decimal(str(max(0, 1 - date_diff.days / DATE_TOLERANCE.days)))
+                confidence = (amount_score * Decimal("0.7") + date_score * Decimal("0.3")).quantize(Decimal("0.01"))
+                confidence = max(Decimal("0"), min(Decimal("1"), confidence))
+                conn.execute(
+                    """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence, tenant_id)
+                       VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+                    (doc["id"], best["id"], confidence, tenant_id),
+                )
+                # Remove matched tx from its bucket
+                bucket = tx_by_cents[int(round(abs(best["amount"]) * 100))]
+                bucket.remove(best)
+                matches.append({"document_id": doc["id"], "bank_transaction_id": best["id"], "confidence": float(confidence)})
         conn.commit()
     return matches
 

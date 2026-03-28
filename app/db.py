@@ -321,9 +321,31 @@ def init_db():
         conn.execute("""
             DO $$ BEGIN
                 ALTER TABLE products ADD CONSTRAINT uq_products_tenant_code UNIQUE (tenant_id, code);
-            EXCEPTION WHEN duplicate_table THEN NULL;
+            EXCEPTION WHEN duplicate_object THEN NULL;
             END $$;
         """)
+
+        # ── CHECK constraints (data integrity) ────────────────────────
+        for _constraint, sql in [
+            ("chk_documents_total_positive", "ALTER TABLE documents ADD CONSTRAINT chk_documents_total_positive CHECK (total >= 0)"),
+            ("chk_documents_vat_positive", "ALTER TABLE documents ADD CONSTRAINT chk_documents_vat_positive CHECK (vat >= 0)"),
+            ("chk_reconciliations_confidence", "ALTER TABLE reconciliations ADD CONSTRAINT chk_reconciliations_confidence CHECK (match_confidence BETWEEN 0 AND 1)"),
+            ("chk_assets_useful_life", "ALTER TABLE assets ADD CONSTRAINT chk_assets_useful_life CHECK (useful_life_years > 0)"),
+            ("uq_unit_families_tenant_name", "ALTER TABLE unit_families ADD CONSTRAINT uq_unit_families_tenant_name UNIQUE (tenant_id, name)"),
+        ]:
+            conn.execute(f"""
+                DO $$ BEGIN
+                    {sql};
+                EXCEPTION WHEN duplicate_object THEN NULL;
+                END $$;
+            """)
+
+        # ── Additional indexes for query performance ──────────────────
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_documents_supplier_nif ON documents(tenant_id, supplier_nif);
+            CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(tenant_id, type);
+        """)
+
         conn.commit()
 
 

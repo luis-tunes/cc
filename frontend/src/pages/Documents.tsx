@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { DocumentList } from "@/components/documents/DocumentList";
@@ -27,6 +28,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 type ViewTab = "todos" | "revisao" | "classificados" | "reconciliados";
 
 export default function Documents() {
+  const queryClient = useQueryClient();
   const { documents, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
   const [filters, setFilters] = useState<DocumentFilters>({
@@ -147,7 +149,9 @@ export default function Documents() {
 
   const handleDocumentProcessed = useCallback(() => {
     refetch();
-  }, [refetch]);
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["reconciliations"] });
+  }, [refetch, queryClient]);
 
   return (
     <PageContainer
