@@ -45,6 +45,7 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAddIngredient, setShowAddIngredient] = useState(false);
+  const [activeTab, setActiveTab] = useState("materias-primas");
   const [defaultCategory, setDefaultCategory] = useState("");
   const [stockEventDialog, setStockEventDialog] = useState<{
     open: boolean;
@@ -108,15 +109,23 @@ export default function Inventory() {
     );
   }
 
-  const renderIngredientSection = (list: Ingredient[], emptyLabel: string) => (
+  const isConsumiveis = activeTab === "consumiveis";
+  const addLabel = isConsumiveis ? "Novo Consumível" : "Nova Matéria Prima";
+
+  const handleAddItem = () => {
+    setDefaultCategory(isConsumiveis ? "consumível" : "");
+    setShowAddIngredient(true);
+  };
+
+  const renderIngredientSection = (list: Ingredient[], emptyLabel: string, emptyDesc: string, emptyTutorial: string) => (
     list.length === 0 ? (
       <EmptyState
         icon={Package}
         title={ingredients.length === 0 ? emptyLabel : "Nenhum resultado"}
-        description={ingredients.length === 0 ? "Adicione o seu primeiro ingrediente para começar a gerir o stock." : "Tente alterar os filtros."}
-        tutorial={ingredients.length === 0 ? "O inventário permite controlar entradas, saídas e desperdício de cada ingrediente. Defina stocks mínimos para receber alertas automáticos quando estiver a ficar sem algo." : undefined}
-        actionLabel={ingredients.length === 0 ? "Novo Ingrediente" : undefined}
-        onAction={ingredients.length === 0 ? () => setShowAddIngredient(true) : undefined}
+        description={ingredients.length === 0 ? emptyDesc : "Tente alterar os filtros."}
+        tutorial={ingredients.length === 0 ? emptyTutorial : undefined}
+        actionLabel={ingredients.length === 0 ? addLabel : undefined}
+        onAction={ingredients.length === 0 ? handleAddItem : undefined}
       />
     ) : (
       <IngredientTable
@@ -138,9 +147,9 @@ export default function Inventory() {
             <ArrowDownToLine className="mr-1.5 h-4 w-4" />
             Registar Movimento
           </Button>
-          <Button size="sm" onClick={() => setShowAddIngredient(true)}>
+          <Button size="sm" onClick={handleAddItem}>
             <Plus className="mr-1.5 h-4 w-4" />
-            Novo Ingrediente
+            {addLabel}
           </Button>
         </div>
       }
@@ -158,7 +167,7 @@ export default function Inventory() {
       )}
 
       {/* Tabs: Matérias Primas | Consumíveis | Movimentos */}
-      <Tabs defaultValue="materias-primas" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <TabsList>
             <TabsTrigger value="materias-primas" className="gap-1.5">
@@ -204,7 +213,12 @@ export default function Inventory() {
             <KpiCard label="Rutura" value={String(mpStats.rutura)} variant={mpStats.rutura > 0 ? "danger" : "default"} compact />
             <KpiCard label="Stock Baixo" value={String(mpStats.baixo)} variant={mpStats.baixo > 0 ? "warning" : "default"} compact />
           </div>
-          {renderIngredientSection(filteredMP, "Sem matérias primas")}
+          {renderIngredientSection(
+            filteredMP,
+            "Sem matérias primas",
+            "Adicione a sua primeira matéria prima para começar a gerir o stock.",
+            "Matérias primas são os ingredientes usados na produção — cereais, carne, legumes, etc. Defina stocks mínimos para receber alertas automáticos."
+          )}
         </TabsContent>
 
         <TabsContent value="consumiveis">
@@ -215,7 +229,12 @@ export default function Inventory() {
             <KpiCard label="Rutura" value={String(consStats.rutura)} variant={consStats.rutura > 0 ? "danger" : "default"} compact />
             <KpiCard label="Stock Baixo" value={String(consStats.baixo)} variant={consStats.baixo > 0 ? "warning" : "default"} compact />
           </div>
-          {renderIngredientSection(filteredCons, "Sem consumíveis")}
+          {renderIngredientSection(
+            filteredCons,
+            "Sem consumíveis",
+            "Adicione o seu primeiro consumível — embalagens, produtos de limpeza, descartáveis, etc.",
+            "Consumíveis são materiais não alimentares usados na operação. Controle stock de embalagens, material de limpeza e outros."
+          )}
         </TabsContent>
 
         <TabsContent value="movimentos">
