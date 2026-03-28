@@ -1,5 +1,5 @@
 """
-Stripe billing — checkout sessions, webhooks, plan status.
+Stripe billing + Clerk webhooks — checkout sessions, webhooks, plan status.
 Clerk handles auth; Stripe handles money. They connect via metadata.
 
 Plans:
@@ -7,6 +7,7 @@ Plans:
   custom — empresa, SLA + garantia, preço personalizado (contacte-nos)
 """
 
+import base64
 import hashlib
 import hmac
 import json
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+CLERK_WEBHOOK_SECRET = os.environ.get("CLERK_WEBHOOK_SECRET", "")
 STRIPE_API = "https://api.stripe.com/v1"
 APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@xtim.ai")
@@ -60,7 +62,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 
 def init_billing_db():
-    """Create the tenant_plans table if it doesn't exist."""
+    """Create the tenant_plans and webhook_events tables if they don't exist."""
     with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tenant_plans (
@@ -72,6 +74,15 @@ def init_billing_db():
                 stripe_customer TEXT,
                 updated_at      TIMESTAMPTZ DEFAULT now()
             );
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id    TEXT PRIMARY KEY,
+                source      VARCHAR(16) NOT NULL,
+                processed_at TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_webhook_events_processed
+                ON webhook_events(processed_at);
         """)
         conn.commit()
 
@@ -219,7 +230,7 @@ async def create_portal(auth: AuthInfo = Depends(require_auth)):
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events."""
+    """Handle Stripe webhook events (idempotent via event_id dedup)."""
     body = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
@@ -233,8 +244,14 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature") from None
 
     event = json.loads(body)
+    event_id = event.get("id", "")
     event_type = event.get("type", "")
     data = event.get("data", {}).get("object", {})
+
+    # Idempotency: skip already-processed events
+    if event_id and _is_event_processed(event_id):
+        logger.info("Stripe webhook: skipping duplicate event %s", event_id)
+        return {"received": True, "duplicate": True}
 
     if event_type == "checkout.session.completed":
         tid = data.get("metadata", {}).get("tenant_id", "")
@@ -295,10 +312,75 @@ async def stripe_webhook(request: Request):
                 )
                 conn.commit()
 
+    # Mark event as processed
+    if event_id:
+        _mark_event_processed(event_id, "stripe")
+
+    return {"received": True}
+
+
+@router.post("/clerk-webhook")
+async def clerk_webhook(request: Request):
+    """Handle Clerk webhook events (user.created → auto-provision tenant)."""
+    body = await request.body()
+
+    if not CLERK_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Clerk webhook not configured")
+
+    # Verify Svix signature
+    svix_id = request.headers.get("svix-id", "")
+    svix_timestamp = request.headers.get("svix-timestamp", "")
+    svix_signature = request.headers.get("svix-signature", "")
+    if not svix_id or not svix_timestamp or not svix_signature:
+        raise HTTPException(status_code=400, detail="Missing Svix headers")
+    try:
+        _verify_svix_signature(body, svix_id, svix_timestamp, svix_signature)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid signature") from None
+
+    event = json.loads(body)
+    event_type = event.get("type", "")
+    data = event.get("data", {})
+
+    # Idempotency
+    if svix_id and _is_event_processed(svix_id):
+        logger.info("Clerk webhook: skipping duplicate event %s", svix_id)
+        return {"received": True, "duplicate": True}
+
+    if event_type == "user.created":
+        user_id = data.get("id", "")
+        email = (data.get("email_addresses") or [{}])[0].get("email_address", "")
+        if user_id:
+            _provision_tenant(user_id, email)
+            logger.info("Clerk user.created: provisioned tenant for user=%s email=%s", user_id, email)
+
+    # Mark processed
+    if svix_id:
+        _mark_event_processed(svix_id, "clerk")
+
     return {"received": True}
 
 
 WEBHOOK_TOLERANCE_SECONDS = 300  # 5 minutes
+
+
+def _is_event_processed(event_id: str) -> bool:
+    """Check if a webhook event was already processed (idempotency)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM webhook_events WHERE event_id = %s", (event_id,)
+        ).fetchone()
+    return row is not None
+
+
+def _mark_event_processed(event_id: str, source: str) -> None:
+    """Record a webhook event as processed."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO webhook_events (event_id, source) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (event_id, source),
+        )
+        conn.commit()
 
 
 def _verify_stripe_signature(payload: bytes, sig_header: str) -> None:
@@ -319,6 +401,72 @@ def _verify_stripe_signature(payload: bytes, sig_header: str) -> None:
     expected = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), signed, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, v1):
         raise ValueError("Signature mismatch")
+
+
+def _verify_svix_signature(payload: bytes, msg_id: str, timestamp: str, signatures: str) -> None:
+    """Svix webhook signature verification (used by Clerk webhooks)."""
+    try:
+        ts = int(timestamp)
+    except ValueError:
+        raise ValueError("Invalid timestamp") from None
+    now = int(datetime.now(UTC).timestamp())
+    if abs(now - ts) > WEBHOOK_TOLERANCE_SECONDS:
+        raise ValueError("Webhook timestamp too old (possible replay)")
+
+    # Clerk/Svix secret is "whsec_<base64>" — decode the key
+    secret = CLERK_WEBHOOK_SECRET
+    if secret.startswith("whsec_"):
+        secret = secret[6:]
+    key = base64.b64decode(secret)
+
+    to_sign = f"{msg_id}.{timestamp}.".encode() + payload
+    computed = base64.b64encode(
+        hmac.new(key, to_sign, hashlib.sha256).digest()
+    ).decode()
+
+    # signatures header can have multiple: "v1,<sig1> v1,<sig2>"
+    for sig_part in signatures.split(" "):
+        parts = sig_part.split(",", 1)
+        if len(parts) == 2 and parts[0] == "v1":
+            if hmac.compare_digest(computed, parts[1]):
+                return
+    raise ValueError("Signature mismatch")
+
+
+def _provision_tenant(user_id: str, email: str) -> None:
+    """Create tenant plan + seed default classification/movement rules for a new user."""
+    tid = user_id  # tenant_id = user_id when no org
+    with get_conn() as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM tenant_plans WHERE tenant_id = %s", (tid,)
+        ).fetchone()
+        if existing:
+            return  # already provisioned
+
+        now = datetime.now(UTC)
+        trial_end = now + timedelta(days=TRIAL_DAYS)
+        conn.execute(
+            "INSERT INTO tenant_plans (tenant_id, plan, status, trial_start, trial_end) VALUES (%s, 'free', 'trialing', %s, %s)",
+            (tid, now, trial_end),
+        )
+
+        # Seed common Portuguese movement rules
+        default_rules = [
+            ("EDP", "edp", "utilities", "62211", None, 10),
+            ("Vodafone/NOS", "vodafone|nos comunicacoes", "comms", "62212", None, 20),
+            ("Combustível", "galp|bp|repsol|cepsa", "fuel", "62214", None, 30),
+            ("Refeições", "uber eats|glovo|bolt food", "meals", "62217", None, 40),
+            ("Portagens", "via verde", "tolls", "62219", None, 50),
+        ]
+        for name, pattern, category, snc, nif, priority in default_rules:
+            conn.execute(
+                """INSERT INTO movement_rules (tenant_id, name, pattern, category, snc_account, entity_nif, priority, active)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (tid, name, pattern, category, snc, nif, priority, True),
+            )
+
+        conn.commit()
+    logger.info("Provisioned tenant %s (email=%s) with trial + default rules", tid, email)
 
 
 def require_pro(auth: AuthInfo = Depends(require_auth)) -> AuthInfo:

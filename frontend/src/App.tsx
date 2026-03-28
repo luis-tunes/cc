@@ -39,6 +39,7 @@ const UserProfile = lazy(() => import("@/pages/UserProfile"));
 const PricingPage = lazy(() => import("@/pages/Pricing"));
 const ActivityFeed = lazy(() => import("@/pages/ActivityFeed"));
 const LandingPage = lazy(() => import("@/pages/Landing"));
+const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const AdminPage = lazy(() => import("@/pages/Admin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -58,6 +59,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/privacidade" element={<PrivacyPage />} />
           <Route path="/auth/sign-in/*" element={<SignInPage />} />
           <Route path="/auth/sign-up/*" element={<SignUpPage />} />
 

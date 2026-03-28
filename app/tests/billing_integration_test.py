@@ -1,13 +1,15 @@
 """
 Billing webhook and checkout tests.
 Tests Stripe webhook signature verification, checkout.session.completed,
-and customer.subscription.deleted flows.
+customer.subscription.deleted, idempotency, and Clerk user.created webhook.
 """
+import base64
 import hashlib
 import hmac
 import json
 import time
 from datetime import UTC
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +21,7 @@ from app.main import app
 client = TestClient(app, raise_server_exceptions=False)
 
 WEBHOOK_SECRET = "whsec_test_secret_for_tests"
+CLERK_SECRET = "whsec_dGVzdF9jbGVya19zZWNyZXRfZm9yX3Rlc3Rz"  # whsec_ + base64("test_clerk_secret_for_tests")
 
 
 def _stripe_sig(payload: bytes, secret: str = WEBHOOK_SECRET) -> str:
@@ -46,7 +49,6 @@ def _send_webhook(event_type: str, data: dict) -> "Response":
 
 
 def _patch_webhook_secret():
-    from unittest.mock import patch
     return patch("app.billing.STRIPE_WEBHOOK_SECRET", WEBHOOK_SECRET)
 
 
@@ -226,3 +228,136 @@ def test_pro_plan_always_active():
     }
     result = _compute_trial_status(info)
     assert result["status"] == "active"
+
+
+# ── Stripe webhook idempotency ───────────────────────────────────────
+
+def test_stripe_webhook_idempotency():
+    """Same event sent twice → second returns duplicate=True."""
+    event = {"id": "evt_idem_test_001", "type": "checkout.session.completed",
+             "data": {"object": {"metadata": {"tenant_id": "t-idem"}, "customer": "cus_idem"}}}
+    body = json.dumps(event).encode()
+    sig = _stripe_sig(body)
+    with _patch_webhook_secret():
+        r1 = client.post("/api/billing/webhook", content=body,
+                         headers={"Content-Type": "application/json", "stripe-signature": sig})
+        assert r1.status_code == 200
+        assert r1.json().get("duplicate") is not True
+
+        # Replay same event
+        sig2 = _stripe_sig(body)
+        r2 = client.post("/api/billing/webhook", content=body,
+                         headers={"Content-Type": "application/json", "stripe-signature": sig2})
+        assert r2.status_code == 200
+        assert r2.json()["duplicate"] is True
+
+
+# ── Clerk webhook: user.created ──────────────────────────────────────
+
+def _clerk_sig(payload: bytes, secret: str = CLERK_SECRET) -> tuple[str, str, str]:
+    """Generate Svix signature headers for Clerk webhook."""
+    raw_secret = secret
+    if raw_secret.startswith("whsec_"):
+        raw_secret = raw_secret[6:]
+    key = base64.b64decode(raw_secret)
+    msg_id = "msg_test_clerk_001"
+    timestamp = str(int(time.time()))
+    to_sign = f"{msg_id}.{timestamp}.".encode() + payload
+    sig = base64.b64encode(hmac.new(key, to_sign, hashlib.sha256).digest()).decode()
+    return msg_id, timestamp, f"v1,{sig}"
+
+
+def _patch_clerk_secret():
+    return patch("app.billing.CLERK_WEBHOOK_SECRET", CLERK_SECRET)
+
+
+def _send_clerk_webhook(event_type: str, data: dict) -> "Response":
+    event = {"type": event_type, "data": data}
+    body = json.dumps(event).encode()
+    msg_id, ts, sig = _clerk_sig(body)
+    with _patch_clerk_secret():
+        return client.post(
+            "/api/billing/clerk-webhook",
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "svix-id": msg_id,
+                "svix-timestamp": ts,
+                "svix-signature": sig,
+            },
+        )
+
+
+def test_clerk_user_created_provisions_tenant():
+    """user.created event creates a trial tenant plan + default movement rules."""
+    r = _send_clerk_webhook("user.created", {
+        "id": "user_clerk_new_001",
+        "email_addresses": [{"email_address": "novo@example.com"}],
+    })
+    assert r.status_code == 200
+    assert r.json()["received"] is True
+
+    import sys
+    tables = sys.modules["tests.conftest"].get_tables()
+    plan = next((p for p in tables["tenant_plans"] if p["tenant_id"] == "user_clerk_new_001"), None)
+    assert plan is not None
+    assert plan["plan"] == "free"
+    assert plan["status"] == "trialing"
+
+    # Default movement rules should be seeded
+    rules = [r for r in tables["movement_rules"] if r["tenant_id"] == "user_clerk_new_001"]
+    assert len(rules) >= 3  # at least some default rules
+
+
+def test_clerk_user_created_idempotent():
+    """Same user.created event sent twice should not duplicate rules."""
+    r1 = _send_clerk_webhook("user.created", {
+        "id": "user_clerk_idem_001",
+        "email_addresses": [{"email_address": "idem@example.com"}],
+    })
+    assert r1.status_code == 200
+
+    import sys
+    tables = sys.modules["tests.conftest"].get_tables()
+    rules_before = len([r for r in tables["movement_rules"] if r["tenant_id"] == "user_clerk_idem_001"])
+
+    # _provision_tenant checks for existing tenant_plans row
+    r2 = _send_clerk_webhook("user.created", {
+        "id": "user_clerk_idem_001",
+        "email_addresses": [{"email_address": "idem@example.com"}],
+    })
+    assert r2.status_code == 200
+    rules_after = len([r for r in tables["movement_rules"] if r["tenant_id"] == "user_clerk_idem_001"])
+    assert rules_after == rules_before  # no duplicates
+
+
+def test_clerk_webhook_missing_headers():
+    """Missing Svix headers → 400."""
+    with _patch_clerk_secret():
+        r = client.post("/api/billing/clerk-webhook",
+                        content=b'{"type":"user.created","data":{}}',
+                        headers={"Content-Type": "application/json"})
+    assert r.status_code == 400
+
+
+def test_clerk_webhook_invalid_signature():
+    """Invalid signature → 400."""
+    with _patch_clerk_secret():
+        r = client.post("/api/billing/clerk-webhook",
+                        content=b'{"type":"user.created","data":{}}',
+                        headers={
+                            "Content-Type": "application/json",
+                            "svix-id": "msg_bad",
+                            "svix-timestamp": str(int(time.time())),
+                            "svix-signature": "v1,invalidsignature",
+                        })
+    assert r.status_code == 400
+
+
+def test_clerk_webhook_not_configured():
+    """Missing CLERK_WEBHOOK_SECRET → 503."""
+    with patch("app.billing.CLERK_WEBHOOK_SECRET", ""):
+        r = client.post("/api/billing/clerk-webhook",
+                        content=b'{"type":"test","data":{}}',
+                        headers={"Content-Type": "application/json"})
+    assert r.status_code == 503

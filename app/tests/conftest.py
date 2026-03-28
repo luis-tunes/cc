@@ -39,7 +39,7 @@ ALL_TABLES = (
     "price_history", "supplier_ingredients",
     "classification_rules",
     "movement_rules", "alerts", "assets",
-    "audit_log",
+    "audit_log", "webhook_events",
 )
 
 ALL_SEQ_TABLES = (
@@ -212,6 +212,10 @@ class FakeConn:
         # ── Bank transactions ──
         if "bank_transactions" in sql_lower:
             return self._handle_bank_transactions(sql, params)
+
+        # ── Webhook events ──
+        if "webhook_events" in sql_lower:
+            return self._handle_webhook_events(sql, params)
 
         # ── Documents ──
         if "documents" in sql_lower:
@@ -455,6 +459,23 @@ class FakeConn:
             tx_id = params[0] if params else None
             _tables["bank_transactions"] = [t for t in _tables["bank_transactions"] if t["id"] != tx_id]
             return FakeCursor([])
+        return FakeCursor([])
+
+    # ────── Webhook Events ──────
+
+    def _handle_webhook_events(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            event_id = params[0] if params else ""
+            source = params[1] if len(params) > 1 else ""
+            # ON CONFLICT DO NOTHING
+            if not any(e["event_id"] == event_id for e in _tables["webhook_events"]):
+                _tables["webhook_events"].append({"event_id": event_id, "source": source, "processed_at": "2025-01-01T00:00:00+00:00"})
+            return FakeCursor([])
+        if sql_lower.startswith("select"):
+            event_id = params[0] if params else ""
+            matches = [e for e in _tables["webhook_events"] if e["event_id"] == event_id]
+            return FakeCursor(matches)
         return FakeCursor([])
 
     # ────── Reconciliations ──────
