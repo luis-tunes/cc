@@ -37,6 +37,13 @@ if ! $SSH "$HOST" "test -f $DIR/.env.production"; then
   fi
 fi
 
+# Fix REDIS_PASSWORD if it contains URL-unsafe chars (breaks redis:// URLs)
+$SSH "$HOST" "cd $DIR && if grep -qP 'REDIS_PASSWORD=.*[/@:]' .env.production 2>/dev/null; then
+  NEW_PW=\$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)
+  sed -i \"s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=\$NEW_PW|\" .env.production
+  echo '→ fixed REDIS_PASSWORD (had URL-unsafe chars)'
+fi"
+
 # Registry login (CI provides GHCR_TOKEN)
 if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   $SSH "$HOST" "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
