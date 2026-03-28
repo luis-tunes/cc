@@ -65,6 +65,95 @@ class UnitFamilyBody(BaseModel):
     conversions: list[UnitFamilyConversion] = []
 
 
+# ── Pydantic models for inventory/operations endpoints ─────────────────
+
+class SupplierCreate(BaseModel):
+    name: str = Field(min_length=1)
+    nif: str = ""
+    category: str = ""
+    reliability: Decimal = Decimal("80")
+    avg_delivery_days: int = Field(default=3, ge=0)
+    ingredient_ids: list[int] = []
+
+class SupplierPatch(BaseModel):
+    name: str | None = None
+    nif: str | None = None
+    category: str | None = None
+    avg_delivery_days: int | None = Field(default=None, ge=0)
+    reliability: Decimal | None = None
+
+class IngredientCreate(BaseModel):
+    name: str = Field(min_length=1)
+    category: str = ""
+    unit: str = "kg"
+    min_threshold: Decimal = Field(default=Decimal("0"), ge=0)
+    last_cost: Decimal = Field(default=Decimal("0"), ge=0)
+    avg_cost: Decimal = Field(default=Decimal("0"), ge=0)
+    supplier_id: int | None = None
+
+class IngredientPatch(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    unit: str | None = None
+    min_threshold: Decimal | None = None
+    supplier_id: int | None = None
+    last_cost: Decimal | None = None
+    avg_cost: Decimal | None = None
+
+class StockEventCreate(BaseModel):
+    type: str
+    ingredient_id: int
+    qty: Decimal = Field(gt=0)
+    unit: str | None = None
+    cost: Decimal | None = Field(default=None, ge=0)
+    date: str | None = None
+    source: str = "manual"
+    reference: str = ""
+
+class RecipeIngredientInput(BaseModel):
+    ingredient_id: int
+    qty: Decimal = Field(gt=0)
+    unit: str = "kg"
+    wastage_percent: Decimal = Decimal("0")
+
+class ProductCreate(BaseModel):
+    code: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    pvp: Decimal = Field(default=Decimal("0"), ge=0)
+    category: str = ""
+    recipe_version: str = "v1"
+    active: bool = True
+    ingredients: list[RecipeIngredientInput] = []
+
+class ProductPatch(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    category: str | None = None
+    pvp: Decimal | None = None
+    active: bool | None = None
+    recipe_version: str | None = None
+    estimated_cost: Decimal | None = None
+    ingredients: list[RecipeIngredientInput] | None = None
+
+class ProduceBody(BaseModel):
+    qty: int = Field(default=1, gt=0)
+
+class PricePointCreate(BaseModel):
+    ingredient_id: int
+    supplier_id: int
+    price: Decimal = Field(ge=0)
+    date: str | None = None
+
+
+def _safe_path(base: str, *parts: str) -> str:
+    """Join path parts and verify the result is under base (path traversal guard)."""
+    joined = os.path.join(base, *parts)
+    real = os.path.realpath(joined)
+    if not real.startswith(os.path.realpath(base)):
+        raise HTTPException(status_code=400, detail="invalid path")
+    return real
+
+
 router = APIRouter()
 
 
@@ -219,9 +308,9 @@ async def upload_document(request: Request, file: UploadFile, background_tasks: 
 
         # Save file to disk for preview
         try:
-            tenant_dir = os.path.join(UPLOADS_DIR, tid or "_global")
+            tenant_dir = _safe_path(UPLOADS_DIR, tid or "_global")
             os.makedirs(tenant_dir, exist_ok=True)
-            file_path = os.path.join(tenant_dir, f"{local_id}{ext}")
+            file_path = _safe_path(tenant_dir, f"{local_id}{ext}")
             with open(file_path, "wb") as f:
                 f.write(content)
         except Exception as exc:
@@ -677,8 +766,8 @@ async def document_preview(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     content_type = MIME_MAP.get(ext, "application/pdf")
 
     # Try local file first
-    tenant_dir = os.path.join(UPLOADS_DIR, row["tenant_id"] or "_global")
-    local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
+    tenant_dir = _safe_path(UPLOADS_DIR, row["tenant_id"] or "_global")
+    local_path = _safe_path(tenant_dir, f"{doc_id}{ext}")
     if os.path.exists(local_path):
         from urllib.parse import quote
         return FileResponse(
@@ -729,8 +818,8 @@ async def document_thumbnail(doc_id: int, auth: AuthInfo = Depends(require_auth)
 
     # For images, serve the file itself as thumbnail
     if ext in (".jpg", ".jpeg", ".png", ".tiff", ".tif"):
-        tenant_dir = os.path.join(UPLOADS_DIR, row["tenant_id"] or "_global")
-        local_path = os.path.join(tenant_dir, f"{doc_id}{ext}")
+        tenant_dir = _safe_path(UPLOADS_DIR, row["tenant_id"] or "_global")
+        local_path = _safe_path(tenant_dir, f"{doc_id}{ext}")
         if os.path.exists(local_path):
             content_type = MIME_MAP.get(ext, "image/jpeg")
             return FileResponse(
@@ -1070,6 +1159,7 @@ async def create_movement_rule(body: MovementRuleCreate, auth: AuthInfo = Depend
                RETURNING id, name, pattern, category, snc_account, entity_nif, priority, active""",
             (tid, body.name, body.pattern, body.category, body.snc_account, body.entity_nif, body.priority, body.active),
         ).fetchone()
+        log_activity(conn, tid, "movement_rule", row["id"], "created", body.pattern)
         conn.commit()
     return row
 
@@ -1090,6 +1180,8 @@ async def update_movement_rule(rule_id: int, patch: MovementRulePatch, auth: Aut
             f"UPDATE movement_rules SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, name, pattern, category, snc_account, entity_nif, priority, active",
             params,
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "movement_rule", rule_id, "updated", str(list(updates.keys())))
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -1103,6 +1195,8 @@ async def delete_movement_rule(rule_id: int, auth: AuthInfo = Depends(require_au
             "DELETE FROM movement_rules WHERE id = %s AND tenant_id = %s RETURNING id",
             (rule_id, tid),
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "movement_rule", rule_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -1294,6 +1388,7 @@ async def create_asset(body: AssetCreate, auth: AuthInfo = Depends(require_auth)
              body.useful_life_years, body.depreciation_method, body.acquisition_cost,
              body.status, body.supplier, body.invoice_ref, body.notes),
         ).fetchone()
+        log_activity(conn, tid, "asset", row["id"], "created", body.name)
         conn.commit()
     return row
 
@@ -1323,6 +1418,8 @@ async def update_asset(asset_id: int, patch: AssetPatch, auth: AuthInfo = Depend
                           status, supplier, invoice_ref, notes, created_at""",
             params,
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "asset", asset_id, "updated", str(list(updates.keys())))
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="asset not found")
@@ -1336,6 +1433,8 @@ async def delete_asset(asset_id: int, auth: AuthInfo = Depends(require_auth)):
             "DELETE FROM assets WHERE id = %s AND tenant_id = %s RETURNING id",
             (asset_id, tid),
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "asset", asset_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="asset not found")
@@ -1517,6 +1616,7 @@ async def put_entity(request_body: EntityProfileBody, auth: AuthInfo = Depends(r
                ON CONFLICT (tenant_id, key) DO UPDATE SET data = %s, updated_at = now()""",
             (tid, data_json, data_json),
         )
+        log_activity(conn, tid, "entity", None, "updated", "entity_profile")
         conn.commit()
     return request_body.model_dump()
 
@@ -1570,6 +1670,7 @@ async def create_unit_family(body: UnitFamilyBody, auth: AuthInfo = Depends(requ
                 "INSERT INTO unit_conversions (unit_family_id, from_unit, to_unit, factor) VALUES (%s, %s, %s, %s)",
                 (fam_id, c["from_unit"], c["to_unit"], Decimal(str(c["factor"]))),
             )
+        log_activity(conn, tid, "unit_family", fam_id, "created", name)
         conn.commit()
     return {**dict(row), "conversions": conversions}
 
@@ -1618,74 +1719,66 @@ async def list_suppliers(
 
 
 @router.post("/suppliers")
-async def create_supplier(body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_supplier(body: SupplierCreate, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    name = (body.get("name") or "").strip()
+    name = body.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name required")
-    nif = (body.get("nif") or "").strip()
+    nif = body.nif.strip()
     if nif and (not nif.isdigit() or len(nif) != 9):
         raise HTTPException(status_code=422, detail="NIF must be exactly 9 digits")
     if nif and not validate_nif(nif):
         raise HTTPException(status_code=422, detail="NIF inválido (checksum mod-11 falhou)")
-    try:
-        reliability = min(max(Decimal(str(body.get("reliability", 80))), Decimal("0")), Decimal("100"))
-        avg_days = max(int(body.get("avg_delivery_days", 3)), 0)
-    except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid numeric value") from None
+    reliability = min(max(body.reliability, Decimal("0")), Decimal("100"))
+    avg_days = max(body.avg_delivery_days, 0)
     with get_conn() as conn:
         row = conn.execute(
             """INSERT INTO suppliers (tenant_id, name, nif, category, avg_delivery_days, reliability)
                VALUES (%s, %s, %s, %s, %s, %s)
                RETURNING id, name, nif, category, avg_delivery_days, reliability""",
-            (tid, name, nif, (body.get("category") or "").strip(),
+            (tid, name, nif, body.category.strip(),
              avg_days, reliability),
         ).fetchone()
         # Link ingredients if provided
-        for ing_id in body.get("ingredient_ids", []):
+        for ing_id in body.ingredient_ids:
             conn.execute(
                 "INSERT INTO supplier_ingredients (supplier_id, ingredient_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                 (row["id"], ing_id),
             )
+        log_activity(conn, tid, "supplier", row["id"], "created", name)
         conn.commit()
-    return {**dict(row), "ingredient_ids": body.get("ingredient_ids", []), "price_history": []}
+    return {**dict(row), "ingredient_ids": [i for i in body.ingredient_ids], "price_history": []}
 
 
 @router.patch("/suppliers/{supplier_id}")
-async def update_supplier(supplier_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def update_supplier(supplier_id: int, body: SupplierPatch, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    fields = {k: body[k] for k in ("name", "nif", "category", "avg_delivery_days", "reliability") if k in body}
-    if not fields:
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
         raise HTTPException(status_code=422, detail="no fields to update")
-    if "nif" in fields:
-        nif = (fields["nif"] or "").strip()
+    if "nif" in updates:
+        nif = (updates["nif"] or "").strip()
         if nif and (not nif.isdigit() or len(nif) != 9):
             raise HTTPException(status_code=422, detail="NIF must be exactly 9 digits")
         if nif and not validate_nif(nif):
             raise HTTPException(status_code=422, detail="NIF inválido (checksum mod-11 falhou)")
-        fields["nif"] = nif
-    if "name" in fields:
-        name = (fields["name"] or "").strip()
+        updates["nif"] = nif
+    if "name" in updates:
+        name = (updates["name"] or "").strip()
         if not name:
             raise HTTPException(status_code=422, detail="name required")
-        fields["name"] = name
-    if "reliability" in fields:
-        try:
-            fields["reliability"] = min(max(Decimal(str(fields["reliability"])), Decimal("0")), Decimal("100"))
-        except (ValueError, ArithmeticError):
-            raise HTTPException(status_code=422, detail="invalid reliability value") from None
-    if "avg_delivery_days" in fields:
-        try:
-            fields["avg_delivery_days"] = max(int(fields["avg_delivery_days"]), 0)
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=422, detail="invalid avg_delivery_days value") from None
-    set_parts = [f"{k} = %s" for k in fields]
-    params = list(fields.values()) + [supplier_id, tid]
+        updates["name"] = name
+    if "reliability" in updates and updates["reliability"] is not None:
+        updates["reliability"] = min(max(updates["reliability"], Decimal("0")), Decimal("100"))
+    set_parts = [f"{k} = %s" for k in updates]
+    params = list(updates.values()) + [supplier_id, tid]
     with get_conn() as conn:
         row = conn.execute(
             f"UPDATE suppliers SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, name, nif, category, avg_delivery_days, reliability",
             params,
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "supplier", supplier_id, "updated", str(list(updates.keys())))
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="supplier not found")
@@ -1697,6 +1790,8 @@ async def delete_supplier(supplier_id: int, auth: AuthInfo = Depends(require_aut
     tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM suppliers WHERE id = %s AND tenant_id = %s RETURNING id", (supplier_id, tid)).fetchone()
+        if row:
+            log_activity(conn, tid, "supplier", supplier_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="supplier not found")
@@ -1820,18 +1915,15 @@ async def list_ingredients(
 
 
 @router.post("/ingredients")
-async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_ingredient(body: IngredientCreate, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    name = (body.get("name") or "").strip()
+    name = body.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name required")
-    try:
-        min_threshold = max(Decimal(str(body.get("min_threshold", 0))), Decimal("0"))
-        last_cost = max(Decimal(str(body.get("last_cost", 0))), Decimal("0"))
-        avg_cost = max(Decimal(str(body.get("avg_cost", 0))), Decimal("0"))
-    except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid numeric value") from None
-    supplier_id = body.get("supplier_id")
+    min_threshold = max(body.min_threshold, Decimal("0"))
+    last_cost = max(body.last_cost, Decimal("0"))
+    avg_cost = max(body.avg_cost, Decimal("0"))
+    supplier_id = body.supplier_id
     with get_conn() as conn:
         # Verify supplier belongs to tenant if provided
         if supplier_id:
@@ -1842,7 +1934,7 @@ async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
             """INSERT INTO ingredients (tenant_id, name, category, unit, min_threshold, supplier_id, last_cost, avg_cost)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                RETURNING id, name, category, unit, min_threshold, supplier_id, last_cost, avg_cost""",
-            (tid, name, (body.get("category") or "").strip(), body.get("unit", "kg"),
+            (tid, name, body.category.strip(), body.unit,
              min_threshold, supplier_id, last_cost, avg_cost),
         ).fetchone()
         # Link to supplier if provided
@@ -1851,14 +1943,15 @@ async def create_ingredient(body: dict, auth: AuthInfo = Depends(require_auth)):
                 "INSERT INTO supplier_ingredients (supplier_id, ingredient_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                 (supplier_id, row["id"]),
             )
+        log_activity(conn, tid, "ingredient", row["id"], "created", name)
         conn.commit()
     return {**dict(row), "stock": 0, "status": "normal"}
 
 
 @router.patch("/ingredients/{ingredient_id}")
-async def update_ingredient(ingredient_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def update_ingredient(ingredient_id: int, body: IngredientPatch, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    fields = {k: body[k] for k in ("name", "category", "unit", "min_threshold", "supplier_id", "last_cost", "avg_cost") if k in body}
+    fields = body.model_dump(exclude_unset=True)
     if not fields:
         raise HTTPException(status_code=422, detail="no fields to update")
     set_parts = [f"{k} = %s" for k in fields]
@@ -1870,6 +1963,8 @@ async def update_ingredient(ingredient_id: int, body: dict, auth: AuthInfo = Dep
                 RETURNING id, name, category, unit, min_threshold, supplier_id, last_cost, avg_cost""",
             params,
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "ingredient", ingredient_id, "updated", str(list(fields.keys())))
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="ingredient not found")
@@ -1881,6 +1976,8 @@ async def delete_ingredient(ingredient_id: int, auth: AuthInfo = Depends(require
     tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM ingredients WHERE id = %s AND tenant_id = %s RETURNING id", (ingredient_id, tid)).fetchone()
+        if row:
+            log_activity(conn, tid, "ingredient", ingredient_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="ingredient not found")
@@ -1925,31 +2022,22 @@ async def list_stock_events(
 
 @router.post("/stock-events")
 @limiter.limit(EXPENSIVE_RATE)
-async def create_stock_event(request: Request, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_stock_event(request: Request, body: StockEventCreate, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    event_type = body.get("type", "")
-    ingredient_id = body.get("ingredient_id")
-    qty = body.get("qty")
-    if not event_type or not ingredient_id or qty is None:
-        raise HTTPException(status_code=422, detail="type, ingredient_id, and qty required")
+    event_type = body.type
     if event_type not in ("entrada", "saída", "desperdício", "ajuste"):
         raise HTTPException(status_code=422, detail="type must be entrada/saída/desperdício/ajuste")
-    try:
-        qty_dec = Decimal(str(qty))
-    except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid qty value") from None
-    if qty_dec <= 0:
-        raise HTTPException(status_code=422, detail="qty must be positive")
+    qty_dec = body.qty
     with get_conn() as conn:
         # Verify ingredient exists and belongs to tenant
         ing = conn.execute(
             "SELECT id, unit FROM ingredients WHERE id = %s AND tenant_id = %s",
-            (ingredient_id, tid),
+            (body.ingredient_id, tid),
         ).fetchone()
         if not ing:
             raise HTTPException(status_code=404, detail="ingredient not found")
         # Unit conversion enforcement
-        event_unit = body.get("unit", ing["unit"])
+        event_unit = body.unit or ing["unit"]
         if event_unit != ing["unit"]:
             conv = conn.execute(
                 """SELECT uc.factor FROM unit_conversions uc
@@ -1965,29 +2053,25 @@ async def create_stock_event(request: Request, body: dict, auth: AuthInfo = Depe
                 )
             qty_dec = qty_dec * conv["factor"]
             event_unit = ing["unit"]
-        try:
-            cost_val = Decimal(str(body["cost"])) if body.get("cost") is not None else None
-        except (ValueError, ArithmeticError):
-            raise HTTPException(status_code=422, detail="invalid cost value") from None
-        if cost_val is not None and cost_val < 0:
-            raise HTTPException(status_code=422, detail="cost must be non-negative")
+        cost_val = body.cost
         row = conn.execute(
             """INSERT INTO stock_events (tenant_id, type, ingredient_id, qty, unit, date, source, reference, cost)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                RETURNING id, type, ingredient_id, qty, unit, date, source, reference, cost""",
-            (tid, event_type, ingredient_id, qty_dec,
+            (tid, event_type, body.ingredient_id, qty_dec,
              event_unit,
-             body.get("date", datetime.date.today().isoformat()),
-             body.get("source", "manual"),
-             body.get("reference", ""),
+             body.date or datetime.date.today().isoformat(),
+             body.source,
+             body.reference,
              cost_val),
         ).fetchone()
         # Update last_cost on ingredient if this is an entrada with cost
         if event_type == "entrada" and cost_val is not None:
             conn.execute(
                 "UPDATE ingredients SET last_cost = %s WHERE id = %s",
-                (cost_val, ingredient_id),
+                (cost_val, body.ingredient_id),
             )
+        log_activity(conn, tid, "stock_event", row["id"], "created", f"{event_type} {qty_dec}")
         conn.commit()
     return dict(row)
 
@@ -2034,57 +2118,55 @@ async def list_products(
 
 
 @router.post("/products")
-async def create_product(body: dict, auth: AuthInfo = Depends(require_auth)):
+async def create_product(body: ProductCreate, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    code = (body.get("code") or "").strip()
-    name = (body.get("name") or "").strip()
+    code = body.code.strip()
+    name = body.name.strip()
     if not code or not name:
         raise HTTPException(status_code=422, detail="code and name required")
-    try:
-        pvp_val = max(Decimal(str(body.get("pvp", 0))), Decimal("0"))
-    except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid pvp value") from None
-    ingredients_list = body.get("ingredients", [])
+    pvp_val = max(body.pvp, Decimal("0"))
+    ingredients_list = body.ingredients
     with get_conn() as conn:
         # Compute estimated cost from recipe
         estimated_cost = Decimal("0")
         for ri in ingredients_list:
-            ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
+            ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri.ingredient_id, tid)).fetchone()
             if not ing:
-                raise HTTPException(status_code=400, detail=f"ingredient {ri['ingredient_id']} not found")
-            waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
-            estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
+                raise HTTPException(status_code=400, detail=f"ingredient {ri.ingredient_id} not found")
+            waste_mult = 1 + ri.wastage_percent / 100
+            estimated_cost += ri.qty * waste_mult * ing["avg_cost"]
         margin = ((pvp_val - estimated_cost) / pvp_val) if pvp_val > 0 else Decimal("0")
         row = conn.execute(
             """INSERT INTO products (tenant_id, code, name, category, recipe_version, estimated_cost, pvp, margin, active)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                RETURNING id, code, name, category, recipe_version, estimated_cost, pvp, margin, active""",
-            (tid, code, name, (body.get("category") or "").strip(), body.get("recipe_version", "v1"),
-             estimated_cost, pvp_val, margin, body.get("active", True)),
+            (tid, code, name, body.category.strip(), body.recipe_version,
+             estimated_cost, pvp_val, margin, body.active),
         ).fetchone()
         # Insert recipe ingredients
         for ri in ingredients_list:
             conn.execute(
                 """INSERT INTO recipe_ingredients (product_id, ingredient_id, qty, unit, wastage_percent)
                    VALUES (%s, %s, %s, %s, %s)""",
-                (row["id"], ri["ingredient_id"], Decimal(str(ri["qty"])),
-                 ri.get("unit", "kg"), Decimal(str(ri.get("wastage_percent", 0)))),
+                (row["id"], ri.ingredient_id, ri.qty,
+                 ri.unit, ri.wastage_percent),
             )
+        log_activity(conn, tid, "product", row["id"], "created", name)
         conn.commit()
-    return {**dict(row), "ingredients": ingredients_list}
+    return {**dict(row), "ingredients": [ri.model_dump() for ri in ingredients_list]}
 
 
 @router.patch("/products/{product_id}")
-async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def update_product(product_id: int, body: ProductPatch, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    fields = {k: body[k] for k in ("code", "name", "category", "pvp", "active", "recipe_version", "estimated_cost") if k in body}
-    if "estimated_cost" in fields:
-        fields["estimated_cost"] = Decimal(str(fields["estimated_cost"]))
-    if not fields and "ingredients" not in body:
+    updates = body.model_dump(exclude_unset=True)
+    ingredients_input = updates.pop("ingredients", None)
+    fields = {k: v for k, v in updates.items()}
+    if not fields and ingredients_input is None:
         raise HTTPException(status_code=422, detail="no fields to update")
     with get_conn() as conn:
         if "estimated_cost" in fields:
-            pvp = Decimal(str(body.get("pvp", 0)))
+            pvp = Decimal(str(fields.get("pvp", 0)))
             if pvp <= 0:
                 existing = conn.execute("SELECT pvp FROM products WHERE id = %s AND tenant_id = %s", (product_id, tid)).fetchone()
                 pvp = existing["pvp"] if existing else Decimal("0")
@@ -2097,7 +2179,7 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
                 params,
             )
         # Replace recipe ingredients if provided — verify tenant first
-        if "ingredients" in body:
+        if ingredients_input is not None:
             existing_prod = conn.execute(
                 "SELECT id, pvp FROM products WHERE id = %s AND tenant_id = %s", (product_id, tid)
             ).fetchone()
@@ -2105,7 +2187,7 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
                 raise HTTPException(status_code=404, detail="product not found")
             conn.execute("DELETE FROM recipe_ingredients WHERE product_id = %s", (product_id,))
             estimated_cost = Decimal("0")
-            for ri in body["ingredients"]:
+            for ri in ingredients_input:
                 ing = conn.execute("SELECT avg_cost FROM ingredients WHERE id = %s AND tenant_id = %s", (ri["ingredient_id"], tid)).fetchone()
                 if not ing:
                     raise HTTPException(status_code=400, detail=f"ingredient {ri['ingredient_id']} not found")
@@ -2118,9 +2200,8 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
                 waste_mult = 1 + Decimal(str(ri.get("wastage_percent", 0))) / 100
                 estimated_cost += Decimal(str(ri["qty"])) * waste_mult * ing["avg_cost"]
             # Only overwrite estimated_cost when a non-empty recipe is provided.
-            # When ingredients=[], manual cost from the fields block above is preserved.
-            if body["ingredients"]:
-                pvp = Decimal(str(body.get("pvp", 0)))
+            if ingredients_input:
+                pvp = Decimal(str(updates.get("pvp", 0)))
                 if pvp <= 0:
                     pvp = existing_prod["pvp"] if existing_prod else Decimal("0")
                 margin = ((pvp - estimated_cost) / pvp) if pvp > 0 else Decimal("0")
@@ -2128,6 +2209,7 @@ async def update_product(product_id: int, body: dict, auth: AuthInfo = Depends(r
                     "UPDATE products SET estimated_cost = %s, margin = %s WHERE id = %s",
                     (estimated_cost, margin, product_id),
                 )
+        log_activity(conn, tid, "product", product_id, "updated", str(list(updates.keys())))
         conn.commit()
         row = conn.execute(
             "SELECT id, code, name, category, recipe_version, estimated_cost, pvp, margin, active FROM products WHERE id = %s AND tenant_id = %s",
@@ -2143,6 +2225,8 @@ async def delete_product(product_id: int, auth: AuthInfo = Depends(require_auth)
     tid = auth.tenant_id
     with get_conn() as conn:
         row = conn.execute("DELETE FROM products WHERE id = %s AND tenant_id = %s RETURNING id", (product_id, tid)).fetchone()
+        if row:
+            log_activity(conn, tid, "product", product_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="product not found")
@@ -2188,12 +2272,10 @@ async def get_product_cost(product_id: int, auth: AuthInfo = Depends(require_aut
 
 @router.post("/products/{product_id}/produce")
 @limiter.limit(EXPENSIVE_RATE)
-async def produce_product(request: Request, product_id: int, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def produce_product(request: Request, product_id: int, body: ProduceBody, auth: AuthInfo = Depends(require_auth)):
     """Execute production: creates saída stock events for each recipe ingredient × quantity."""
     tid = auth.tenant_id
-    qty_to_produce = body.get("qty", 1)
-    if qty_to_produce <= 0:
-        raise HTTPException(status_code=422, detail="qty must be positive")
+    qty_to_produce = body.qty
     with get_conn() as conn:
         prod = conn.execute(
             "SELECT id, name, code FROM products WHERE id = %s AND tenant_id = %s",
@@ -2232,6 +2314,7 @@ async def produce_product(request: Request, product_id: int, body: dict, auth: A
                  datetime.date.today().isoformat(), f"{prod['code']} x{qty_to_produce}"),
             ).fetchone()
             events_created.append(dict(row))
+        log_activity(conn, tid, "product", product_id, "produced", f"x{qty_to_produce}")
         conn.commit()
     return {"produced": qty_to_produce, "product": prod["name"], "events": events_created}
 
@@ -2648,42 +2731,33 @@ async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require
 
 @router.post("/price-history")
 @limiter.limit(EXPENSIVE_RATE)
-async def add_price_point(request: Request, body: dict, auth: AuthInfo = Depends(require_auth)):
+async def add_price_point(request: Request, body: PricePointCreate, auth: AuthInfo = Depends(require_auth)):
     tid = auth.tenant_id
-    ingredient_id = body.get("ingredient_id")
-    supplier_id = body.get("supplier_id")
-    price = body.get("price")
-    if not ingredient_id or not supplier_id or price is None:
-        raise HTTPException(status_code=422, detail="ingredient_id, supplier_id, and price required")
-    try:
-        price_dec = Decimal(str(price))
-    except (ValueError, ArithmeticError):
-        raise HTTPException(status_code=422, detail="invalid price value") from None
-    if price_dec < 0:
-        raise HTTPException(status_code=422, detail="price must be non-negative")
+    price_dec = body.price
     with get_conn() as conn:
         # Verify ingredient and supplier belong to tenant
-        if not conn.execute("SELECT id FROM ingredients WHERE id = %s AND tenant_id = %s", (ingredient_id, tid)).fetchone():
+        if not conn.execute("SELECT id FROM ingredients WHERE id = %s AND tenant_id = %s", (body.ingredient_id, tid)).fetchone():
             raise HTTPException(status_code=404, detail="ingredient not found")
-        if not conn.execute("SELECT id FROM suppliers WHERE id = %s AND tenant_id = %s", (supplier_id, tid)).fetchone():
+        if not conn.execute("SELECT id FROM suppliers WHERE id = %s AND tenant_id = %s", (body.supplier_id, tid)).fetchone():
             raise HTTPException(status_code=404, detail="supplier not found")
         row = conn.execute(
             """INSERT INTO price_history (tenant_id, ingredient_id, supplier_id, price, date)
                VALUES (%s, %s, %s, %s, %s)
                RETURNING id, ingredient_id, supplier_id, price, date""",
-            (tid, ingredient_id, supplier_id, price_dec,
-             body.get("date", datetime.date.today().isoformat())),
+            (tid, body.ingredient_id, body.supplier_id, price_dec,
+             body.date or datetime.date.today().isoformat()),
         ).fetchone()
         # Update ingredient avg_cost (tenant-scoped)
         avg = conn.execute(
             "SELECT AVG(price) as avg_price FROM price_history WHERE ingredient_id = %s AND tenant_id = %s",
-            (ingredient_id, tid),
+            (body.ingredient_id, tid),
         ).fetchone()
         if avg and avg["avg_price"]:
             conn.execute(
                 "UPDATE ingredients SET avg_cost = %s, last_cost = %s WHERE id = %s",
-                (avg["avg_price"], price_dec, ingredient_id),
+                (avg["avg_price"], price_dec, body.ingredient_id),
             )
+        log_activity(conn, tid, "price_history", row["id"], "created", f"ing={body.ingredient_id} sup={body.supplier_id}")
         conn.commit()
     return dict(row)
 
@@ -2750,6 +2824,7 @@ async def create_classification_rule(body: ClassificationRuleCreate, auth: AuthI
                RETURNING id, field, operator, value, account, label, priority, active""",
             (tid, body.field, body.operator, body.value, body.account, body.label, body.priority, body.active),
         ).fetchone()
+        log_activity(conn, tid, "classification_rule", row["id"], "created", f"{body.field} {body.operator}")
         conn.commit()
     return row
 
@@ -2775,6 +2850,8 @@ async def update_classification_rule(rule_id: int, patch: ClassificationRulePatc
             f"UPDATE classification_rules SET {', '.join(set_parts)} WHERE id = %s AND tenant_id = %s RETURNING id, field, operator, value, account, label, priority, active",
             params,
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "classification_rule", rule_id, "updated", str(list(updates.keys())))
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -2789,6 +2866,8 @@ async def delete_classification_rule(rule_id: int, auth: AuthInfo = Depends(requ
             "DELETE FROM classification_rules WHERE id = %s AND tenant_id = %s RETURNING id",
             (rule_id, tid),
         ).fetchone()
+        if row:
+            log_activity(conn, tid, "classification_rule", rule_id, "deleted")
         conn.commit()
     if not row:
         raise HTTPException(status_code=404, detail="rule not found")

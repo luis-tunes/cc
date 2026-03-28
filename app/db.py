@@ -371,6 +371,10 @@ def _init_db_schema():
             ("chk_reconciliations_confidence", "ALTER TABLE reconciliations ADD CONSTRAINT chk_reconciliations_confidence CHECK (match_confidence BETWEEN 0 AND 1)"),
             ("chk_assets_useful_life", "ALTER TABLE assets ADD CONSTRAINT chk_assets_useful_life CHECK (useful_life_years > 0)"),
             ("uq_unit_families_tenant_name", "ALTER TABLE unit_families ADD CONSTRAINT uq_unit_families_tenant_name UNIQUE (tenant_id, name)"),
+            ("chk_stock_events_type", "ALTER TABLE stock_events ADD CONSTRAINT chk_stock_events_type CHECK (type IN ('entrada', 'saída', 'desperdício', 'ajuste'))"),
+            ("chk_stock_events_qty", "ALTER TABLE stock_events ADD CONSTRAINT chk_stock_events_qty CHECK (qty > 0)"),
+            ("chk_price_history_price", "ALTER TABLE price_history ADD CONSTRAINT chk_price_history_price CHECK (price >= 0)"),
+            ("chk_ingredients_min_threshold", "ALTER TABLE ingredients ADD CONSTRAINT chk_ingredients_min_threshold CHECK (min_threshold >= 0)"),
         ]:
             conn.execute(f"""
                 DO $$ BEGIN
