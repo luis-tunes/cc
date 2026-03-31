@@ -40,9 +40,14 @@ export function Nav() {
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-        <Link to="/" className="flex items-baseline">
-          <span className="text-xl font-extrabold tracking-tight text-foreground">xtim</span>
-          <span className="text-xl font-extrabold tracking-tight text-primary">.ai</span>
+        <Link to="/" className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <span className="text-sm font-extrabold text-primary">x</span>
+          </div>
+          <div className="flex items-baseline">
+            <span className="text-xl font-extrabold tracking-tight text-foreground">xtim</span>
+            <span className="text-xl font-extrabold tracking-tight text-primary">.ai</span>
+          </div>
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">

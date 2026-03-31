@@ -27,6 +27,35 @@ export function Hero() {
         </div>
       </div>
 
+      {/* Floating stat badges — cinematic desktop accents */}
+      <div className="pointer-events-none absolute left-[6%] top-[32%] hidden animate-float-badge-1 xl:block">
+        <div className="rounded-xl border border-tim-info/20 bg-card/80 backdrop-blur-sm px-4 py-2.5 shadow-lg shadow-tim-info/5">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-2 rounded-full bg-tim-info animate-pulse" />
+            <span className="text-sm font-extrabold tabular-nums text-tim-info">&lt;30s</span>
+            <span className="text-[10px] text-muted-foreground">extração</span>
+          </div>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute right-[6%] top-[48%] hidden animate-float-badge-2 xl:block">
+        <div className="rounded-xl border border-tim-success/20 bg-card/80 backdrop-blur-sm px-4 py-2.5 shadow-lg shadow-tim-success/5">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-2 rounded-full bg-tim-success animate-pulse" />
+            <span className="text-sm font-extrabold tabular-nums text-tim-success">95%</span>
+            <span className="text-[10px] text-muted-foreground">automático</span>
+          </div>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute left-[10%] bottom-[22%] hidden animate-float-badge-3 xl:block">
+        <div className="rounded-xl border border-primary/20 bg-card/80 backdrop-blur-sm px-4 py-2.5 shadow-lg shadow-primary/5">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-sm font-extrabold tabular-nums text-primary">500+</span>
+            <span className="text-[10px] text-muted-foreground">docs processados</span>
+          </div>
+        </div>
+      </div>
+
       <div className="relative mx-auto max-w-6xl px-4 pb-20 pt-20 sm:px-6 sm:pb-28 sm:pt-28 md:pb-36 md:pt-36">
         <div className="mx-auto max-w-3xl text-center">
           <FadeIn delay={0}>
@@ -44,7 +73,7 @@ export function Hero() {
               <br className="hidden sm:block" />
               Organizadas.{" "}
               <span className="relative inline-block">
-                <span className="tim-gradient-text">Automaticamente.</span>
+                <span className="tim-gradient-text animate-text-shimmer">Automaticamente.</span>
                 <svg
                   className="absolute -bottom-1.5 left-0 w-full sm:-bottom-2"
                   viewBox="0 0 280 8"
