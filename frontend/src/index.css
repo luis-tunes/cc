@@ -276,6 +276,87 @@
   animation: step-highlight 1.5s ease-out;
 }
 
+/* ── Typography scale ─────────────────────────────────── */
+@layer components {
+  .tim-page-title    { @apply text-2xl font-bold text-foreground tracking-tight; }
+  .tim-page-subtitle { @apply text-sm text-muted-foreground; }
+  .tim-section-title { @apply text-lg font-semibold text-foreground; }
+  .tim-card-title    { @apply text-base font-semibold text-foreground; }
+  .tim-body          { @apply text-sm text-foreground leading-relaxed; }
+  .tim-caption       { @apply text-xs text-muted-foreground; }
+  .tim-data          { @apply text-sm font-mono tabular-nums text-foreground; }
+  .tim-money         { @apply text-sm font-mono tabular-nums text-right; }
+  .tim-money-lg      { @apply text-lg font-mono tabular-nums font-semibold text-right; }
+}
+
+/* ── Table row interactive states ─────────────────────── */
+.tim-table-row {
+  @apply transition-colors duration-150;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
+.tim-table-row:hover {
+  @apply bg-accent/50;
+}
+.tim-table-row[data-selected="true"] {
+  @apply bg-primary/5;
+  border-left: 2px solid hsl(var(--primary));
+}
+.tim-table-row:focus-visible {
+  @apply bg-accent/70 outline-none;
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.3);
+}
+.tim-table-row:active {
+  @apply bg-accent/80;
+}
+
+.dark .tim-table-row:hover {
+  @apply bg-accent/30;
+}
+.dark .tim-table-row[data-selected="true"] {
+  @apply bg-primary/10;
+}
+
+/* Row action reveal on hover */
+.tim-table-row .row-actions {
+  @apply opacity-0 translate-x-1 transition-all duration-150;
+}
+.tim-table-row:hover .row-actions,
+.tim-table-row:focus-within .row-actions {
+  @apply opacity-100 translate-x-0;
+}
+
+/* ── Skeleton stagger ─────────────────────────────────── */
+@layer utilities {
+  .skeleton-stagger > :nth-child(1) { animation-delay: 0ms; }
+  .skeleton-stagger > :nth-child(2) { animation-delay: 50ms; }
+  .skeleton-stagger > :nth-child(3) { animation-delay: 100ms; }
+  .skeleton-stagger > :nth-child(4) { animation-delay: 150ms; }
+  .skeleton-stagger > :nth-child(5) { animation-delay: 200ms; }
+  .skeleton-stagger > :nth-child(6) { animation-delay: 250ms; }
+  .skeleton-stagger > :nth-child(7) { animation-delay: 300ms; }
+  .skeleton-stagger > :nth-child(8) { animation-delay: 350ms; }
+}
+
+/* ── Table scroll performance ─────────────────────────── */
+.tim-table-scroll {
+  will-change: transform;
+  overflow-y: auto;
+}
+
+/* ── Safe area bottom padding ─────────────────────────── */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* ── Form shake animation ─────────────────────────────── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.animate-shake { animation: shake 0.3s ease-in-out; }
+
 /* Respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
