@@ -50,7 +50,7 @@ def test_admin_tenants_lists_tenants():
 def test_admin_tenants_forbidden_non_admin():
     """Non-master users should get 403."""
     # Temporarily clear MASTER_USER_IDS
-    import app.routes as routes_mod
+    import app.routes_admin as routes_mod
     original = routes_mod._MASTER_USER_IDS
     routes_mod._MASTER_USER_IDS = {"some-other-user"}
     try:

@@ -48,7 +48,7 @@ def test_suppliers_isolated():
 # ── Documents ─────────────────────────────────────────────────────────
 
 def test_documents_isolated():
-    with patch("app.routes.httpx.post") as mock_post:
+    with patch("app.routes_documents.httpx.post") as mock_post:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_post.return_value = mock_resp
@@ -135,7 +135,7 @@ def test_products_isolated():
 def test_reconciliation_isolated():
     """Reconciliation only matches within the same tenant."""
     # tenant-A: upload doc + bank tx
-    with patch("app.routes.httpx.post") as mock_post:
+    with patch("app.routes_documents.httpx.post") as mock_post:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_post.return_value = mock_resp

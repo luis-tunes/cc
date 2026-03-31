@@ -163,7 +163,7 @@ app.include_router(billing_router, prefix="/api")
 # Backward-compat: Paperless post-consume calls /webhook without /api prefix
 @app.post("/webhook")
 async def webhook_compat(request: Request, payload: dict):
-    from app.routes import WebhookRequest, paperless_webhook
+    from app.routes_documents import WebhookRequest, paperless_webhook
     return await paperless_webhook(request, WebhookRequest(**payload))
 
 _web_dir = os.environ.get("WEB_DIR", "/opt/tim/web")

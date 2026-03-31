@@ -1,8 +1,26 @@
 """Tests for the alerts module — IVA deadline computation and compliance alerts."""
+import base64
 import datetime
+import json
+import sys
 from unittest.mock import patch
 
 from app.alerts import _iva_deadline, generate_compliance_alerts
+
+
+def _conftest():
+    return sys.modules["tests.conftest"]
+
+
+def _jwt_headers(tenant_id: str, user_id: str = "user-1") -> dict:
+    payload = {"sub": user_id, "org_id": tenant_id, "email": f"{user_id}@test.pt"}
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=").decode()
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    return {"Authorization": f"Bearer {header}.{body}."}
+
+
+_T1 = _jwt_headers("t1")
+_T2 = _jwt_headers("t2")
 
 
 class TestIvaDeadline:
@@ -156,3 +174,57 @@ class TestGenerateComplianceAlerts:
             mock_get.return_value.__exit__ = lambda s, *a: None
             result = generate_compliance_alerts("test-tenant")
         assert result == 0
+
+
+# ── Alerts CRUD (from operations_test.py) ─────────────────────────────
+
+
+class TestAlertsCRUD:
+    def _seed_alert(self, client=None, tenant="t1", severity="urgente", title="Teste"):
+        c = _conftest()
+        c._seq["alerts"] += 1
+        alert = {
+            "id": c._seq["alerts"],
+            "tenant_id": tenant,
+            "type": "unreconciled",
+            "severity": severity,
+            "title": title,
+            "description": "desc",
+            "action_url": "/reconciliacao",
+            "read": False,
+            "created_at": None,
+        }
+        c._tables["alerts"].append(alert)
+        return alert
+
+    def test_list_alerts_empty(self, client):
+        r = client.get("/api/alerts", headers=_T1)
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_list_alerts_returns_seeded(self, client):
+        self._seed_alert(client, title="Documentos não reconciliados")
+        r = client.get("/api/alerts", headers=_T1)
+        assert r.status_code == 200
+        assert len(r.json()) == 1
+
+    def test_mark_alert_read(self, client):
+        alert = self._seed_alert(client)
+        r = client.patch(f"/api/alerts/{alert['id']}", headers=_T1)
+        assert r.status_code == 200
+        assert r.json()["read"] is True
+
+    def test_mark_alert_nonexistent_404(self, client):
+        r = client.patch("/api/alerts/9999", headers=_T1)
+        assert r.status_code == 404
+
+    def test_tenant_isolation(self, client):
+        self._seed_alert(client, tenant="t1")
+        r = client.get("/api/alerts", headers=_T2)
+        assert r.json() == []
+
+    def test_generate_alerts_endpoint(self, client):
+        """POST /alerts/generate should call the engine and return count."""
+        r = client.post("/api/alerts/generate", headers=_T1)
+        assert r.status_code == 200
+        assert "generated" in r.json()

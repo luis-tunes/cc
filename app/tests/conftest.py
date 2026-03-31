@@ -227,7 +227,15 @@ class FakeConn:
         if "to_char" in sql_lower:
             return FakeCursor([])
 
-        return FakeCursor([])
+        # Fire-and-forget: audit log, advisory locks, health checks
+        if "audit_log" in sql_lower:
+            return FakeCursor([])
+        if "pg_advisory" in sql_lower:
+            return FakeCursor([])
+        if sql_lower.strip() == "select 1":
+            return FakeCursor([{"?column?": 1}])
+
+        raise NotImplementedError(f"FakeConn: unhandled SQL: {sql[:120]}")
 
     def commit(self):
         pass
@@ -1443,7 +1451,11 @@ def fake_get_conn():
 def _clean_db_and_patch(tmp_path):
     """Reset in-memory tables and re-apply FakeConn per test."""
     reset_db()
-    with patch("app.routes.get_conn", fake_get_conn), \
+    with patch("app.routes_documents.get_conn", fake_get_conn), \
+         patch("app.routes_bank.get_conn", fake_get_conn), \
+         patch("app.routes_inventory.get_conn", fake_get_conn), \
+         patch("app.routes_finance.get_conn", fake_get_conn), \
+         patch("app.routes_admin.get_conn", fake_get_conn), \
          patch("app.billing.get_conn", fake_get_conn), \
          patch("app.db.get_conn", fake_get_conn), \
          patch("app.reconcile.get_conn", fake_get_conn), \
@@ -1454,7 +1466,7 @@ def _clean_db_and_patch(tmp_path):
          patch("app.assistant.get_conn", fake_get_conn), \
          patch("app.cache.cache_get", return_value=None), \
          patch("app.cache.cache_set", return_value=None), \
-         patch("app.routes.UPLOADS_DIR", str(tmp_path / "uploads")):
+         patch("app.routes_documents.UPLOADS_DIR", str(tmp_path / "uploads")):
         yield
 
 

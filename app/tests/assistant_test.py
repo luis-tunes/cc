@@ -60,7 +60,7 @@ class TestBatchStock:
 
     def test_batch_stock_returns_correct_values(self, client):
         self._seed_events()
-        from app.routes import _get_batch_stock
+        from app.routes_inventory import _get_batch_stock
         with _conftest().fake_get_conn() as conn:
             result = _get_batch_stock(conn, [1, 2, 3], "t1")
         assert result[1] == Decimal("2")
@@ -68,13 +68,13 @@ class TestBatchStock:
         assert result[3] == Decimal("0")
 
     def test_batch_stock_empty_list(self, client):
-        from app.routes import _get_batch_stock
+        from app.routes_inventory import _get_batch_stock
         with _conftest().fake_get_conn() as conn:
             result = _get_batch_stock(conn, [], "t1")
         assert result == {}
 
     def test_batch_stock_unknown_ids_return_zero(self, client):
-        from app.routes import _get_batch_stock
+        from app.routes_inventory import _get_batch_stock
         with _conftest().fake_get_conn() as conn:
             result = _get_batch_stock(conn, [999], "t1")
         assert result[999] == Decimal("0")
@@ -391,7 +391,7 @@ class TestDashboardCache:
             "pending_review": 0,
             "classified": 0,
         }
-        with patch("app.routes.cache_get", return_value=cached_data):
+        with patch("app.routes_finance.cache_get", return_value=cached_data):
             r = client.get("/api/dashboard/summary", headers=_T1)
         assert r.status_code == 200
         assert r.json()["documents"]["count"] == 99

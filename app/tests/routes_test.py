@@ -2,6 +2,11 @@
 Comprehensive API route tests.
 Uses shared FakeConn from conftest.py — no PostgreSQL needed.
 """
+import base64
+import datetime
+import json
+import sys
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -9,6 +14,59 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
+
+
+def _conftest():
+    return sys.modules["tests.conftest"]
+
+
+def _jwt_headers(tenant_id: str, user_id: str = "user-1") -> dict:
+    payload = {"sub": user_id, "org_id": tenant_id, "email": f"{user_id}@test.pt"}
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=").decode()
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    return {"Authorization": f"Bearer {header}.{body}."}
+
+
+_T1 = _jwt_headers("t1")
+_T2 = _jwt_headers("t2")
+
+
+def _post_doc(rclient, tenant="t1"):
+    return rclient.post(
+        "/api/documents/upload",
+        files={"file": ("inv.pdf", b"dummy", "application/pdf")},
+        headers=_jwt_headers(tenant),
+    )
+
+
+def _post_tx(client=None, amount="100.00", tenant="t1", date="2024-06-01", desc="PAGAMENTO"):
+    c = _conftest()
+    c._seq["bank_transactions"] += 1
+    tx = {
+        "id": c._seq["bank_transactions"],
+        "date": datetime.date.fromisoformat(date),
+        "description": desc,
+        "amount": Decimal(str(amount)),
+        "tenant_id": tenant,
+        "created_at": None,
+    }
+    c._tables["bank_transactions"].append(tx)
+    return tx
+
+
+def _create_reconciliation(doc_id, tx_id, tenant="t1"):
+    c = _conftest()
+    c._seq["reconciliations"] += 1
+    rec = {
+        "id": c._seq["reconciliations"],
+        "document_id": doc_id,
+        "bank_transaction_id": tx_id,
+        "match_confidence": Decimal("0.90"),
+        "tenant_id": tenant,
+        "status": "pendente",
+    }
+    c._tables["reconciliations"].append(rec)
+    return rec
 
 
 # ── Health ────────────────────────────────────────────────────────────
@@ -48,7 +106,7 @@ def test_upload_rejects_non_pdf():
     assert "PDF" in r.json()["detail"]
 
 
-@patch("app.routes._extract_with_vision", return_value={"total": 100, "vat": 23, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+@patch("app.routes_documents._extract_with_vision", return_value={"total": 100, "vat": 23, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
 def test_upload_document_success(mock_vision):
     r = client.post(
         "/api/documents/upload",
@@ -62,7 +120,7 @@ def test_upload_document_success(mock_vision):
     mock_vision.assert_called_once()
 
 
-@patch("app.routes._extract_with_vision", return_value={"total": 50, "vat": 11.5, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+@patch("app.routes_documents._extract_with_vision", return_value={"total": 50, "vat": 11.5, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
 def test_upload_jpg_success(mock_vision):
     jpg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 100
     r = client.post(
@@ -78,7 +136,7 @@ def test_upload_jpg_success(mock_vision):
     assert call_args[0][1] == "image/jpeg"
 
 
-@patch("app.routes._extract_with_vision", return_value={"total": 25, "vat": 5.75, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
+@patch("app.routes_documents._extract_with_vision", return_value={"total": 25, "vat": 5.75, "supplier_nif": "123456789", "client_nif": "987654321", "date": "2024-01-01", "type": "fatura"})
 def test_upload_png_success(mock_vision):
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
     r = client.post(
@@ -92,7 +150,7 @@ def test_upload_png_success(mock_vision):
     assert call_args[0][1] == "image/png"
 
 
-@patch("app.routes._extract_with_vision", return_value=None)
+@patch("app.routes_documents._extract_with_vision", return_value=None)
 def test_upload_vision_fails_saves_pending(mock_vision):
     """GPT Vision fails → document saved as pending."""
     r = client.post(
@@ -104,9 +162,9 @@ def test_upload_vision_fails_saves_pending(mock_vision):
     assert "id" in r.json()
 
 
-@patch("app.routes._extract_with_vision", return_value=None)
-@patch("app.routes.PAPERLESS_TOKEN", "fake-token")
-@patch("app.routes.httpx.Client")
+@patch("app.routes_documents._extract_with_vision", return_value=None)
+@patch("app.routes_documents.PAPERLESS_TOKEN", "fake-token")
+@patch("app.routes_documents.httpx.Client")
 def test_upload_paperless_rejects_archive_still_works(mock_client_cls, mock_vision):
     """Paperless archive fails, Vision also fails — document still saved as pending."""
     mock_resp = MagicMock()
@@ -139,7 +197,7 @@ def test_patch_document_no_fields():
     assert r.status_code == 422
 
 
-@patch("app.routes.httpx.Client")
+@patch("app.routes_documents.httpx.Client")
 def test_create_and_patch_document(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -161,7 +219,7 @@ def test_create_and_patch_document(mock_client_cls):
     assert r.json()["status"] == "classificado"
 
 
-@patch("app.routes.httpx.Client")
+@patch("app.routes_documents.httpx.Client")
 def test_delete_document(mock_client_cls):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -311,8 +369,8 @@ def test_billing_status():
 
 # ── Webhook ───────────────────────────────────────────────────────────
 
-@patch("app.routes.ingest_document")
-@patch("app.routes.WEBHOOK_SECRET", "test-secret")
+@patch("app.routes_documents.ingest_document")
+@patch("app.routes_documents.WEBHOOK_SECRET", "test-secret")
 def test_webhook_success(mock_ingest):
     mock_ingest.return_value = 42
     r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret", "tenant_id": "dev-tenant"})
@@ -320,8 +378,8 @@ def test_webhook_success(mock_ingest):
     assert r.json()["document_id"] == 42
 
 
-@patch("app.routes.ingest_document", side_effect=ValueError("parse failed"))
-@patch("app.routes.WEBHOOK_SECRET", "test-secret")
+@patch("app.routes_documents.ingest_document", side_effect=ValueError("parse failed"))
+@patch("app.routes_documents.WEBHOOK_SECRET", "test-secret")
 def test_webhook_parse_error(mock_ingest):
     r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret", "tenant_id": "dev-tenant"})
     assert r.status_code == 422
@@ -333,7 +391,7 @@ def test_webhook_missing_secret():
     assert r.status_code == 403
 
 
-@patch("app.routes.WEBHOOK_SECRET", "test-secret")
+@patch("app.routes_documents.WEBHOOK_SECRET", "test-secret")
 def test_webhook_missing_tenant():
     """Webhook without tenant_id and no pending stub is rejected."""
     r = client.post("/api/webhook", json={"document_id": 1, "secret": "test-secret"})
@@ -489,3 +547,178 @@ def test_activity_list_limit():
 def test_activity_list_limit_too_large():
     r = client.get("/api/activity?limit=999")
     assert r.status_code == 422
+
+
+# ── Document preview & thumbnail (from operations_test.py) ───────────
+
+
+class TestDocumentPreviewThumbnail:
+    def _seed_doc_with_paperless(self, paperless_id=42, filename="fatura.pdf"):
+        """Insert a document with a paperless_id directly into the in-memory table."""
+        c = _conftest()
+        c._seq["documents"] += 1
+        doc = {
+            "id": c._seq["documents"],
+            "tenant_id": "t1",
+            "supplier_nif": "",
+            "client_nif": "",
+            "total": Decimal("0"),
+            "vat": Decimal("0"),
+            "date": None,
+            "type": "outro",
+            "filename": filename,
+            "raw_text": None,
+            "status": "pendente",
+            "paperless_id": paperless_id,
+            "created_at": "2025-01-01T00:00:00+00:00",
+            "notes": None,
+            "snc_account": None,
+            "classification_source": None,
+        }
+        c._tables["documents"].append(doc)
+        return doc
+
+    @patch("app.routes_documents.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes_documents.httpx.Client")
+    def test_preview_success(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=10, filename="inv.pdf")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"%PDF-fake-content"
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 200
+        assert r.content == b"%PDF-fake-content"
+        assert "application/pdf" in r.headers.get("content-type", "")
+
+    def test_preview_doc_not_found(self, client):
+        r = client.get("/api/documents/99999/preview", headers=_T1)
+        assert r.status_code == 404
+
+    def test_preview_from_local_file(self, client):
+        """Documents without paperless_id are served from local disk."""
+        doc = _post_doc(client)
+        doc_id = doc.json()["id"]
+        r = client.get(f"/api/documents/{doc_id}/preview", headers=_T1)
+        assert r.status_code == 200
+        assert r.content == b"dummy"
+        assert "application/pdf" in r.headers.get("content-type", "")
+
+    @patch("app.routes_documents.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes_documents.httpx.Client")
+    def test_preview_paperless_error(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=10)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 502
+
+    @patch("app.routes_documents.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes_documents.httpx.Client")
+    def test_preview_paperless_unreachable(self, mock_client_cls, client):
+        import httpx
+        doc = self._seed_doc_with_paperless(paperless_id=10)
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.side_effect = httpx.ConnectError("connection refused")
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/preview", headers=_T1)
+        assert r.status_code == 502
+
+    @patch("app.routes_documents.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes_documents.httpx.Client")
+    def test_thumbnail_success(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=20)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"\x89PNG-thumb"
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/thumbnail", headers=_T1)
+        assert r.status_code == 200
+        assert r.content == b"\x89PNG-thumb"
+        assert "image/webp" in r.headers.get("content-type", "")
+        assert "max-age" in r.headers.get("cache-control", "")
+
+    def test_thumbnail_doc_not_found(self, client):
+        r = client.get("/api/documents/99999/thumbnail", headers=_T1)
+        assert r.status_code == 404
+
+    def test_thumbnail_no_paperless_id(self, client):
+        doc = _post_doc(client)
+        doc_id = doc.json()["id"]
+        r = client.get(f"/api/documents/{doc_id}/thumbnail", headers=_T1)
+        assert r.status_code == 404
+
+    @patch("app.routes_documents.PAPERLESS_TOKEN", "tok-test")
+    @patch("app.routes_documents.httpx.Client")
+    def test_thumbnail_paperless_error(self, mock_client_cls, client):
+        doc = self._seed_doc_with_paperless(paperless_id=20)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+        mock_ctx.__exit__ = MagicMock(return_value=False)
+        mock_ctx.get.return_value = mock_resp
+        mock_client_cls.return_value = mock_ctx
+
+        r = client.get(f"/api/documents/{doc['id']}/thumbnail", headers=_T1)
+        assert r.status_code == 502
+
+
+# ── Document GET by ID (from operations_test.py) ─────────────────────
+
+
+def test_get_document_success(client):
+    resp = _post_doc(client)
+    doc_id = resp.json()["id"]
+    r = client.get(f"/api/documents/{doc_id}", headers=_T1)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == doc_id
+    assert "filename" in data
+    assert "status" in data
+
+
+# ── CSV exports (from operations_test.py) ─────────────────────────────
+
+
+def test_export_bank_transactions_csv(client):
+    _post_tx(client)
+    r = client.get("/api/export/bank-transactions/csv", headers=_T1)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers.get("content-type", "")
+    assert b"date" in r.content or b"amount" in r.content
+
+
+def test_export_reconciliations_csv_empty(client):
+    r = client.get("/api/export/reconciliations/csv", headers=_T1)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers.get("content-type", "")
+
+
+def test_export_reconciliations_csv_with_data(client):
+    doc = _post_doc(client)
+    tx = _post_tx(client, amount="100.00", date="2024-06-01")
+    _create_reconciliation(doc.json()["id"], tx["id"])
+    r = client.get("/api/export/reconciliations/csv", headers=_T1)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers.get("content-type", "")
+    assert b"document_id" in r.content or len(r.content) > 10

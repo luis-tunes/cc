@@ -36,7 +36,7 @@ def _import_docs_and_txs(docs, txs):
     # For documents, insert via PATCH route after creating stubs
     # We directly create via upload route with mock paperless
     for total, dt in docs:
-        with patch("app.routes.httpx.post") as mock_post:
+        with patch("app.routes_documents.httpx.post") as mock_post:
             from unittest.mock import MagicMock
             mock_resp = MagicMock()
             mock_resp.status_code = 200
@@ -86,7 +86,7 @@ def test_reconcile_via_api():
     assert r.json()["imported"] == 1
 
     # Create a document with matching total
-    with patch("app.routes.httpx.post") as mock_post:
+    with patch("app.routes_documents.httpx.post") as mock_post:
         from unittest.mock import MagicMock
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -127,7 +127,7 @@ def test_reconcile_no_match_amount():
         files={"file": ("bank.csv", csv_data.encode(), "text/csv")},
     )
 
-    with patch("app.routes.httpx.post") as mock_post:
+    with patch("app.routes_documents.httpx.post") as mock_post:
         from unittest.mock import MagicMock
         mock_resp = MagicMock()
         mock_resp.status_code = 200
