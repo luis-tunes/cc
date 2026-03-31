@@ -44,6 +44,7 @@
     --tim-warning-foreground: 0 0% 100%;
     --tim-info: 210 70% 48%;
     --tim-info-foreground: 0 0% 100%;
+    --tim-purple: 270 60% 55%;
 
     --chart-1: 40 75% 48%;
     --chart-2: 152 55% 38%;
@@ -92,6 +93,7 @@
     --tim-warning-foreground: 0 0% 100%;
     --tim-info: 210 65% 55%;
     --tim-info-foreground: 0 0% 100%;
+    --tim-purple: 270 55% 65%;
 
     --chart-1: 40 75% 52%;
     --chart-2: 152 50% 42%;
@@ -449,6 +451,12 @@
     hsl(220 18% 8%) 100%
   );
   color: hsl(210 10% 92%);
+  --foreground: 210 10% 92%;
+  --card-foreground: 210 10% 92%;
+  --muted-foreground: 220 8% 55%;
+  --border: 220 12% 20%;
+  --card: 220 14% 11%;
+  --muted: 220 12% 16%;
 }
 .dark .tim-dark-section {
   background: linear-gradient(

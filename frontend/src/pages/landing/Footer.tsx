@@ -21,7 +21,7 @@ export function Footer() {
             <h2 className="mt-8 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
               <span className="tim-gradient-text-light">A sua contabilidade merece melhor</span>
             </h2>
-            <p className="mx-auto mt-5 max-w-lg text-base text-[hsl(210_10%_65%)] sm:text-lg">
+            <p className="mx-auto mt-5 max-w-lg text-base text-muted-foreground sm:text-lg">
               Chega de papéis perdidos e horas desperdiçadas. Comece hoje e veja a diferença.
             </p>
           </FadeIn>
@@ -37,7 +37,7 @@ export function Footer() {
               </Link>
               <a
                 href="mailto:info@xtim.ai"
-                className="flex items-center gap-2 text-sm font-semibold text-[hsl(210_10%_70%)] transition-colors hover:text-white"
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
               >
                 Falar com a equipa
                 <ChevronRight className="h-4 w-4" />
@@ -46,9 +46,9 @@ export function Footer() {
           </FadeIn>
 
           <FadeIn delay={350} direction="none">
-            <div className="mt-10 inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5">
+            <div className="mt-10 inline-flex items-center gap-2.5 rounded-full border border-border/50 bg-muted/10 px-5 py-2.5">
               <Users className="h-4 w-4 text-primary/80" />
-              <span className="text-sm text-[hsl(210_10%_65%)]">
+              <span className="text-sm text-muted-foreground">
                 Centenas de empresários portugueses já poupam horas por semana
               </span>
             </div>
@@ -56,24 +56,22 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Footer — continues dark canvas, thin border separator */}
-      <footer className="relative border-t border-white/[0.06]">
+      {/* Footer — continues dark canvas */}
+      <footer className="relative border-t border-border/30">
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
           <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
-            {/* Brand */}
             <div className="sm:col-span-2 md:col-span-1">
               <Link to="/" className="flex items-center gap-0.5">
-                <span className="text-lg font-extrabold tracking-tight text-white">xtim</span>
+                <span className="text-lg font-extrabold tracking-tight text-foreground">xtim</span>
                 <span className="text-lg font-extrabold text-primary">.ai</span>
               </Link>
-              <p className="mt-4 text-sm leading-relaxed text-[hsl(210_10%_55%)]">
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                 Contabilidade automatizada para negócios portugueses. Simples, seguro e em português.
               </p>
             </div>
 
-            {/* Product */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(210_10%_75%)]">Produto</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/60">Produto</h4>
               <ul className="mt-4 space-y-2.5">
                 {[
                   { label: "Funcionalidades", href: "#funcionalidades" },
@@ -81,33 +79,31 @@ export function Footer() {
                   { label: "Preços", href: "#precos" },
                 ].map((l) => (
                   <li key={l.href}>
-                    <a href={l.href} className="text-sm text-[hsl(210_10%_55%)] transition-colors hover:text-white">{l.label}</a>
+                    <a href={l.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">{l.label}</a>
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Account */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(210_10%_75%)]">Conta</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/60">Conta</h4>
               <ul className="mt-4 space-y-2.5">
                 {isSignedIn ? (
-                  <li><Link to="/painel" className="text-sm text-[hsl(210_10%_55%)] transition-colors hover:text-white">Painel</Link></li>
+                  <li><Link to="/painel" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Painel</Link></li>
                 ) : (
                   <>
-                    <li><Link to="/auth/sign-in" className="text-sm text-[hsl(210_10%_55%)] transition-colors hover:text-white">Entrar</Link></li>
-                    <li><Link to="/auth/sign-up" className="text-sm text-[hsl(210_10%_55%)] transition-colors hover:text-white">Criar conta</Link></li>
+                    <li><Link to="/auth/sign-in" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Entrar</Link></li>
+                    <li><Link to="/auth/sign-up" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Criar conta</Link></li>
                   </>
                 )}
               </ul>
             </div>
 
-            {/* Contact */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[hsl(210_10%_75%)]">Contacto</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/60">Contacto</h4>
               <ul className="mt-4 space-y-2.5">
                 <li>
-                  <a href="mailto:info@xtim.ai" className="flex items-center gap-2 text-sm text-[hsl(210_10%_55%)] transition-colors hover:text-white">
+                  <a href="mailto:info@xtim.ai" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
                     <Mail className="h-3.5 w-3.5" /> info@xtim.ai
                   </a>
                 </li>
@@ -115,17 +111,16 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Bottom bar */}
-          <div className="mt-10 border-t border-white/[0.06] pt-8">
+          <div className="mt-10 border-t border-border/30 pt-8">
             <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-              <p className="text-xs text-[hsl(210_10%_40%)]">
+              <p className="text-xs text-muted-foreground/70">
                 &copy; {new Date().getFullYear()} xtim.ai — Contabilidade Inteligente. Todos os direitos reservados.
               </p>
               <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-[hsl(210_10%_55%)]">
+                <span className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/10 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                   <Shield className="h-3 w-3 text-tim-success" /> RGPD
                 </span>
-                <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-[hsl(210_10%_55%)]">
+                <span className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/10 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                   <Lock className="h-3 w-3 text-tim-info" /> Encriptado
                 </span>
               </div>

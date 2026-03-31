@@ -70,6 +70,7 @@ export default {
           "warning-foreground": "hsl(var(--tim-warning-foreground))",
           info: "hsl(var(--tim-info))",
           "info-foreground": "hsl(var(--tim-info-foreground))",
+          purple: "hsl(var(--tim-purple))",
         },
       },
       borderRadius: {
