@@ -248,13 +248,18 @@
 
 /* Landing page hero glow animation */
 @keyframes hero-glow {
-  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.06; }
-  50% { transform: translate(-50%, -15px) scale(1.08); opacity: 0.1; }
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.12; }
+  50% { transform: translate(-50%, -20px) scale(1.12); opacity: 0.20; }
 }
 
 @keyframes hero-glow-right {
-  0%, 100% { transform: scale(1); opacity: 0.03; }
-  50% { transform: scale(1.12); opacity: 0.06; }
+  0%, 100% { transform: scale(1); opacity: 0.08; }
+  50% { transform: scale(1.15); opacity: 0.15; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
 }
 
 .animate-hero-glow {
@@ -263,6 +268,10 @@
 
 .animate-hero-glow-right {
   animation: hero-glow-right 10s ease-in-out infinite 2s;
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
 }
 
 /* Pipeline step highlight pulse */
@@ -348,6 +357,179 @@
 .pb-safe {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
+
+/* ── Interactive card micro-lift ──────────────────────── */
+.tim-card-hover {
+  @apply transition-all duration-300 ease-out;
+}
+.tim-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 40px -8px rgb(0 0 0 / 0.10),
+    0 4px 12px -4px rgb(0 0 0 / 0.06);
+}
+.dark .tim-card-hover:hover {
+  box-shadow:
+    0 12px 40px -8px rgb(0 0 0 / 0.4),
+    0 4px 12px -4px rgb(0 0 0 / 0.3);
+}
+
+/* ── Glass morphism ──────────────────────────────────── */
+.tim-glass {
+  @apply bg-card/80 backdrop-blur-xl border-b border-border/50;
+}
+
+/* ── Gradient text ───────────────────────────────────── */
+.tim-gradient-text {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(40 90% 62%), hsl(30 85% 55%), hsl(var(--primary)));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Gradient text (light on dark) ───────────────────── */
+.tim-gradient-text-light {
+  background: linear-gradient(135deg, hsl(40 95% 75%), hsl(40 90% 90%), hsl(40 95% 75%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Touch target minimum (mobile) ───────────────────── */
+.tim-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ── Safe area helpers ───────────────────────────────── */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Mesh gradient background for hero sections ──────── */
+@keyframes mesh-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.tim-mesh-gradient {
+  background: linear-gradient(
+    -45deg,
+    hsl(var(--primary) / 0.10),
+    hsl(40 85% 58% / 0.07),
+    hsl(var(--background)),
+    hsl(152 55% 38% / 0.06),
+    hsl(var(--primary) / 0.08)
+  );
+  background-size: 400% 400%;
+  animation: mesh-shift 20s ease infinite;
+}
+.dark .tim-mesh-gradient {
+  background: linear-gradient(
+    -45deg,
+    hsl(var(--primary) / 0.08),
+    hsl(40 85% 58% / 0.05),
+    hsl(var(--background)),
+    hsl(152 55% 38% / 0.04),
+    hsl(var(--primary) / 0.06)
+  );
+  background-size: 400% 400%;
+  animation: mesh-shift 20s ease infinite;
+}
+
+/* ── Dark section for CTA ────────────────────────────── */
+.tim-dark-section {
+  background: linear-gradient(
+    180deg,
+    hsl(220 20% 10%) 0%,
+    hsl(220 18% 8%) 100%
+  );
+  color: hsl(210 10% 92%);
+}
+.dark .tim-dark-section {
+  background: linear-gradient(
+    180deg,
+    hsl(220 15% 5%) 0%,
+    hsl(220 13% 3%) 100%
+  );
+}
+
+/* ── Glow ring for primary CTA buttons ───────────────── */
+.tim-glow-button {
+  position: relative;
+}
+.tim-glow-button::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.4), hsl(40 85% 58% / 0.2), hsl(var(--primary) / 0.4));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  filter: blur(8px);
+}
+.tim-glow-button:hover::after {
+  opacity: 1;
+}
+
+/* ── Dot grid pattern ────────────────────────────────── */
+.tim-dot-grid {
+  background-image: radial-gradient(hsl(var(--primary) / 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.dark .tim-dot-grid {
+  background-image: radial-gradient(hsl(var(--primary) / 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Feature card accent colors ──────────────────────── */
+.tim-accent-gold    { --accent-color: var(--primary); }
+.tim-accent-blue    { --accent-color: var(--tim-info); }
+.tim-accent-green   { --accent-color: var(--tim-success); }
+.tim-accent-orange  { --accent-color: var(--tim-warning); }
+.tim-accent-red     { --accent-color: var(--tim-danger); }
+.tim-accent-purple  { --accent-color: 270 60% 55%; }
+
+/* ── Section divider gradient ────────────────────────── */
+.tim-section-fade {
+  background: linear-gradient(to bottom, hsl(var(--background)), hsl(var(--muted) / 0.3), hsl(var(--background)));
+}
+
+/* ── Gold shimmer for premium elements ───────────────── */
+@keyframes gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.tim-gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--primary)) 0%,
+    hsl(40 90% 65%) 25%,
+    hsl(var(--primary)) 50%,
+    hsl(40 90% 65%) 75%,
+    hsl(var(--primary)) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-shimmer 4s linear infinite;
+}
+
+/* ── Stagger entrance for children ───────────────────── */
+.tim-stagger-children > * {
+  @apply animate-in fade-in slide-in-from-bottom-2;
+}
+.tim-stagger-children > :nth-child(1) { animation-delay: 0ms; animation-duration: 400ms; }
+.tim-stagger-children > :nth-child(2) { animation-delay: 60ms; animation-duration: 400ms; }
+.tim-stagger-children > :nth-child(3) { animation-delay: 120ms; animation-duration: 400ms; }
+.tim-stagger-children > :nth-child(4) { animation-delay: 180ms; animation-duration: 400ms; }
+.tim-stagger-children > :nth-child(5) { animation-delay: 240ms; animation-duration: 400ms; }
+.tim-stagger-children > :nth-child(6) { animation-delay: 300ms; animation-duration: 400ms; }
 
 /* ── Form shake animation ─────────────────────────────── */
 @keyframes shake {
