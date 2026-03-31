@@ -64,7 +64,7 @@ services:
         condition: service_healthy
 
   app:
-    image: ghcr.io/xzero-ai/cc:latest
+    image: ghcr.io/luis-tunes/cc:latest
     restart: unless-stopped
     build:
       context: .

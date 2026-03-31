@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-IMAGE="${IMAGE:-ghcr.io/xzero-ai/cc}"
+IMAGE="${IMAGE:-ghcr.io/luis-tunes/cc}"
 TAG="${TAG:-latest}"
 
 # 1. Test
