@@ -700,14 +700,14 @@ async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)
 
     owner_entities = []
     with contextlib.suppress(Exception), get_conn() as conn:
-            settings_row = conn.execute(
-                "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
-                (tid,),
-            ).fetchone()
-            if settings_row and settings_row["data"]:
-                import json as _json
-                entity_data = settings_row["data"] if isinstance(settings_row["data"], dict) else _json.loads(settings_row["data"])
-                owner_entities = owner_entities_from_settings(entity_data)
+        settings_row = conn.execute(
+            "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
+            (tid,),
+        ).fetchone()
+        if settings_row and settings_row["data"]:
+            import json as _json
+            entity_data = settings_row["data"] if isinstance(settings_row["data"], dict) else _json.loads(settings_row["data"])
+            owner_entities = owner_entities_from_settings(entity_data)
 
     hints = None
     with contextlib.suppress(Exception):

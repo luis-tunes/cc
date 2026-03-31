@@ -125,10 +125,10 @@ export default function App() {
             <Route path="/insights" element={<UpgradeGate title="Insights" subtitle="Análises financeiras"><Insights /></UpgradeGate>} />
             <Route path="/previsoes" element={<UpgradeGate title="Previsões" subtitle="Projeções de cash flow"><Forecasts /></UpgradeGate>} />
             <Route path="/otimizacao" element={<UpgradeGate title="Otimização de Custos" subtitle="Análise de despesas"><CostOptimization /></UpgradeGate>} />
-            <Route path="/entidade" element={<EntityProfile />} />
+            <Route path="/entidade" element={<ErrorBoundary><EntityProfile /></ErrorBoundary>} />
             <Route path="/definicoes" element={<SettingsPage />} />
             <Route path="/guia" element={<GuidePage />} />
-            <Route path="/perfil" element={<UserProfile />} />
+            <Route path="/perfil" element={<ErrorBoundary><UserProfile /></ErrorBoundary>} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/monitoring" element={<MonitoringPage />} />
           </Route>
