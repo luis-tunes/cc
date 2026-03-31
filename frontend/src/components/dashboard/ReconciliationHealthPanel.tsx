@@ -37,17 +37,17 @@ export function ReconciliationHealthPanel({ className }: { className?: string })
           <span
             className={cn(
               "text-xs font-semibold",
-              pct >= 80 ? "text-tim-success" : pct >= 50 ? "text-tim-warning" : "text-tim-danger"
+              pct === 100 ? "tim-gradient-text" : pct >= 80 ? "text-tim-success" : pct >= 50 ? "text-tim-warning" : "text-tim-danger"
             )}
           >
-            {pct}%
+            {pct === 100 ? "Tudo reconciliado!" : `${pct}%`}
           </span>
         </div>
-        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`Reconciliação: ${pct}%`}>
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              pct >= 80 ? "bg-tim-success" : pct >= 50 ? "bg-tim-warning" : "bg-tim-danger"
+              pct === 100 ? "bg-gradient-to-r from-tim-gold to-primary" : pct >= 80 ? "bg-tim-success" : pct >= 50 ? "bg-tim-warning" : "bg-tim-danger"
             )}
             style={{ width: `${pct}%` }}
           />

@@ -170,7 +170,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10"
+            className="h-8 sm:h-6 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10"
             onClick={() => onApprove(pair.id)}
           >
             <Check className="mr-1 h-2.5 w-2.5" /> Aprovar
@@ -178,7 +178,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="outline"
-            className="h-6 text-xs"
+            className="h-8 sm:h-6 text-xs"
             onClick={() => onReview(pair.id)}
           >
             <Eye className="mr-1 h-2.5 w-2.5" /> Rever
@@ -186,7 +186,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 text-xs text-muted-foreground"
+            className="h-8 sm:h-6 text-xs text-muted-foreground"
             onClick={() => onFlag(pair.id)}
           >
             <Flag className="mr-1 h-2.5 w-2.5" /> Exceção

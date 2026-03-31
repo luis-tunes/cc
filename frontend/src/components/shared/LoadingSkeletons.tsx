@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function KpiSkeleton() {
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-3">
+    <div className="rounded-lg border bg-card p-4 space-y-3" role="status" aria-label="A carregar">
       <Skeleton className="h-3 w-20" />
       <Skeleton className="h-8 w-16" />
       <Skeleton className="h-3 w-28" />
@@ -13,7 +13,7 @@ export function KpiSkeleton() {
 
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="rounded-lg border bg-card animate-in fade-in duration-300">
+    <div className="rounded-lg border bg-card animate-in fade-in duration-300" role="status" aria-label="A carregar">
       {/* Header */}
       <div className="flex gap-4 border-b px-4 py-3">
         {Array.from({ length: cols }).map((_, i) => (

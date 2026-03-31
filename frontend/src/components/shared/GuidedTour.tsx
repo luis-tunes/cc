@@ -48,7 +48,9 @@ export function GuidedTour({ step, onNext, onSkip, onComplete }: GuidedTourProps
   const isLast = step === STEPS.length - 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" aria-hidden="true" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="tour-title">
       <div className="relative mx-4 w-full max-w-md rounded-xl border bg-card p-6 shadow-lg">
         <button
           onClick={onSkip}
@@ -60,7 +62,7 @@ export function GuidedTour({ step, onNext, onSkip, onComplete }: GuidedTourProps
 
         <div className="flex flex-col items-center text-center">
           <div className="rounded-xl bg-primary/10 p-4">{current.icon}</div>
-          <h2 className="mt-4 text-lg font-semibold text-foreground">{current.title}</h2>
+          <h2 id="tour-title" className="mt-4 text-lg font-semibold text-foreground">{current.title}</h2>
           <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
             {current.description}
           </p>
@@ -88,5 +90,6 @@ export function GuidedTour({ step, onNext, onSkip, onComplete }: GuidedTourProps
         </div>
       </div>
     </div>
+    </>
   );
 }

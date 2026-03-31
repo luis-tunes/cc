@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -12,9 +11,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Bot,
-  Check,
-  Pencil,
-  Clock,
   FileText,
   AlertTriangle,
   Copy,
@@ -156,22 +152,6 @@ export function MovementDetailDrawer({ movement, open, onClose }: MovementDetail
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="mt-4 flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs border-tim-success/30 text-tim-success hover:bg-tim-success/10"
-                >
-                  <Check className="mr-1 h-3 w-3" /> Aprovar
-                </Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs">
-                  <Pencil className="mr-1 h-3 w-3" /> Editar
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
-                  <Clock className="mr-1 h-3 w-3" /> Adiar
-                </Button>
-              </div>
             </div>
           </div>
 

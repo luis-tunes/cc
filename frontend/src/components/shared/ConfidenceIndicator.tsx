@@ -61,7 +61,7 @@ export function ConfidenceIndicator({
   if (variant === "donut") {
     const d = size === "sm" ? 28 : 40;
     return (
-      <div className={cn("relative inline-flex items-center justify-center", className)}>
+      <div className={cn("relative inline-flex items-center justify-center", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
         <DonutRing value={clamped} diameter={d} />
         {showLabel && (
           <span
@@ -79,7 +79,7 @@ export function ConfidenceIndicator({
   }
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center gap-2", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
       <div
         className={cn(
           "overflow-hidden rounded-full bg-muted",
