@@ -1,13 +1,15 @@
 ---
-description: "Use when editing React frontend code: components, hooks, pages, styles, API client."
+description: "Use when editing React frontend code: components, hooks, pages, styles, API client, TypeScript."
 applyTo: "frontend/src/**"
 ---
 # Frontend Rules
 
-- React 18 + TypeScript strict mode + Tailwind CSS.
-- All user-facing text in Portuguese.
-- Hooks in `hooks/`, pages in `pages/`, shared UI in `components/ui/`.
-- API client in `lib/api.ts` — all backend calls go through it.
-- Use `vitest` for tests. Run with `make test` or `cd frontend && npx vitest run`.
-- No `any`. Prefer explicit types over inference for function signatures.
-- CSS custom properties for theming — defined in `index.css`.
+- **Stack**: React 18 + TypeScript strict + Tailwind CSS + Vite.
+- **Language**: All user-facing text in Portuguese. Code in English.
+- **Structure**: Hooks in `hooks/use-*.ts`. Pages in `pages/`. Shared UI in `components/ui/`.
+- **API**: All backend calls go through `lib/api.ts`. Never call `fetch()` directly.
+- **Types**: No `any`. Explicit types on function signatures. Interfaces over types for objects.
+- **Tests**: vitest. Run `cd frontend && npx vitest run` or just `make test`.
+- **Theming**: CSS custom properties in `index.css`. Dark mode via class strategy.
+- **State**: React hooks for local state. No global state library. Server state via custom hooks.
+- **Components**: Props interface above component. Named exports. One component per file for pages.
