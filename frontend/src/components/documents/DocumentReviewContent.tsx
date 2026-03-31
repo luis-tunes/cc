@@ -267,7 +267,7 @@ export function DocumentReviewContent({
         {/* Financials */}
         <div className="px-5 py-4">
           <SectionTitle>Valores</SectionTitle>
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <InfoItem label="Total" value={document.total != null ? `€${Math.abs(document.total).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large confidence={document.fieldConfidence?.total} />
             <InfoItem label="IVA" value={document.vat != null ? `€${Math.abs(document.vat).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="IVA" confidence={document.fieldConfidence?.vat} />
             <InfoItem label="Base Tributável" value={document.total != null && document.vat != null ? `€${(Math.abs(document.total) - Math.abs(document.vat)).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="Base Tributável" />
@@ -504,7 +504,7 @@ export function DocumentReviewContent({
         )}
 
         {/* Actions footer */}
-        <div className="sticky bottom-0 flex items-center gap-2 border-t bg-card px-5 py-3">
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-card px-5 py-3">
           {!isApproved && !isArchived && (
             <Button size="sm" className="h-9 text-sm" onClick={handleApprove}>
               <CheckCircle2 className="mr-1.5 h-4 w-4" />

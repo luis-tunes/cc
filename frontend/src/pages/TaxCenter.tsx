@@ -124,7 +124,7 @@ export default function TaxCenter() {
               </div>
               {/* Period table */}
               {ivaPeriods.length > 0 && (
-                <div className="border-t">
+                <div className="border-t overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b bg-muted/30">

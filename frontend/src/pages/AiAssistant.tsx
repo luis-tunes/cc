@@ -9,10 +9,10 @@ import { useUser } from "@clerk/react";
 import { cn } from "@/lib/utils";
 
 const categoryColors: Record<string, string> = {
-  fiscal:       "bg-amber-100 text-amber-800 border-amber-200",
-  operacional:  "bg-blue-100  text-blue-800  border-blue-200",
-  análise:      "bg-green-100 text-green-800 border-green-200",
-  comunicação:  "bg-purple-100 text-purple-800 border-purple-200",
+  fiscal:       "bg-tim-warning/10 text-tim-warning border-tim-warning/20",
+  operacional:  "bg-tim-info/10  text-tim-info  border-tim-info/20",
+  análise:      "bg-tim-success/10 text-tim-success border-tim-success/20",
+  comunicação:  "bg-primary/10 text-primary border-primary/20",
 };
 
 function MessageBubble({ role, content, timestamp, userInitials }: { role: "user" | "assistant"; content: string; timestamp: Date; userInitials: string }) {
@@ -87,7 +87,7 @@ export default function AiAssistant() {
       title="Assistente IA"
       subtitle="Consulte os seus dados contabilísticos em linguagem natural"
     >
-      <div className="flex flex-col h-[calc(100dvh-12rem)] max-w-3xl mx-auto gap-4">
+      <div className="flex flex-col min-h-0 flex-1 max-w-3xl mx-auto gap-4">
         {/* Quick prompts */}
         {prompts.length > 0 && (
           <div className="flex flex-wrap gap-2">

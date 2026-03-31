@@ -99,7 +99,7 @@ export default function EntityProfile() {
           <span className="text-xs font-semibold text-primary tabular-nums">{activeStep}/{totalSteps}</span>
         </div>
         <Progress value={progressPct} className="h-1.5 bg-muted mb-3" />
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto pb-1">
           {setupSteps.map((step) => (
             <button
               key={step.id}

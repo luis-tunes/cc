@@ -198,7 +198,7 @@ export function FinancialOverviewPanel({ className }: { className?: string }) {
       </div>
 
       {/* Cash position strip */}
-      <div className="flex items-center gap-6 border-t px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6 border-t px-4 py-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Total Receita

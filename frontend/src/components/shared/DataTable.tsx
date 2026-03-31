@@ -39,6 +39,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className={cn("rounded-lg border bg-card", className)}>
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
@@ -77,6 +78,7 @@ export function DataTable<T extends Record<string, unknown>>({
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

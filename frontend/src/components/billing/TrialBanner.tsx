@@ -29,7 +29,7 @@ export function TrialBanner() {
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-1.5 text-xs bg-primary/5 border-b border-primary/10 animate-in slide-in-from-top-1 duration-300">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 text-xs bg-primary/5 border-b border-primary/10 animate-in slide-in-from-top-1 duration-300">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span>

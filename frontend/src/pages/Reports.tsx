@@ -124,7 +124,7 @@ export default function Reports() {
 
           {/* Monthly table */}
           {barData.length > 0 && (
-            <div className="rounded-lg border bg-card">
+            <div className="rounded-lg border bg-card overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b bg-muted/30">
