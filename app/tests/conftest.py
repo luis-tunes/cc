@@ -15,6 +15,8 @@ import pytest
 # Ensure auth is disabled for tests
 os.environ.setdefault("AUTH_DISABLED", "1")
 os.environ.setdefault("DATABASE_URL", "postgresql://cc:cc@localhost:5432/cc")
+os.environ.setdefault("MASTER_USER_IDS", "dev-user")
+os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_test")
 
 import app.auth
 
@@ -40,6 +42,10 @@ ALL_TABLES = (
     "classification_rules",
     "movement_rules", "alerts", "assets",
     "audit_log", "webhook_events",
+    "accounts", "fiscal_periods", "accounting_journals",
+    "journal_entries", "journal_entry_lines",
+    "customers",
+    "invoice_series", "invoices", "invoice_lines", "invoice_payments",
 )
 
 ALL_SEQ_TABLES = (
@@ -50,6 +56,10 @@ ALL_SEQ_TABLES = (
     "price_history",
     "classification_rules",
     "movement_rules", "alerts", "assets",
+    "accounts", "fiscal_periods", "accounting_journals",
+    "journal_entries", "journal_entry_lines",
+    "customers",
+    "invoice_series", "invoices", "invoice_lines", "invoice_payments",
 )
 
 _tables: dict[str, list[dict]] = {}
@@ -134,6 +144,46 @@ class FakeConn:
         # ── Movement rules ──
         if "movement_rules" in sql_lower:
             return self._handle_movement_rules(sql, params)
+
+        # ── Invoice payments (before invoice_lines and invoices) ──
+        if "invoice_payments" in sql_lower:
+            return self._handle_invoice_payments(sql, params)
+
+        # ── Invoice lines (before invoices) ──
+        if "invoice_lines" in sql_lower and "from invoices" not in sql_lower:
+            return self._handle_invoice_lines(sql, params)
+
+        # ── Invoices (may JOIN invoice_series) ──
+        if "from invoices" in sql_lower or "into invoices" in sql_lower or "update invoices" in sql_lower or "delete from invoices" in sql_lower:
+            return self._handle_invoices(sql, params)
+
+        # ── Invoice series (standalone) ──
+        if "invoice_series" in sql_lower:
+            return self._handle_invoice_series(sql, params)
+
+        # ── Customers ──
+        if "customers" in sql_lower:
+            return self._handle_customers(sql, params)
+
+        # ── Journal entry lines (only when it's the primary table, not in JOINs) ──
+        if "journal_entry_lines" in sql_lower and "from accounts" not in sql_lower and "a.code = %s" not in sql_lower:
+            return self._handle_journal_entry_lines(sql, params)
+
+        # ── Journal entries (before accounting_journals) ──
+        if "journal_entries" in sql_lower and "from accounts" not in sql_lower and "a.code = %s" not in sql_lower:
+            return self._handle_journal_entries(sql, params)
+
+        # ── Accounting journals ──
+        if "accounting_journals" in sql_lower and "journal_entries" not in sql_lower:
+            return self._handle_accounting_journals(sql, params)
+
+        # ── Fiscal periods ──
+        if "fiscal_periods" in sql_lower:
+            return self._handle_fiscal_periods(sql, params)
+
+        # ── Accounts (chart of accounts — includes trial balance and general ledger JOINs) ──
+        if "accounts" in sql_lower and any(k in sql_lower for k in ("from accounts", "into accounts", "update accounts", "delete from accounts", "join accounts")):
+            return self._handle_accounts(sql, params)
 
         # ── Alerts ──
         if "alerts" in sql_lower and any(k in sql_lower for k in ("from alerts", "into alerts", "delete from alerts", "update alerts")):
@@ -453,7 +503,12 @@ class FakeConn:
             tx_id = params[-1]  # id is always last param
             for t in _tables["bank_transactions"]:
                 if t["id"] == tx_id:
-                    if "category" in sql_lower:
+                    if "classification_source = 'reconcile'" in sql_lower:
+                        # SNC reinforcement from reconciliation
+                        if t.get("classification_source") != "manual":
+                            t["snc_account"] = params[0]
+                            t["classification_source"] = "reconcile"
+                    elif "category" in sql_lower:
                         t["category"] = params[0]
                         t["snc_account"] = params[1]
                         t["entity_nif"] = params[2]
@@ -492,19 +547,28 @@ class FakeConn:
         sql_lower = sql.strip().lower()
         if sql_lower.startswith("insert"):
             _seq["reconciliations"] += 1
+            # 5 params: doc_id, tx_id, confidence, status, tenant_id
+            # or 4 params (legacy): doc_id, tx_id, confidence, tenant_id
+            if len(params) >= 5:
+                status = params[3]
+                tid = params[4]
+            else:
+                status = "pendente"
+                tid = params[3] if len(params) > 3 else None
             row = {
                 "id": _seq["reconciliations"],
                 "document_id": params[0],
                 "bank_transaction_id": params[1],
                 "match_confidence": Decimal(str(params[2])),
-                "tenant_id": params[3] if len(params) > 3 else None,
-                "status": "pendente",
+                "tenant_id": tid,
+                "status": status,
             }
             # ON CONFLICT DO NOTHING
             existing = [r for r in _tables["reconciliations"]
                         if r["document_id"] == params[0] and r["bank_transaction_id"] == params[1]]
             if not existing:
                 _tables["reconciliations"].append(row)
+                return FakeCursor([row])
             return FakeCursor([])
         if sql_lower.startswith("update"):
             # PATCH status endpoint: UPDATE reconciliations SET status = %s WHERE id = %s AND tenant_id = %s
@@ -1241,11 +1305,14 @@ class FakeConn:
     def _handle_alerts(self, sql, params):
         sql_lower = sql.strip().lower()
         if sql_lower.startswith("delete"):
-            # DELETE FROM alerts WHERE tenant_id = %s AND read = false
             tid = params[0] if params else None
-            len(_tables["alerts"])
-            _tables["alerts"] = [a for a in _tables["alerts"]
-                                  if not (a.get("tenant_id") == tid and not a.get("read", False))]
+            if "type = 'missing_document'" in sql_lower:
+                _tables["alerts"] = [a for a in _tables["alerts"]
+                                      if not (a.get("tenant_id") == tid and a.get("type") == "missing_document")]
+            else:
+                # DELETE FROM alerts WHERE tenant_id = %s AND read = false
+                _tables["alerts"] = [a for a in _tables["alerts"]
+                                      if not (a.get("tenant_id") == tid and not a.get("read", False))]
             return FakeCursor([])
         if sql_lower.startswith("insert"):
             _seq["alerts"] += 1
@@ -1345,13 +1412,687 @@ class FakeConn:
             return FakeCursor(rows)
         return FakeCursor([])
 
+    # ────── Customers ──────
+
+    def _handle_customers(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["customers"] += 1
+            cid = _seq["customers"]
+            rec = {
+                "id": cid,
+                "tenant_id": params[0],
+                "name": params[1],
+                "nif": params[2] if len(params) > 2 else "",
+                "email": params[3] if len(params) > 3 else "",
+                "phone": params[4] if len(params) > 4 else "",
+                "address": params[5] if len(params) > 5 else "",
+                "postal_code": params[6] if len(params) > 6 else "",
+                "city": params[7] if len(params) > 7 else "",
+                "country": params[8] if len(params) > 8 else "PT",
+                "notes": params[9] if len(params) > 9 else "",
+                "active": True,
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            _tables["customers"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            # WHERE id = %s AND tenant_id = %s → params = [id, tid]
+            is_id_lookup = "where id = %s" in sql_lower
+            if is_id_lookup:
+                cid = params[0]
+                tid = params[1] if len(params) > 1 else None
+                rows = [c for c in _tables["customers"] if c["id"] == cid]
+                if tid:
+                    rows = [c for c in rows if c.get("tenant_id") == tid]
+            else:
+                tid = params[0] if params else None
+                rows = [c for c in _tables["customers"] if c.get("tenant_id") == tid]
+            # NIF uniqueness check: WHERE tenant_id = %s AND nif = %s [AND id != %s]
+            if "nif = %s" in sql_lower:
+                nif_val = params[1] if len(params) > 1 else params[-1]
+                rows = [c for c in rows if c.get("nif") == nif_val]
+                if "id != %s" in sql_lower:
+                    exclude_id = params[2] if len(params) > 2 else None
+                    rows = [c for c in rows if c["id"] != exclude_id]
+            if "ilike" in sql_lower and params:
+                q = params[1] if len(params) > 1 else params[0]
+                q = str(q).replace("%", "").lower()
+                rows = [c for c in rows if q in c.get("name", "").lower() or q in c.get("nif", "").lower() or q in c.get("email", "").lower()]
+            return FakeCursor(rows)
+        if sql_lower.startswith("update"):
+            # UPDATE customers SET {k} = %s, ... WHERE id = %s AND tenant_id = %s RETURNING *
+            # params = [...field_values, customer_id, tenant_id]
+            tid = params[-1] if params else None
+            cid = params[-2] if len(params) >= 2 else None
+            for c in _tables["customers"]:
+                if c["id"] == cid and c.get("tenant_id") == tid:
+                    # Extract SET clause fields
+                    import re as _re
+                    set_match = _re.search(r'set\s+(.*?)\s+where', sql_lower)
+                    if set_match:
+                        fields = [f.strip().split("=")[0].strip() for f in set_match.group(1).split(",")]
+                        for i, field in enumerate(fields):
+                            if i < len(params) - 2:
+                                c[field] = params[i]
+                    return FakeCursor([c])
+            return FakeCursor([])
+        if sql_lower.startswith("delete"):
+            # DELETE FROM customers WHERE id = %s AND tenant_id = %s RETURNING id
+            cid = params[0]
+            tid = params[1] if len(params) > 1 else None
+            before = len(_tables["customers"])
+            deleted = [c for c in _tables["customers"] if c["id"] == cid and (not tid or c.get("tenant_id") == tid)]
+            _tables["customers"] = [c for c in _tables["customers"] if not (c["id"] == cid and (not tid or c.get("tenant_id") == tid))]
+            return FakeCursor(deleted, rowcount=before - len(_tables["customers"]))
+        return FakeCursor([])
+
+    # ────── Accounts ──────
+
+    def _handle_accounts(self, sql, params):
+        sql_lower = sql.strip().lower()
+
+        # ── Trial Balance (complex JOIN from accounts + journal_entry_lines + journal_entries) ──
+        if sql_lower.startswith("select") and "group by" in sql_lower and "journal_entry_lines" in sql_lower:
+            # params: [tenant_id (for je JOIN), tenant_id (for WHERE), date_from?, date_to?]
+            tid = params[1] if len(params) > 1 else params[0]
+            accts = [a for a in _tables["accounts"] if a.get("tenant_id") == tid]
+            entries = [e for e in _tables["journal_entries"] if e.get("tenant_id") == tid]
+            entry_ids = {e["id"] for e in entries}
+            lines = [ln for ln in _tables["journal_entry_lines"] if ln["entry_id"] in entry_ids]
+            result = []
+            for a in accts:
+                acc_lines = [ln for ln in lines if ln["account_id"] == a["id"]]
+                td = sum(Decimal(str(ln["debit"])) for ln in acc_lines)
+                tc = sum(Decimal(str(ln["credit"])) for ln in acc_lines)
+                if td != 0 or tc != 0:
+                    result.append({
+                        "code": a["code"], "name": a["name"], "type": a["type"],
+                        "total_debit": td, "total_credit": tc, "balance": td - tc,
+                    })
+            result.sort(key=lambda x: x["code"])
+            return FakeCursor(result)
+
+        # ── General Ledger (JOIN from journal_entry_lines + journal_entries + accounts + accounting_journals) ──
+        if sql_lower.startswith("select") and "a.code = %s" in sql_lower and "journal_entry_lines" in sql_lower:
+            tid = params[0] if params else None
+            account_code = params[1] if len(params) > 1 else None
+            account = next((a for a in _tables["accounts"] if a.get("tenant_id") == tid and a["code"] == account_code), None)
+            if not account:
+                return FakeCursor([])
+            entries = {e["id"]: e for e in _tables["journal_entries"] if e.get("tenant_id") == tid}
+            lines = [ln for ln in _tables["journal_entry_lines"] if ln["account_id"] == account["id"] and ln["entry_id"] in entries]
+            result = []
+            for ln in lines:
+                entry = entries[ln["entry_id"]]
+                journal = next((j for j in _tables["accounting_journals"] if j["id"] == entry.get("journal_id")), None)
+                result.append({
+                    "id": ln["id"],
+                    "entry_date": entry.get("entry_date", ""),
+                    "reference": entry.get("reference", ""),
+                    "entry_description": entry.get("description", ""),
+                    "debit": ln["debit"],
+                    "credit": ln["credit"],
+                    "line_description": ln.get("description", ""),
+                    "journal_code": journal["code"] if journal else "",
+                })
+            return FakeCursor(result)
+
+        if sql_lower.startswith("insert"):
+            _seq["accounts"] += 1
+            aid = _seq["accounts"]
+            rec = {
+                "id": aid,
+                "tenant_id": params[0],
+                "code": params[1],
+                "name": params[2],
+                "type": params[3],
+                "parent_code": params[4] if len(params) > 4 else "",
+                "active": True,
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            # Handle ON CONFLICT DO NOTHING
+            if "on conflict" in sql_lower:
+                existing = [a for a in _tables["accounts"]
+                            if a["tenant_id"] == rec["tenant_id"] and a["code"] == rec["code"]]
+                if existing:
+                    return FakeCursor([existing[0]])
+            _tables["accounts"].append(rec)
+            return FakeCursor([rec])
+
+        if sql_lower.startswith("select"):
+            # WHERE id = %s AND tenant_id = %s (explicit id lookup)
+            if "where id = %s" in sql_lower:
+                aid = params[0]
+                tid = params[1] if len(params) > 1 else None
+                rows = [a for a in _tables["accounts"] if a["id"] == aid]
+                if tid:
+                    rows = [a for a in rows if a.get("tenant_id") == tid]
+            else:
+                tid = params[0] if params else None
+                rows = [a for a in _tables["accounts"] if a.get("tenant_id") == tid]
+                # Filter by code: WHERE tenant_id = %s AND code = %s
+                if "code = %s" in sql_lower and len(params) > 1:
+                    code_val = params[1]
+                    rows = [a for a in rows if a["code"] == code_val]
+                # Filter by active
+                if "active = true" in sql_lower:
+                    rows = [a for a in rows if a.get("active", True)]
+                # Filter by type
+                if "type = %s" in sql_lower:
+                    type_val = params[-1] if "limit" not in sql_lower else params[1] if len(params) > 1 else params[-1]
+                    # type param comes after tenant_id (and possibly after active)
+                    for p in params[1:]:
+                        if isinstance(p, str) and p in ("asset", "liability", "equity", "revenue", "expense", "result"):
+                            type_val = p
+                            break
+                    rows = [a for a in rows if a["type"] == type_val]
+            if "count(" in sql_lower:
+                return FakeCursor([{"cnt": len(rows)}])
+            rows.sort(key=lambda x: x.get("code", ""))
+            return FakeCursor(rows)
+
+        if sql_lower.startswith("update"):
+            aid = params[-2] if len(params) >= 2 else params[-1]
+            tid = params[-1]
+            for a in _tables["accounts"]:
+                if a["id"] == aid and a.get("tenant_id") == tid:
+                    if "name = %s" in sql_lower:
+                        a["name"] = params[0]
+                    if "active = %s" in sql_lower:
+                        a["active"] = params[0] if "name" not in sql_lower else params[1]
+                    return FakeCursor([a])
+            return FakeCursor([])
+        return FakeCursor([])
+
+    # ────── Accounting Journals ──────
+
+    def _handle_accounting_journals(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["accounting_journals"] += 1
+            jid = _seq["accounting_journals"]
+            rec = {
+                "id": jid,
+                "tenant_id": params[0],
+                "code": params[1],
+                "name": params[2],
+                "type": params[3] if len(params) > 3 else "general",
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            if "on conflict" in sql_lower:
+                existing = [j for j in _tables["accounting_journals"]
+                            if j["tenant_id"] == rec["tenant_id"] and j["code"] == rec["code"]]
+                if existing:
+                    return FakeCursor([existing[0]])
+            _tables["accounting_journals"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [j for j in _tables["accounting_journals"] if j.get("tenant_id") == tid]
+            if "count(" in sql_lower:
+                return FakeCursor([{"cnt": len(rows)}])
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+    # ────── Fiscal Periods ──────
+
+    def _handle_fiscal_periods(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["fiscal_periods"] += 1
+            pid = _seq["fiscal_periods"]
+            rec = {
+                "id": pid,
+                "tenant_id": params[0],
+                "name": params[1],
+                "start_date": params[2],
+                "end_date": params[3],
+                "status": "open",
+                "lock_date": None,
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            _tables["fiscal_periods"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [p for p in _tables["fiscal_periods"] if p.get("tenant_id") == tid]
+            if "id = %s" in sql_lower and len(params) > 1:
+                pid = params[0]
+                rows = [p for p in _tables["fiscal_periods"] if p["id"] == pid]
+                if tid:
+                    rows = [p for p in rows if p.get("tenant_id") == params[1]]
+            return FakeCursor(rows)
+        if sql_lower.startswith("update"):
+            pid = params[-2] if len(params) >= 2 else params[-1]
+            tid = params[-1]
+            for p in _tables["fiscal_periods"]:
+                if p["id"] == pid and p.get("tenant_id") == tid:
+                    if "status = 'closed'" in sql_lower:
+                        p["status"] = "closed"
+                        p["lock_date"] = params[0]
+                    elif "status = 'open'" in sql_lower:
+                        p["status"] = "open"
+                        p["lock_date"] = None
+                    elif "status = %s" in sql_lower:
+                        p["status"] = params[0]
+                        p["lock_date"] = params[1] if len(params) > 1 else None
+                    return FakeCursor([p])
+            return FakeCursor([])
+        return FakeCursor([])
+
+    # ────── Journal Entries ──────
+
+    def _handle_journal_entries(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["journal_entries"] += 1
+            eid = _seq["journal_entries"]
+            rec = {
+                "id": eid,
+                "tenant_id": params[0],
+                "journal_id": params[1],
+                "period_id": params[2],
+                "entry_date": params[3],
+                "reference": params[4] if len(params) > 4 else "",
+                "description": params[5] if len(params) > 5 else "",
+                "source_type": params[6] if len(params) > 6 else None,
+                "source_id": params[7] if len(params) > 7 else None,
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            _tables["journal_entries"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            # Duplicate check: WHERE source_type = %s AND source_id = %s AND tenant_id = %s
+            if "source_type = %s" in sql_lower:
+                stype = params[0] if params else None
+                sid = params[1] if len(params) > 1 else None
+                tid = params[2] if len(params) > 2 else None
+                rows = [e for e in _tables["journal_entries"]
+                        if e.get("source_type") == stype and e.get("source_id") == sid and e.get("tenant_id") == tid]
+                return FakeCursor(rows)
+
+            # Single entry lookup: WHERE je.id = %s AND je.tenant_id = %s
+            if "je.id = %s" in sql_lower:
+                eid = params[0]
+                tid = params[1] if len(params) > 1 else None
+                rows = [e for e in _tables["journal_entries"] if e["id"] == eid]
+                if tid:
+                    rows = [e for e in rows if e.get("tenant_id") == tid]
+                # Enrich with journal data
+                enriched = []
+                for e in rows:
+                    j = next((j for j in _tables["accounting_journals"] if j["id"] == e.get("journal_id")), None)
+                    row = {**e}
+                    if j:
+                        row["journal_code"] = j["code"]
+                        row["journal_name"] = j["name"]
+                    enriched.append(row)
+                return FakeCursor(enriched)
+
+            # List: WHERE je.tenant_id = %s ... LIMIT %s OFFSET %s
+            tid = params[0] if params else None
+            rows = [e for e in _tables["journal_entries"] if e.get("tenant_id") == tid]
+            # Enrich with journal data (for JOIN queries)
+            if "join" in sql_lower or "accounting_journals" in sql_lower:
+                enriched = []
+                for e in rows:
+                    j = next((j for j in _tables["accounting_journals"] if j["id"] == e.get("journal_id")), None)
+                    row = {**e}
+                    if j:
+                        row["journal_code"] = j["code"]
+                        row["journal_name"] = j["name"]
+                    enriched.append(row)
+                rows = enriched
+            if "count(" in sql_lower:
+                return FakeCursor([{"total": len(rows)}])
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+    # ────── Journal Entry Lines ──────
+
+    def _handle_journal_entry_lines(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["journal_entry_lines"] += 1
+            lid = _seq["journal_entry_lines"]
+            rec = {
+                "id": lid,
+                "entry_id": params[0],
+                "account_id": params[1],
+                "debit": Decimal(str(params[2])),
+                "credit": Decimal(str(params[3])),
+                "description": params[4] if len(params) > 4 else "",
+            }
+            _tables["journal_entry_lines"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            if "entry_id = %s" in sql_lower:
+                eid = params[0] if params else None
+                rows = [l for l in _tables["journal_entry_lines"] if l["entry_id"] == eid]
+            elif "account_id" in sql_lower:
+                rows = list(_tables["journal_entry_lines"])
+            else:
+                rows = list(_tables["journal_entry_lines"])
+            # Handle JOINs with accounts
+            if "join" in sql_lower and "accounts" in sql_lower:
+                enriched = []
+                for ln in rows:
+                    acc = next((a for a in _tables["accounts"] if a["id"] == ln["account_id"]), None)
+                    if acc:
+                        row = {**ln, "code": acc["code"], "name": acc["name"], "account_code": acc["code"], "account_name": acc["name"]}
+                        enriched.append(row)
+                    else:
+                        enriched.append(ln)
+                rows = enriched
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+    # ────── Invoice Series ──────
+
+    def _handle_invoice_series(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["invoice_series"] += 1
+            sid = _seq["invoice_series"]
+            rec = {
+                "id": sid,
+                "tenant_id": params[0],
+                "series_code": params[1],
+                "document_type": params[2],
+                "atcud_validation_code": params[3] if len(params) > 3 else "",
+                "current_number": 0,
+                "active": True,
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            _tables["invoice_series"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            tid = params[0] if params else None
+            rows = [s for s in _tables["invoice_series"] if s.get("tenant_id") == tid]
+            if "where id = %s" in sql_lower and len(params) > 1:
+                sid = params[0]
+                tid = params[1]
+                rows = [s for s in _tables["invoice_series"] if s["id"] == sid and s.get("tenant_id") == tid]
+            if "series_code = %s" in sql_lower and len(params) > 1:
+                code = params[1]
+                rows = [s for s in rows if s["series_code"] == code]
+            return FakeCursor(rows)
+        if sql_lower.startswith("update"):
+            # UPDATE invoice_series SET current_number = %s WHERE id = %s
+            new_num = params[0]
+            sid = params[1]
+            for s in _tables["invoice_series"]:
+                if s["id"] == sid:
+                    s["current_number"] = new_num
+                    return FakeCursor([s])
+            return FakeCursor([])
+        return FakeCursor([])
+
+    # ────── Invoices ──────
+
+    def _handle_invoices(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["invoices"] += 1
+            iid = _seq["invoices"]
+            rec = {
+                "id": iid,
+                "tenant_id": params[0],
+                "series_id": params[1],
+                "number": params[2],
+                "document_type": params[3],
+                "atcud": params[4],
+                "customer_id": params[5],
+                "customer_name": params[6],
+                "customer_nif": params[7],
+                "issue_date": params[8],
+                "due_date": params[9],
+                "subtotal": Decimal(str(params[10])),
+                "vat_total": Decimal(str(params[11])),
+                "total": Decimal(str(params[12])),
+                "withholding_tax": Decimal(str(params[13])),
+                "net_total": Decimal(str(params[14])),
+                "notes": params[15] if len(params) > 15 else "",
+                "status": "rascunho",
+                "payment_status": "pendente",
+                "amount_paid": Decimal("0"),
+                "finalized_at": None,
+                "voided_at": None,
+                "created_at": "2024-01-01T00:00:00Z",
+                "currency": "EUR",
+            }
+            _tables["invoices"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            # GROUP BY (summary)
+            if "group by" in sql_lower:
+                tid = params[0] if params else None
+                invs = [i for i in _tables["invoices"] if i.get("tenant_id") == tid]
+                if "status" in sql_lower and "group by status" in sql_lower:
+                    by_status: dict[str, dict] = {}
+                    for i in invs:
+                        s = i["status"]
+                        if s not in by_status:
+                            by_status[s] = {"status": s, "cnt": 0, "total_amount": Decimal("0")}
+                        by_status[s]["cnt"] += 1
+                        by_status[s]["total_amount"] += Decimal(str(i.get("total", 0)))
+                    return FakeCursor(list(by_status.values()))
+                if "document_type" in sql_lower and "group by document_type" in sql_lower:
+                    by_type: dict[str, dict] = {}
+                    for i in invs:
+                        dt = i["document_type"]
+                        if dt not in by_type:
+                            by_type[dt] = {"document_type": dt, "cnt": 0, "total_amount": Decimal("0")}
+                        by_type[dt]["cnt"] += 1
+                        by_type[dt]["total_amount"] += Decimal(str(i.get("total", 0)))
+                    return FakeCursor(list(by_type.values()))
+                return FakeCursor([])
+
+            # Detect single-invoice lookup: WHERE id = %s AND tenant_id = %s
+            # or WHERE i.id = %s AND i.tenant_id = %s
+            is_id_lookup = ("where i.id = %s" in sql_lower
+                           or "where id = %s and tenant_id" in sql_lower
+                           or ("where id = %s" in sql_lower and "tenant_id = %s" in sql_lower))
+            if is_id_lookup and len(params) >= 2:
+                iid = params[0]
+                tid = params[1]
+                rows = [i for i in _tables["invoices"] if i["id"] == iid and i.get("tenant_id") == tid]
+            else:
+                # List with tenant filter
+                tid = params[0] if params else None
+                rows = [i for i in _tables["invoices"] if i.get("tenant_id") == tid]
+
+            # Filter by status
+            if "i.status = %s" in sql_lower or ("status = %s" in sql_lower and not is_id_lookup):
+                for j, p in enumerate(params):
+                    if j > 0 and isinstance(p, str) and p in ("rascunho", "emitida", "anulada"):
+                        rows = [i for i in rows if i["status"] == p]
+                        break
+
+            # Filter by payment_status
+            if "payment_status" in sql_lower and "!=" in sql_lower:
+                rows = [i for i in rows if i.get("payment_status") != "pago"]
+
+            # JOIN with invoice_series to add series_code
+            if "join" in sql_lower and "invoice_series" in sql_lower:
+                enriched = []
+                for inv in rows:
+                    series = next((s for s in _tables["invoice_series"] if s["id"] == inv["series_id"]), None)
+                    row = {**inv}
+                    if series:
+                        row["series_code"] = series["series_code"]
+                    enriched.append(row)
+                rows = enriched
+
+            return FakeCursor(rows)
+
+        if sql_lower.startswith("update"):
+            # Detect which update: status change, totals, or payment
+            if "status = 'emitida'" in sql_lower:
+                finalized_at = params[0]
+                iid = params[1]
+                tid = params[2]
+                for inv in _tables["invoices"]:
+                    if inv["id"] == iid and inv.get("tenant_id") == tid:
+                        inv["status"] = "emitida"
+                        inv["finalized_at"] = finalized_at
+                        return FakeCursor([inv])
+            elif "status = 'anulada'" in sql_lower:
+                voided_at = params[0]
+                iid = params[1]
+                tid = params[2]
+                for inv in _tables["invoices"]:
+                    if inv["id"] == iid and inv.get("tenant_id") == tid:
+                        inv["status"] = "anulada"
+                        inv["voided_at"] = voided_at
+                        return FakeCursor([inv])
+            elif "payment_status = %s" in sql_lower:
+                ps = params[0]
+                paid = params[1]
+                iid = params[2]
+                tid = params[3]
+                for inv in _tables["invoices"]:
+                    if inv["id"] == iid and inv.get("tenant_id") == tid:
+                        inv["payment_status"] = ps
+                        inv["amount_paid"] = Decimal(str(paid))
+                        return FakeCursor([inv])
+            elif "subtotal = %s" in sql_lower:
+                # Update totals
+                subtotal = Decimal(str(params[0]))
+                vat_total = Decimal(str(params[1]))
+                total = Decimal(str(params[2]))
+                wh = Decimal(str(params[3]))
+                net = Decimal(str(params[4]))
+                iid = params[5]
+                tid = params[6]
+                for inv in _tables["invoices"]:
+                    if inv["id"] == iid and inv.get("tenant_id") == tid:
+                        inv["subtotal"] = subtotal
+                        inv["vat_total"] = vat_total
+                        inv["total"] = total
+                        inv["withholding_tax"] = wh
+                        inv["net_total"] = net
+                        return FakeCursor([inv])
+            else:
+                # Generic scalar update
+                iid = params[-2] if len(params) >= 2 else params[-1]
+                tid = params[-1]
+                for inv in _tables["invoices"]:
+                    if inv["id"] == iid and inv.get("tenant_id") == tid:
+                        return FakeCursor([inv])
+            return FakeCursor([])
+
+        if sql_lower.startswith("delete"):
+            iid = params[0]
+            tid = params[1] if len(params) > 1 else None
+            before = len(_tables["invoices"])
+            _tables["invoices"] = [i for i in _tables["invoices"] if not (i["id"] == iid and (not tid or i.get("tenant_id") == tid))]
+            # Also delete related lines
+            _tables["invoice_lines"] = [l for l in _tables["invoice_lines"] if l.get("invoice_id") != iid]
+            return FakeCursor([], rowcount=before - len(_tables["invoices"]))
+
+        return FakeCursor([])
+
+    # ────── Invoice Lines ──────
+
+    def _handle_invoice_lines(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["invoice_lines"] += 1
+            lid = _seq["invoice_lines"]
+            rec = {
+                "id": lid,
+                "invoice_id": params[0],
+                "tenant_id": params[1],
+                "line_number": params[2],
+                "description": params[3],
+                "quantity": Decimal(str(params[4])),
+                "unit_price": Decimal(str(params[5])),
+                "discount_pct": Decimal(str(params[6])),
+                "vat_rate": Decimal(str(params[7])),
+                "subtotal": Decimal(str(params[8])),
+                "vat_amount": Decimal(str(params[9])),
+                "total": Decimal(str(params[10])),
+                "snc_account": params[11] if len(params) > 11 else "",
+            }
+            _tables["invoice_lines"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            iid = params[0] if params else None
+            tid = params[1] if len(params) > 1 else None
+            rows = [l for l in _tables["invoice_lines"] if l.get("invoice_id") == iid]
+            if tid:
+                rows = [l for l in rows if l.get("tenant_id") == tid]
+            rows.sort(key=lambda x: x.get("line_number", 0))
+            return FakeCursor(rows)
+        if sql_lower.startswith("delete"):
+            iid = params[0]
+            tid = params[1] if len(params) > 1 else None
+            before = len(_tables["invoice_lines"])
+            _tables["invoice_lines"] = [l for l in _tables["invoice_lines"]
+                                         if not (l["invoice_id"] == iid and (not tid or l.get("tenant_id") == tid))]
+            return FakeCursor([], rowcount=before - len(_tables["invoice_lines"]))
+        return FakeCursor([])
+
+    # ────── Invoice Payments ──────
+
+    def _handle_invoice_payments(self, sql, params):
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert"):
+            _seq["invoice_payments"] += 1
+            pid = _seq["invoice_payments"]
+            rec = {
+                "id": pid,
+                "invoice_id": params[0],
+                "tenant_id": params[1],
+                "amount": Decimal(str(params[2])),
+                "payment_date": params[3],
+                "method": params[4] if len(params) > 4 else "",
+                "reference": params[5] if len(params) > 5 else "",
+                "notes": params[6] if len(params) > 6 else "",
+                "created_at": "2024-01-01T00:00:00Z",
+            }
+            _tables["invoice_payments"].append(rec)
+            return FakeCursor([rec])
+        if sql_lower.startswith("select"):
+            if "sum(" in sql_lower or "coalesce" in sql_lower:
+                iid = params[0] if params else None
+                payments = [p for p in _tables["invoice_payments"] if p.get("invoice_id") == iid]
+                if len(params) > 1:
+                    tid = params[1]
+                    payments = [p for p in payments if p.get("tenant_id") == tid]
+                total = sum(p["amount"] for p in payments)
+                return FakeCursor([{"paid": total}])
+            iid = params[0] if params else None
+            tid = params[1] if len(params) > 1 else None
+            rows = [p for p in _tables["invoice_payments"] if p.get("invoice_id") == iid]
+            if tid:
+                rows = [p for p in rows if p.get("tenant_id") == tid]
+            if "where id = %s" in sql_lower and "invoice_id = %s" in sql_lower:
+                pid = params[0]
+                iid = params[1]
+                tid = params[2] if len(params) > 2 else None
+                rows = [p for p in _tables["invoice_payments"] if p["id"] == pid and p["invoice_id"] == iid]
+                if tid:
+                    rows = [p for p in rows if p.get("tenant_id") == tid]
+            return FakeCursor(rows)
+        if sql_lower.startswith("delete"):
+            pid = params[0]
+            tid = params[1] if len(params) > 1 else None
+            before = len(_tables["invoice_payments"])
+            _tables["invoice_payments"] = [p for p in _tables["invoice_payments"]
+                                            if not (p["id"] == pid and (not tid or p.get("tenant_id") == tid))]
+            return FakeCursor([], rowcount=before - len(_tables["invoice_payments"]))
+        return FakeCursor([])
+
     # ────── Aggregates ──────
 
     def _handle_aggregate(self, sql, params):
         import re as _re
         sql_lower = sql.strip().lower()
-        # Detect COUNT alias (e.g. COUNT(*) as cnt → _ck="cnt")
-        _cm = _re.search(r'count\(\*\)\s+as\s+(\w+)', sql_lower)
+        # Detect COUNT alias (e.g. COUNT(*) as cnt, COUNT(DISTINCT x) as cnt → _ck="cnt")
+        _cm = _re.search(r'count\([^)]*\)\s+as\s+(\w+)', sql_lower)
         _ck = _cm.group(1) if _cm else "count"
         if "to_char" in sql_lower:
             return FakeCursor([])
@@ -1385,14 +2126,31 @@ class FakeConn:
         if "count" in sql_lower and "sum" in sql_lower and "from bank_transactions" in sql_lower:
             txs = list(_tables["bank_transactions"])
             if "tenant_id = %s" in sql_lower and params:
-                txs = [t for t in txs if t.get("tenant_id") == params[-1]]
-            total = sum(t.get("amount", Decimal("0")) for t in txs)
-            return FakeCursor([{"count": len(txs), "total": total}])
+                txs = [t for t in txs if t.get("tenant_id") == params[0]]
+                # Date range filter: tenant_id, date_from, date_to
+                if len(params) >= 3:
+                    date_from, date_to = params[1], params[2]
+                    txs = [t for t in txs if t.get("date") and date_from <= t["date"] <= date_to]
+            total = sum(abs(t.get("amount", Decimal("0"))) for t in txs)
+            return FakeCursor([{_ck: len(txs), "total_amount": total, "count": len(txs), "total": total}])
         # Dashboard: reconciliations count
         if "count" in sql_lower and "from reconciliations" in sql_lower:
             recs = list(_tables["reconciliations"])
             if "tenant_id = %s" in sql_lower and params:
-                recs = [r for r in recs if r.get("tenant_id") == params[-1]]
+                recs = [r for r in recs if r.get("tenant_id") == params[0]]
+            # JOIN bank_transactions with date range filter
+            if "join bank_transactions" in sql_lower and len(params) >= 3:
+                tid, date_from, date_to = params[0], params[1], params[2]
+                recs = [r for r in recs if r.get("tenant_id") == tid]
+                tx_ids_in_range = set()
+                for t in _tables["bank_transactions"]:
+                    if t.get("date") and date_from <= t["date"] <= date_to:
+                        tx_ids_in_range.add(t["id"])
+                recs = [r for r in recs if r["bank_transaction_id"] in tx_ids_in_range]
+                if "status = 'aprovado'" in sql_lower:
+                    recs = [r for r in recs if r.get("status") == "aprovado"]
+                elif "status = 'pendente'" in sql_lower:
+                    recs = [r for r in recs if r.get("status") == "pendente"]
             return FakeCursor([{_ck: len(recs)}])
         # Dashboard: unmatched documents (NOT IN reconciliations subquery)
         if "count" in sql_lower and "not in" in sql_lower and "document_id" in sql_lower:
@@ -1450,23 +2208,31 @@ def fake_get_conn():
 @pytest.fixture(autouse=True)
 def _clean_db_and_patch(tmp_path):
     """Reset in-memory tables and re-apply FakeConn per test."""
+    from contextlib import ExitStack
     reset_db()
-    with patch("app.routes_documents.get_conn", fake_get_conn), \
-         patch("app.routes_bank.get_conn", fake_get_conn), \
-         patch("app.routes_inventory.get_conn", fake_get_conn), \
-         patch("app.routes_finance.get_conn", fake_get_conn), \
-         patch("app.routes_admin.get_conn", fake_get_conn), \
-         patch("app.billing.get_conn", fake_get_conn), \
-         patch("app.db.get_conn", fake_get_conn), \
-         patch("app.reconcile.get_conn", fake_get_conn), \
-         patch("app.parse.get_conn", fake_get_conn), \
-         patch("app.classify.get_conn", fake_get_conn), \
-         patch("app.alerts.get_conn", fake_get_conn), \
-         patch("app.classify_movements.get_conn", fake_get_conn), \
-         patch("app.assistant.get_conn", fake_get_conn), \
-         patch("app.cache.cache_get", return_value=None), \
-         patch("app.cache.cache_set", return_value=None), \
-         patch("app.routes_documents.UPLOADS_DIR", str(tmp_path / "uploads")):
+    with ExitStack() as stack:
+        for mod in (
+            "app.routes_documents",
+            "app.routes_bank",
+            "app.routes_inventory",
+            "app.routes_finance",
+            "app.routes_admin",
+            "app.routes_accounting",
+            "app.routes_customers",
+            "app.routes_invoices",
+            "app.billing",
+            "app.db",
+            "app.reconcile",
+            "app.parse",
+            "app.classify",
+            "app.alerts",
+            "app.classify_movements",
+            "app.assistant",
+        ):
+            stack.enter_context(patch(f"{mod}.get_conn", fake_get_conn))
+        stack.enter_context(patch("app.cache.cache_get", return_value=None))
+        stack.enter_context(patch("app.cache.cache_set", return_value=None))
+        stack.enter_context(patch("app.routes_documents.UPLOADS_DIR", str(tmp_path / "uploads")))
         yield
 
 
