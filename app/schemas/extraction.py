@@ -55,7 +55,7 @@ class QRValidationStatus(StrEnum):
 class ExtractedField(BaseModel):
     """A single extracted value with provenance metadata."""
     value: Any
-    confidence: float = Field(0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source: FieldSource = FieldSource.raw
     origin: ExtractionOrigin = ExtractionOrigin.llm
     evidence_text: str | None = None
