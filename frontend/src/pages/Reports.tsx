@@ -180,7 +180,7 @@ export default function Reports() {
                 {loadingSuppliers ? (
                   <div className="space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-44 w-full rounded-lg" /><Skeleton className="h-4 w-1/2" /></div>
                 ) : supplierPieData.length === 0 ? (
-                  <EmptyState icon={PieChartIcon} title="Sem dados" description="Processe faturas para ver a distribuição por fornecedor." />
+                  <EmptyState icon={PieChartIcon} title="Sem gastos registados" description="Processe faturas para ver a distribuição por fornecedor." />
                 ) : (
                   <ResponsiveContainer width="100%" height={220} minWidth={0}>
                     <PieChart>

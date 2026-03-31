@@ -118,7 +118,7 @@ export function DocumentFiltersBar({
             }
           >
             <X className="mr-1 h-3 w-3" />
-            Limpar
+            Limpar filtros
           </Button>
         )}
 

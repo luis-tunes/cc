@@ -184,7 +184,7 @@ export default function Inventory() {
           </TabsList>
           <div className="flex items-center gap-2">
             <Input
-              placeholder="Pesquisar…"
+              placeholder="Pesquisar ingredientes…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 w-48"

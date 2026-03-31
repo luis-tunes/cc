@@ -120,7 +120,7 @@ export function MovementFiltersBar({
             onChange({ search: "", classification: "all", reconciliation: "all", type: "all", anomaly: "all", confidence: "all" })
           }
         >
-          <X className="mr-1 h-3 w-3" /> Limpar
+          <X className="mr-1 h-3 w-3" /> Limpar filtros
         </Button>
       )}
 

@@ -74,7 +74,7 @@ export function ErrorState({
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={onRetry}>
           <RefreshCcw className="h-4 w-4" />
-          Tentar novamente
+          Voltar a tentar
         </Button>
       )}
     </div>

@@ -29,8 +29,8 @@ interface DataTableProps<T> {
 export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
-  emptyTitle = "Sem dados",
-  emptyDescription = "Nenhum registo encontrado.",
+  emptyTitle = "Nenhum registo encontrado",
+  emptyDescription = "Ajuste os filtros ou adicione novos dados.",
   className,
 }: DataTableProps<T>) {
   if (data.length === 0) {

@@ -182,7 +182,7 @@ function StatusIndicator({ status }: { status: UploadingFile["status"] }) {
     case "failed":
       return (
         <span className="flex items-center gap-1 text-xs text-tim-danger">
-          <AlertCircle className="h-3 w-3" /> Erro
+          <AlertCircle className="h-3 w-3" /> Falha no processamento
         </span>
       );
   }

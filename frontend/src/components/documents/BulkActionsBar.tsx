@@ -79,7 +79,7 @@ export function BulkActionsBar({
           </Button>
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onExport}>
             <Download className="mr-1 h-3.5 w-3.5" />
-            Exportar
+            Exportar CSV
           </Button>
           <Button variant="outline" size="sm" className="h-8 text-xs text-muted-foreground" onClick={onArchive}>
             <Archive className="mr-1 h-3.5 w-3.5" />

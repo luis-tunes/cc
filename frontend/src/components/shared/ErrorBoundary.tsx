@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <Button onClick={this.handleReset} variant="outline" className="gap-2">
             <RotateCcw className="h-4 w-4" />
-            Tentar novamente
+            Voltar a tentar
           </Button>
         </div>
       );

@@ -20,7 +20,7 @@ describe("ErrorState", () => {
   it("renders retry button and fires callback", () => {
     const onRetry = vi.fn();
     render(<ErrorState onRetry={onRetry} />);
-    const btn = screen.getByRole("button", { name: /tentar novamente/i });
+    const btn = screen.getByRole("button", { name: /voltar a tentar/i });
     fireEvent.click(btn);
     expect(onRetry).toHaveBeenCalledOnce();
   });
@@ -28,7 +28,7 @@ describe("ErrorState", () => {
   it("does not render retry button when onRetry is omitted", () => {
     render(<ErrorState />);
     expect(
-      screen.queryByRole("button", { name: /tentar novamente/i })
+      screen.queryByRole("button", { name: /voltar a tentar/i })
     ).not.toBeInTheDocument();
   });
 
