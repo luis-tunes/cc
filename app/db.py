@@ -387,6 +387,192 @@ def _init_db_schema():
             CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(tenant_id, created_at DESC);
         """)
 
+        # ── Accounting: Chart of Accounts ─────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                code        VARCHAR(16) NOT NULL,
+                name        TEXT NOT NULL,
+                type        VARCHAR(16) NOT NULL,
+                parent_code VARCHAR(16),
+                active      BOOLEAN NOT NULL DEFAULT true,
+                created_at  TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(tenant_id, code)
+            );
+            CREATE INDEX IF NOT EXISTS idx_accounts_tenant ON accounts(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(tenant_id, type);
+        """)
+
+        # ── Accounting: Fiscal Periods ────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS fiscal_periods (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                start_date  DATE NOT NULL,
+                end_date    DATE NOT NULL,
+                status      VARCHAR(16) NOT NULL DEFAULT 'open',
+                lock_date   DATE,
+                created_at  TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(tenant_id, name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_fiscal_periods_tenant ON fiscal_periods(tenant_id);
+        """)
+
+        # ── Accounting: Journals ──────────────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS accounting_journals (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                code        VARCHAR(8) NOT NULL,
+                name        TEXT NOT NULL,
+                type        VARCHAR(16) NOT NULL,
+                active      BOOLEAN NOT NULL DEFAULT true,
+                created_at  TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(tenant_id, code)
+            );
+            CREATE INDEX IF NOT EXISTS idx_accounting_journals_tenant
+                ON accounting_journals(tenant_id);
+        """)
+
+        # ── Accounting: Journal Entries ───────────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                journal_id      INTEGER NOT NULL REFERENCES accounting_journals(id),
+                period_id       INTEGER REFERENCES fiscal_periods(id),
+                entry_date      DATE NOT NULL,
+                reference       TEXT NOT NULL DEFAULT '',
+                description     TEXT NOT NULL DEFAULT '',
+                source_type     VARCHAR(32),
+                source_id       INTEGER,
+                status          VARCHAR(16) NOT NULL DEFAULT 'draft',
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_journal_entries_tenant
+                ON journal_entries(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_journal_entries_date
+                ON journal_entries(tenant_id, entry_date);
+            CREATE INDEX IF NOT EXISTS idx_journal_entries_source
+                ON journal_entries(tenant_id, source_type, source_id);
+        """)
+
+        # ── Accounting: Journal Entry Lines ───────────────────────────
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS journal_entry_lines (
+                id          SERIAL PRIMARY KEY,
+                entry_id    INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+                account_id  INTEGER NOT NULL REFERENCES accounts(id),
+                debit       NUMERIC(15,2) NOT NULL DEFAULT 0,
+                credit      NUMERIC(15,2) NOT NULL DEFAULT 0,
+                description TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_entry
+                ON journal_entry_lines(entry_id);
+            CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_account
+                ON journal_entry_lines(account_id);
+
+            CREATE TABLE IF NOT EXISTS customers (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                nif         VARCHAR(20) NOT NULL DEFAULT '',
+                email       TEXT NOT NULL DEFAULT '',
+                phone       TEXT NOT NULL DEFAULT '',
+                address     TEXT NOT NULL DEFAULT '',
+                postal_code TEXT NOT NULL DEFAULT '',
+                city        TEXT NOT NULL DEFAULT '',
+                country     VARCHAR(2) NOT NULL DEFAULT 'PT',
+                notes       TEXT NOT NULL DEFAULT '',
+                active      BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_customers_tenant
+                ON customers(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_customers_nif
+                ON customers(tenant_id, nif);
+        """)
+
+        # ── Invoice series & invoices ─────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS invoice_series (
+                id                      SERIAL PRIMARY KEY,
+                tenant_id               TEXT NOT NULL,
+                series_code             VARCHAR(20) NOT NULL,
+                document_type           VARCHAR(30) NOT NULL DEFAULT 'FT',
+                current_number          INTEGER NOT NULL DEFAULT 0,
+                atcud_validation_code   VARCHAR(50) NOT NULL DEFAULT '',
+                active                  BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at              TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_series_code
+                ON invoice_series(tenant_id, series_code);
+            CREATE INDEX IF NOT EXISTS idx_invoice_series_tenant
+                ON invoice_series(tenant_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS invoices (
+                id              SERIAL PRIMARY KEY,
+                tenant_id       TEXT NOT NULL,
+                series_id       INTEGER NOT NULL REFERENCES invoice_series(id),
+                number          INTEGER NOT NULL,
+                document_type   VARCHAR(30) NOT NULL DEFAULT 'FT',
+                atcud           VARCHAR(80) NOT NULL DEFAULT '',
+                customer_id     INTEGER REFERENCES customers(id),
+                customer_name   TEXT NOT NULL DEFAULT '',
+                customer_nif    VARCHAR(20) NOT NULL DEFAULT '',
+                issue_date      DATE NOT NULL,
+                due_date        DATE,
+                subtotal        NUMERIC(15,2) NOT NULL DEFAULT 0,
+                vat_total       NUMERIC(15,2) NOT NULL DEFAULT 0,
+                total           NUMERIC(15,2) NOT NULL DEFAULT 0,
+                withholding_tax NUMERIC(15,2) NOT NULL DEFAULT 0,
+                net_total       NUMERIC(15,2) NOT NULL DEFAULT 0,
+                currency        VARCHAR(3) NOT NULL DEFAULT 'EUR',
+                notes           TEXT NOT NULL DEFAULT '',
+                status          VARCHAR(20) NOT NULL DEFAULT 'rascunho',
+                finalized_at    TIMESTAMPTZ,
+                voided_at       TIMESTAMPTZ,
+                created_at      TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_series_number
+                ON invoices(tenant_id, series_id, number);
+            CREATE INDEX IF NOT EXISTS idx_invoices_tenant
+                ON invoices(tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_invoices_customer
+                ON invoices(tenant_id, customer_id);
+            CREATE INDEX IF NOT EXISTS idx_invoices_date
+                ON invoices(tenant_id, issue_date);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS invoice_lines (
+                id              SERIAL PRIMARY KEY,
+                invoice_id      INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+                tenant_id       TEXT NOT NULL,
+                line_number     INTEGER NOT NULL DEFAULT 1,
+                description     TEXT NOT NULL DEFAULT '',
+                quantity        NUMERIC(12,4) NOT NULL DEFAULT 1,
+                unit_price      NUMERIC(15,4) NOT NULL DEFAULT 0,
+                discount_pct    NUMERIC(5,2) NOT NULL DEFAULT 0,
+                vat_rate        NUMERIC(5,2) NOT NULL DEFAULT 23,
+                subtotal        NUMERIC(15,2) NOT NULL DEFAULT 0,
+                vat_amount      NUMERIC(15,2) NOT NULL DEFAULT 0,
+                total           NUMERIC(15,2) NOT NULL DEFAULT 0,
+                snc_account     VARCHAR(20) NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice
+                ON invoice_lines(invoice_id);
+        """)
+
         # ── Unique constraints (safe to run repeatedly) ───────────────
         conn.execute("""
             DO $$ BEGIN
