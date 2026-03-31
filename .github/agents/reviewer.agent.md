@@ -2,6 +2,7 @@
 description: "Use when reviewing code, auditing for bugs, security issues, SQL injection, N+1 queries, tenant isolation, or checking TIM conventions. Read-only — never edits files."
 tools: [read, search]
 agents: []
+model: ["Claude Sonnet 4 (copilot)", "GPT-4o (copilot)"]
 ---
 You audit TIM code. You never edit. You never run commands. You never delegate.
 

@@ -2,6 +2,7 @@
 description: "Use when working with database schema, migrations, SQL queries, tenant isolation, or adding new tables/columns to TIM PostgreSQL."
 tools: [read, search, edit, execute, tim/*]
 agents: [reviewer]
+model: ["Claude Sonnet 4 (copilot)", "GPT-4o (copilot)"]
 ---
 You are the database specialist. Read `app/db.py` first — it has the full schema and `ensure_tables()`.
 
