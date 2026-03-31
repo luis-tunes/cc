@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useAssistant, useAssistantPrompts } from "@/hooks/use-assistant";
+import { useUser } from "@clerk/react";
 import { cn } from "@/lib/utils";
 
 const categoryColors: Record<string, string> = {
@@ -14,7 +15,7 @@ const categoryColors: Record<string, string> = {
   comunicação:  "bg-purple-100 text-purple-800 border-purple-200",
 };
 
-function MessageBubble({ role, content, timestamp }: { role: "user" | "assistant"; content: string; timestamp: Date }) {
+function MessageBubble({ role, content, timestamp, userInitials }: { role: "user" | "assistant"; content: string; timestamp: Date; userInitials: string }) {
   const isUser = role === "user";
   // Split content into segments: plain text and **bold** markers
   const parts = content.split(/(\*\*.+?\*\*)/g);
@@ -24,7 +25,7 @@ function MessageBubble({ role, content, timestamp }: { role: "user" | "assistant
         "h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold",
         isUser ? "bg-primary text-primary-foreground" : "bg-muted border"
       )}>
-        {isUser ? "EU" : <Bot className="h-4 w-4 text-muted-foreground" />}
+        {isUser ? userInitials : <Bot className="h-4 w-4 text-muted-foreground" />}
       </div>
       <div className={cn(
         "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
@@ -50,9 +51,13 @@ function MessageBubble({ role, content, timestamp }: { role: "user" | "assistant
 export default function AiAssistant() {
   const { messages, sendMessage, clearMessages, isPending } = useAssistant();
   const { data: prompts = [] } = useAssistantPrompts();
+  const { user } = useUser();
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const userInitials = user?.firstName && user?.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : user?.firstName?.[0]?.toUpperCase() ?? "EU";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -107,7 +112,7 @@ export default function AiAssistant() {
         {/* Message list */}
         <div className="flex-1 overflow-y-auto rounded-xl border bg-muted/30 p-4 space-y-4 scroll-smooth">
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} role={msg.role} content={msg.content} timestamp={msg.timestamp} />
+            <MessageBubble key={msg.id} role={msg.role} content={msg.content} timestamp={msg.timestamp} userInitials={userInitials} />
           ))}
           {isPending && (
             <div className="flex gap-3">

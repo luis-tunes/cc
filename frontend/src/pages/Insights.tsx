@@ -20,8 +20,8 @@ function fmt(n: number) {
 export default function Insights() {
   const colors = useChartColors();
   const { data: pl, isLoading, isError, refetch } = usePlReport();
-  const { data: topSuppliers = [] } = useTopSuppliers(8);
-  const { data: auditData } = useAuditFlags();
+  const { data: topSuppliers = [], isError: suppliersError } = useTopSuppliers(8);
+  const { data: auditData, isError: auditError } = useAuditFlags();
 
   const cashFlowData = pl?.months.map((m) => ({
     month: m.month_label,
@@ -30,7 +30,7 @@ export default function Insights() {
     gastos: m.gastos,
   })) ?? [];
 
-  const supplierData = topSuppliers.map((s) => ({ name: s.supplier_nif, value: s.total_spend }));
+  const supplierData = topSuppliers.map((s) => ({ name: s.supplier_name || s.supplier_nif, value: s.total_spend }));
 
   const avgMontlyResult = cashFlowData.length > 0
     ? cashFlowData.reduce((s, m) => s + m.resultado, 0) / cashFlowData.length
@@ -126,7 +126,9 @@ export default function Insights() {
             <h3 className="text-sm font-semibold">Gastos por Fornecedor</h3>
           </div>
           <div className="p-4">
-            {supplierData.length === 0 ? (
+            {suppliersError ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Erro ao carregar fornecedores</div>
+            ) : supplierData.length === 0 ? (
               <EmptyState icon={PieChartIcon} title="Sem fornecedores com gastos registados" description="Os dados aparecerão após processar faturas." />
             ) : (
               <ResponsiveContainer width="100%" height={192}>

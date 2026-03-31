@@ -391,6 +391,20 @@ def _init_db_schema():
             CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(tenant_id, type);
         """)
 
+        # ── CHECK constraints (idempotent — skip if already exists) ──
+        for _constraint, ddl in [
+            ("chk_documents_total_gte_0", "ALTER TABLE documents ADD CONSTRAINT chk_documents_total_gte_0 CHECK (total >= 0)"),
+            ("chk_documents_vat_gte_0", "ALTER TABLE documents ADD CONSTRAINT chk_documents_vat_gte_0 CHECK (vat >= 0)"),
+            ("chk_reconciliations_confidence", "ALTER TABLE reconciliations ADD CONSTRAINT chk_reconciliations_confidence CHECK (match_confidence BETWEEN 0 AND 1)"),
+            ("chk_assets_useful_life", "ALTER TABLE assets ADD CONSTRAINT chk_assets_useful_life CHECK (useful_life_years > 0)"),
+        ]:
+            conn.execute(f"""
+                DO $$ BEGIN
+                    {ddl};
+                EXCEPTION WHEN duplicate_object THEN NULL;
+                END $$;
+            """)
+
         conn.commit()
 
 

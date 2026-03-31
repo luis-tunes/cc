@@ -47,7 +47,7 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCate
   const [supplierId, setSupplierId] = useState<string>("");
   const [avgCost, setAvgCost] = useState("0");
 
-  const isConsumivel = CONS_CATEGORIES.some((c) => c.value === defaultCategory);
+  const isConsumivel = CONS_CATEGORIES.some((c) => c.value === (category || defaultCategory));
   const dialogTitle = isConsumivel ? "Novo Consumível" : "Nova Matéria Prima";
 
   useEffect(() => {

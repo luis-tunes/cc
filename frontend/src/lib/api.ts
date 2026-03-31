@@ -804,6 +804,7 @@ export interface PlReport {
 
 export interface TopSupplier {
   supplier_nif: string;
+  supplier_name: string;
   doc_count: number;
   total_spend: number;
   total_vat: number;

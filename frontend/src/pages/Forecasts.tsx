@@ -30,6 +30,14 @@ export default function Forecasts() {
     );
   }
 
+  if (isError) {
+    return (
+      <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
+        <ErrorState onRetry={refetch} />
+      </PageContainer>
+    );
+  }
+
   // Simple linear projection: average of last 3 months + trend
   const historical = pl?.months ?? [];
   const last3 = historical.slice(-3);
@@ -60,14 +68,6 @@ export default function Forecasts() {
 
   const totalProjectedReceitas = projections.reduce((s, m) => s + m.receitas, 0);
   const totalProjectedResultado = projections.reduce((s, m) => s + m.resultado, 0);
-
-  if (isError) {
-    return (
-      <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">
-        <ErrorState onRetry={refetch} />
-      </PageContainer>
-    );
-  }
 
   return (
     <PageContainer title="Previsões" subtitle="Projeções de cash flow baseadas em dados históricos">

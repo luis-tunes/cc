@@ -18,17 +18,17 @@ log = logging.getLogger(__name__)
 def _iva_deadline(today: datetime.date) -> tuple[datetime.date, str] | None:
     """Compute the next IVA quarterly deadline relative to today.
 
-    Portuguese IVA deadlines: Q1 submitted by 15 May, Q2 by 15 Aug,
-    Q3 by 15 Nov, Q4 by 15 Feb of the next year.
+    Portuguese IVA deadlines: Q1 submitted by 20 May, Q2 by 20 Aug,
+    Q3 by 20 Nov, Q4 by 20 Feb of the next year (art. 41.º CIVA).
     """
     year = today.year
     # (deadline_date, period_label) for each quarter's submission
     deadlines = [
-        (datetime.date(year, 2, 15), f"T4 {year - 1}"),
-        (datetime.date(year, 5, 15), f"T1 {year}"),
-        (datetime.date(year, 8, 15), f"T2 {year}"),
-        (datetime.date(year, 11, 15), f"T3 {year}"),
-        (datetime.date(year + 1, 2, 15), f"T4 {year}"),
+        (datetime.date(year, 2, 20), f"T4 {year - 1}"),
+        (datetime.date(year, 5, 20), f"T1 {year}"),
+        (datetime.date(year, 8, 20), f"T2 {year}"),
+        (datetime.date(year, 11, 20), f"T3 {year}"),
+        (datetime.date(year + 1, 2, 20), f"T4 {year}"),
     ]
     for deadline, period in deadlines:
         days_left = (deadline - today).days

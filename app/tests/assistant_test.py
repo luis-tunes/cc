@@ -337,6 +337,12 @@ class TestIntentDetection:
         assert self._detect("como está a minha conta?") == "dashboard"
         assert self._detect("resumo geral") == "dashboard"
 
+    def test_iva_not_hijacked_by_dashboard(self):
+        """'como está o IVA?' must match tax_iva, not dashboard."""
+        assert self._detect("como está o meu IVA?") == "tax_iva"
+        assert self._detect("como está o IVA este mês?") == "tax_iva"
+        assert self._detect("como está a situação fiscal?") == "tax_iva"
+
     def test_docs_count(self):
         assert self._detect("quantos documentos tenho?") == "docs_count"
 
@@ -349,6 +355,10 @@ class TestIntentDetection:
 
     def test_iva(self):
         assert self._detect("quanto de IVA tenho?") == "tax_iva"
+        assert self._detect("declaração periódica") == "tax_iva"
+        assert self._detect("modelo 303") == "tax_iva"
+        assert self._detect("centro fiscal") == "tax_iva"
+        assert self._detect("como está o IRC?") == "tax_iva"
 
     def test_help(self):
         assert self._detect("ajuda") == "help"

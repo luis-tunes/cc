@@ -544,7 +544,11 @@ async def classification_stats(auth: AuthInfo = Depends(require_auth)):
 
 # SNC accounts for content-based suggestion
 _SNC_SUGGEST = {
-    "fatura": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "fatura": {"account": "71", "label": "Vendas"},
+    "fatura-fornecedor": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "fatura-recibo": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "fatura-simplificada": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
+    "fatura-proforma": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
     "recibo": {"account": "62", "label": "Fornecimentos e Serviços Externos"},
     "nota-credito": {"account": "22", "label": "Fornecedores"},
     "nota-debito": {"account": "21", "label": "Clientes"},
@@ -656,11 +660,21 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
         raise HTTPException(status_code=404, detail="document not found")
     return row
 
+VALID_DOC_STATUSES = {"pendente", "pendente ocr", "a processar", "extraído", "aprovado", "rejeitado", "classificado", "revisto", "arquivado"}
+
 @router.patch("/documents/{doc_id}", response_model=DocumentOut)
 async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = Depends(require_auth)):
     updates = patch.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=422, detail="no fields to update")
+    # Validate status
+    if "status" in updates and updates["status"] not in VALID_DOC_STATUSES:
+        raise HTTPException(status_code=422, detail=f"invalid status: {updates['status']}")
+    # Validate NIFs
+    for nif_field in ("supplier_nif", "client_nif"):
+        nif_val = updates.get(nif_field)
+        if nif_val and nif_val != "000000000" and nif_val != "" and not validate_nif(nif_val):
+            raise HTTPException(status_code=422, detail=f"invalid {nif_field}: {nif_val}")
     set_parts = []
     params: list = []
     for k, v in updates.items():
@@ -2479,11 +2493,11 @@ async def tax_iva_periods(auth: AuthInfo = Depends(require_auth)):
             "year": r["year"],
             "quarter": r["quarter"],
             "doc_count": r["doc_count"],
-            "total_invoiced": float(r["total_invoiced"] or 0),
-            "total_vat": float(r["total_vat"] or 0),
-            "vat_collected": float(r["vat_collected"] or 0),
-            "vat_deductible": float(r["vat_deductible"] or 0),
-            "vat_due": float((r["vat_collected"] or 0) - (r["vat_deductible"] or 0)),
+            "total_invoiced": round(float(r["total_invoiced"] or 0), 2),
+            "total_vat": round(float(r["total_vat"] or 0), 2),
+            "vat_collected": round(float(r["vat_collected"] or 0), 2),
+            "vat_deductible": round(float(r["vat_deductible"] or 0), 2),
+            "vat_due": round(float((r["vat_collected"] or 0) - (r["vat_deductible"] or 0)), 2),
         }
         for r in rows
     ]
@@ -2508,9 +2522,9 @@ async def tax_irc_estimate(auth: AuthInfo = Depends(require_auth)):
             """,
             (tid, year),
         ).fetchone()
-    receitas = float(totals["receitas"] or 0)
-    gastos = float(totals["gastos"] or 0)
-    resultado = receitas - gastos
+    receitas = round(float(totals["receitas"] or 0), 2)
+    gastos = round(float(totals["gastos"] or 0), 2)
+    resultado = round(receitas - gastos, 2)
     # PT IRC: 17% up to €25k, 21% above (simplified estimate)
     if resultado <= 0:
         irc_estimate = 0.0
@@ -2588,7 +2602,7 @@ PT_OBLIGATIONS: list[dict[str, object]] = [
     {"id": "iva_q2", "type": "IVA", "period": "T2", "deadline_month": 8, "deadline_day": 20, "description": "Declaração IVA 2º Trimestre"},
     {"id": "iva_q3", "type": "IVA", "period": "T3", "deadline_month": 11, "deadline_day": 20, "description": "Declaração IVA 3º Trimestre"},
     {"id": "iva_q4", "type": "IVA", "period": "T4", "deadline_month": 2, "deadline_day": 20, "description": "Declaração IVA 4º Trimestre"},
-    {"id": "irc_annual", "type": "IRC", "period": "Anual", "deadline_month": 7, "deadline_day": 31, "description": "Declaração Modelo 22 (IRC)"},
+    {"id": "irc_annual", "type": "IRC", "period": "Anual", "deadline_month": 5, "deadline_day": 31, "description": "Declaração Modelo 22 (IRC)"},
     {"id": "irs_cat_b", "type": "IRS", "period": "Anual", "deadline_month": 6, "deadline_day": 30, "description": "IRS Categoria B (se aplicável)"},
     {"id": "ss_q1", "type": "SS", "period": "T1", "deadline_month": 4, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
     {"id": "ss_q2", "type": "SS", "period": "T2", "deadline_month": 7, "deadline_day": 20, "description": "Segurança Social – Declaração Trimestral"},
@@ -2672,16 +2686,16 @@ async def report_pl(year: int | None = None, auth: AuthInfo = Depends(require_au
     data = []
     for r in rows:
         mm = int(r["month"].split("-")[1]) - 1
-        receitas = float(r["receitas"] or 0)
-        gastos = float(r["gastos"] or 0)
+        receitas = round(float(r["receitas"] or 0), 2)
+        gastos = round(float(r["gastos"] or 0), 2)
         data.append({
             "month": r["month"],
             "month_label": months_pt[mm],
             "receitas": receitas,
-            "iva_cobrado": float(r["iva_cobrado"] or 0),
+            "iva_cobrado": round(float(r["iva_cobrado"] or 0), 2),
             "gastos": gastos,
-            "iva_dedutivel": float(r["iva_dedutivel"] or 0),
-            "resultado": receitas - gastos,
+            "iva_dedutivel": round(float(r["iva_dedutivel"] or 0), 2),
+            "resultado": round(receitas - gastos, 2),
             "doc_count": r["doc_count"],
         })
     totals = {
@@ -2701,16 +2715,18 @@ async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT supplier_nif,
+            SELECT d.supplier_nif,
+                   s.name AS supplier_name,
                    COUNT(*) as doc_count,
-                   SUM(total) as total_spend,
-                   SUM(vat) as total_vat,
-                   MAX(date) as last_date
-            FROM documents
-            WHERE tenant_id = %s
-              AND type IN ('fatura-fornecedor', 'recibo')
-              AND status != 'arquivado'
-            GROUP BY supplier_nif
+                   SUM(d.total) as total_spend,
+                   SUM(d.vat) as total_vat,
+                   MAX(d.date) as last_date
+            FROM documents d
+            LEFT JOIN suppliers s ON s.nif = d.supplier_nif AND s.tenant_id = d.tenant_id
+            WHERE d.tenant_id = %s
+              AND d.type IN ('fatura-fornecedor', 'recibo')
+              AND d.status != 'arquivado'
+            GROUP BY d.supplier_nif, s.name
             ORDER BY total_spend DESC
             LIMIT %s
             """,
@@ -2719,9 +2735,10 @@ async def report_top_suppliers(limit: int = 10, auth: AuthInfo = Depends(require
     return [
         {
             "supplier_nif": r["supplier_nif"],
+            "supplier_name": r["supplier_name"] or r["supplier_nif"],
             "doc_count": r["doc_count"],
-            "total_spend": float(r["total_spend"] or 0),
-            "total_vat": float(r["total_vat"] or 0),
+            "total_spend": round(float(r["total_spend"] or 0), 2),
+            "total_vat": round(float(r["total_vat"] or 0), 2),
             "last_date": r["last_date"].isoformat() if r["last_date"] else None,
         }
         for r in rows

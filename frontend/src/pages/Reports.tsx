@@ -33,7 +33,7 @@ export default function Reports() {
   const totals = pl?.totals;
 
   const supplierPieData = topSuppliers.slice(0, 8).map((s) => ({
-    name: s.supplier_nif,
+    name: s.supplier_name || s.supplier_nif,
     value: s.total_spend,
   }));
 
@@ -204,8 +204,8 @@ export default function Reports() {
                   <div key={s.supplier_nif} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{s.supplier_nif}</p>
-                      <p className="text-xs text-muted-foreground">{s.doc_count} docs · último {s.last_date ? new Date(s.last_date).toLocaleDateString("pt-PT") : "—"}</p>
+                      <p className="text-xs font-medium truncate">{s.supplier_name || s.supplier_nif}</p>
+                      <p className="text-xs text-muted-foreground">{s.supplier_name ? s.supplier_nif + " · " : ""}{s.doc_count} docs · último {s.last_date ? new Date(s.last_date).toLocaleDateString("pt-PT") : "—"}</p>
                     </div>
                     <p className="text-xs font-semibold text-tim-danger">{fmt(s.total_spend)}</p>
                   </div>

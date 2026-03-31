@@ -110,7 +110,7 @@ export default function Reconciliation() {
     toast.warning("Marcado como exceção");
   }, [patchRecon]);
 
-  const allResolved = summary.approved + summary.autoMatched === summary.total && summary.total > 0;
+  const allResolved = summary.approved === summary.total && summary.total > 0;
 
   // Group by section for "all" view
   const sections = useMemo(() => {

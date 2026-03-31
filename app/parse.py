@@ -47,7 +47,7 @@ Return ONLY valid JSON with these exact fields:
   "client_name": string (company/person name of the client, "" if not found),
   "date": string (document issue date in ISO YYYY-MM-DD, null if not found),
   "due_date": string (payment due date in ISO YYYY-MM-DD, null if not found),
-  "type": string (one of: "fatura", "fatura-recibo", "fatura-simplificada", "fatura-proforma", "recibo", "nota-credito", "nota-debito", "extrato", "guia-remessa", "orcamento", "outro"),
+  "type": string (one of: "fatura", "fatura-fornecedor", "fatura-recibo", "fatura-simplificada", "fatura-proforma", "recibo", "nota-credito", "nota-debito", "extrato", "guia-remessa", "orcamento", "outro"),
   "payment_method": string ("transferência", "multibanco", "mbway", "dinheiro", "cheque", "cartão", "débito direto", "" if not found),
   "description": string (brief summary of goods/services in document, max 120 chars, in Portuguese),
   "line_items": [
@@ -84,7 +84,9 @@ Return ONLY valid JSON with these exact fields:
 - DO NOT confuse supplier and client NIFs
 
 ### Document Type
-- "FT" / "Fatura" = fatura
+- "FT" / "Fatura" (issued BY the company / sales invoice) = fatura
+- "FT" / "Fatura" (received FROM a supplier / purchase invoice / despesa) = fatura-fornecedor
+  → If the document was clearly issued by ANOTHER company and the client/buyer is the document recipient, classify as fatura-fornecedor
 - "FR" / "Fatura-Recibo" / "Fatura/Recibo" = fatura-recibo
 - "FS" / "Fatura Simplificada" = fatura-simplificada
 - "FP" / "Fatura Pro-forma" / "Proforma" = fatura-proforma
@@ -689,9 +691,9 @@ def parse_invoice(pdf_bytes: bytes) -> dict:
 
 
 _VALID_DOC_TYPES = frozenset({
-    "fatura", "fatura-recibo", "fatura-simplificada", "fatura-proforma",
-    "recibo", "nota-credito", "nota-debito", "extrato", "guia-remessa",
-    "orcamento", "outro",
+    "fatura", "fatura-fornecedor", "fatura-recibo", "fatura-simplificada",
+    "fatura-proforma", "recibo", "nota-credito", "nota-debito", "extrato",
+    "guia-remessa", "orcamento", "outro",
 })
 
 _MIME_FROM_EXT = {

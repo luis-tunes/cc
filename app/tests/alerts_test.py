@@ -7,62 +7,62 @@ from app.alerts import _iva_deadline, generate_compliance_alerts
 
 class TestIvaDeadline:
     def test_no_deadline_far_from_any(self):
-        # June 20 — next deadline Aug 15 is 56 days away (>30)
+        # June 20 — next deadline Aug 20 is 61 days away (>30)
         assert _iva_deadline(datetime.date(2025, 6, 20)) is None
 
     def test_q1_deadline_approaching(self):
-        # April 20 — May 15 is 25 days away
+        # April 20 — May 20 is 30 days away
         result = _iva_deadline(datetime.date(2025, 4, 20))
         assert result is not None
         deadline, period = result
-        assert deadline == datetime.date(2025, 5, 15)
+        assert deadline == datetime.date(2025, 5, 20)
         assert period == "T1 2025"
 
     def test_q2_deadline_approaching(self):
-        # July 20 — Aug 15 is 26 days away
-        result = _iva_deadline(datetime.date(2025, 7, 20))
+        # July 25 — Aug 20 is 26 days away
+        result = _iva_deadline(datetime.date(2025, 7, 25))
         assert result is not None
         deadline, period = result
-        assert deadline == datetime.date(2025, 8, 15)
+        assert deadline == datetime.date(2025, 8, 20)
         assert period == "T2 2025"
 
     def test_q3_deadline_approaching(self):
-        # Oct 20 — Nov 15 is 26 days away
-        result = _iva_deadline(datetime.date(2025, 10, 20))
+        # Oct 25 — Nov 20 is 26 days away
+        result = _iva_deadline(datetime.date(2025, 10, 25))
         assert result is not None
         deadline, period = result
-        assert deadline == datetime.date(2025, 11, 15)
+        assert deadline == datetime.date(2025, 11, 20)
         assert period == "T3 2025"
 
     def test_q4_deadline_approaching_year_boundary(self):
-        # Jan 20 2026 — Feb 15 2026 is 26 days away (T4 2025)
-        result = _iva_deadline(datetime.date(2026, 1, 20))
+        # Jan 25 2026 — Feb 20 2026 is 26 days away (T4 2025)
+        result = _iva_deadline(datetime.date(2026, 1, 25))
         assert result is not None
         deadline, period = result
-        assert deadline == datetime.date(2026, 2, 15)
+        assert deadline == datetime.date(2026, 2, 20)
         assert period == "T4 2025"
 
     def test_deadline_day_itself_returns_none(self):
         # On the deadline day (0 days left), no alert
-        assert _iva_deadline(datetime.date(2025, 5, 15)) is None
+        assert _iva_deadline(datetime.date(2025, 5, 20)) is None
 
     def test_day_after_deadline_returns_none(self):
-        assert _iva_deadline(datetime.date(2025, 5, 16)) is None
+        assert _iva_deadline(datetime.date(2025, 5, 21)) is None
 
     def test_exactly_30_days_before(self):
-        # 30 days before May 15 = April 15
-        result = _iva_deadline(datetime.date(2025, 4, 15))
+        # 30 days before May 20 = April 20
+        result = _iva_deadline(datetime.date(2025, 4, 20))
         assert result is not None
-        assert result[0] == datetime.date(2025, 5, 15)
+        assert result[0] == datetime.date(2025, 5, 20)
 
     def test_31_days_before_returns_none(self):
-        # 31 days before May 15 = April 14
-        assert _iva_deadline(datetime.date(2025, 4, 14)) is None
+        # 31 days before May 20 = April 19
+        assert _iva_deadline(datetime.date(2025, 4, 19)) is None
 
     def test_works_for_any_year(self):
         result = _iva_deadline(datetime.date(2030, 4, 20))
         assert result is not None
-        assert result[0] == datetime.date(2030, 5, 15)
+        assert result[0] == datetime.date(2030, 5, 20)
         assert result[1] == "T1 2030"
 
 

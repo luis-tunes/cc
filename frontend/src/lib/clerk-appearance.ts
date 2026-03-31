@@ -69,13 +69,14 @@ export const clerkAppearance = {
   },
 };
 
-/** Appearance for inline Organization Profile (Settings page - embedded, no chrome). */
+/** Appearance for inline Organization Profile (Settings page - embedded). */
 export const orgProfileAppearance = {
   elements: {
     rootBox: "w-full [&_.cl-organizationProfile-root]:w-full",
     card: "bg-transparent shadow-none border-0 p-0 m-0",
-    navbar: "!hidden",
-    navbarMobileMenuButton: "!hidden",
+    navbar: "border-border bg-muted/30 rounded-lg mb-3 p-1",
+    navbarButton: "text-foreground hover:bg-muted text-xs",
+    navbarMobileMenuButton: "text-muted-foreground",
     headerTitle: "text-foreground text-sm font-semibold",
     headerSubtitle: "text-muted-foreground text-xs",
     page: "w-full gap-4",
@@ -94,8 +95,8 @@ export const orgProfileAppearance = {
     tableHead: "text-xs uppercase tracking-wider text-muted-foreground",
     badge: "text-xs",
     accordionTriggerButton: "text-sm text-foreground hover:bg-muted/50",
-    breadcrumbs: "hidden",
-    breadcrumbsItem: "hidden",
+    breadcrumbs: "text-xs text-muted-foreground mb-2",
+    breadcrumbsItem: "text-xs text-muted-foreground hover:text-foreground",
   },
 };
 

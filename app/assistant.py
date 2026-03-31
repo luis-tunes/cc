@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 _INTENTS = [
     # Inventory — checked first so "como está o inventário" doesn't fall to dashboard
     ("inventory",      r"invent[aá]rio|\bstock\b|existências|rup?tura|ingredientes?"),
+    # IVA / Tax — checked before dashboard so "como está o IVA?" isn't hijacked
+    ("tax_iva",        r"\biva\b|imposto sobre valor|taxa de iva|declara[cç][aã]o de iva|declara[cç][aã]o peri[oó]dica|modelo 303|\bfiscal\b|\birc\b|centro fiscal"),
     # Dashboard / summary
     ("dashboard",      r"resumo|painel|dashboard|estado geral|como est[aáã]\b"),
     # Documents
@@ -35,8 +37,6 @@ _INTENTS = [
     ("alerts",         r"alertas?|avisos?|problemas?|compliance"),
     # Assets
     ("assets",         r"ativos?|imobilizad|bens|deprecia[cç]"),
-    # IVA / Tax
-    ("tax_iva",        r"\biva\b|imposto sobre valor|taxa de iva|declara[cç][aã]o de iva"),
     # Suppliers
     ("suppliers",      r"fornecedor|fornecedores|parceiros"),
     # Help / greetings
@@ -200,14 +200,24 @@ def _handle_tax_iva(conn, tid: str) -> str:
     quarter = (today.month - 1) // 3 + 1
     q_start = datetime.date(today.year, (quarter - 1) * 3 + 1, 1)
     tp: list = [str(q_start), str(today), tid]
-    where = "WHERE date >= %s AND date <= %s AND type = 'fatura' AND tenant_id = %s"
     row = conn.execute(
-        f"SELECT COALESCE(SUM(vat),0) as vat, COALESCE(SUM(total),0) as total FROM documents {where}",
+        """SELECT
+             COALESCE(SUM(CASE WHEN type = 'fatura' THEN vat ELSE 0 END), 0) as vat_collected,
+             COALESCE(SUM(CASE WHEN type = 'fatura' THEN total ELSE 0 END), 0) as total_invoiced,
+             COALESCE(SUM(CASE WHEN type IN ('fatura-fornecedor','recibo') THEN vat ELSE 0 END), 0) as vat_deductible,
+             COALESCE(SUM(CASE WHEN type = 'nota-credito' THEN vat ELSE 0 END), 0) as vat_credit_notes
+           FROM documents
+           WHERE date >= %s AND date <= %s AND tenant_id = %s""",
         tp,
     ).fetchone()
+    vat_collected = row['vat_collected'] - row['vat_credit_notes']
+    vat_deductible = row['vat_deductible']
+    vat_due = vat_collected - vat_deductible
     return (
         f"IVA do {quarter}º trimestre de {today.year}:\n"
-        f"💰 IVA liquidado: **{_fmt_eur(row['vat'])}** sobre {_fmt_eur(row['total'])} faturados.\n"
+        f"💰 IVA liquidado: **{_fmt_eur(vat_collected)}** sobre {_fmt_eur(row['total_invoiced'])} faturados.\n"
+        f"📥 IVA dedutível: **{_fmt_eur(vat_deductible)}**\n"
+        f"📊 IVA a {'pagar' if vat_due >= 0 else 'recuperar'}: **{_fmt_eur(abs(vat_due))}**\n"
         "Aceda a **Centro Fiscal** para ver o detalhe das declarações."
     )
 

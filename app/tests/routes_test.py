@@ -367,9 +367,9 @@ def test_iva_periods():
     if data:
         period = data[0]
         assert "quarter" in period
-        assert "cobrado" in period
-        assert "dedutivel" in period
-        assert "devido" in period
+        assert "vat_collected" in period
+        assert "vat_deductible" in period
+        assert "vat_due" in period
 
 
 def test_irc_estimate():

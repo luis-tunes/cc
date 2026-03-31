@@ -144,7 +144,7 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Convidar colegas e gerir permissões</p>
             </div>
           </div>
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 max-h-[600px] overflow-y-auto">
             <OrganizationProfile
               appearance={orgProfileAppearance}
               routing="hash"
