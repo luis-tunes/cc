@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import { navigation } from "./navigation";
 
 describe("navigation config", () => {
-  it("has 3 groups", () => {
-    expect(navigation).toHaveLength(3);
-    expect(navigation.map((g) => g.label)).toEqual(["Principal", "Negócio", "Definições"]);
+  it("has 6 groups", () => {
+    expect(navigation).toHaveLength(6);
+    expect(navigation.map((g) => g.label)).toEqual([
+      "Home", "Documentos", "Financeiro", "Negócio", "Inteligência", "Sistema",
+    ]);
   });
 
   it("all items have required fields", () => {
@@ -23,25 +25,39 @@ describe("navigation config", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  it("Principal group contains core pages", () => {
+  it("Home group has dashboard", () => {
     const paths = navigation[0].items.map((i) => i.path);
     expect(paths).toContain("/painel");
-    expect(paths).toContain("/documentos");
-    expect(paths).toContain("/movimentos");
-    expect(paths).toContain("/reconciliacao");
   });
 
-  it("Negócio group contains business pages", () => {
-    const paths = navigation[1].items.map((i) => i.path);
-    expect(paths).toContain("/inventario");
-    expect(paths).toContain("/fornecedores");
-    expect(paths).toContain("/produtos");
+  it("Documentos group contains doc-related pages", () => {
+    const byLabel = navigation.find((g) => g.label === "Documentos")!;
+    const paths = byLabel.items.map((i) => i.path);
+    expect(paths).toContain("/caixa-entrada");
+    expect(paths).toContain("/documentos");
+    expect(paths).toContain("/classificacoes");
+  });
+
+  it("Financeiro group contains finance pages", () => {
+    const byLabel = navigation.find((g) => g.label === "Financeiro")!;
+    const paths = byLabel.items.map((i) => i.path);
+    expect(paths).toContain("/movimentos");
+    expect(paths).toContain("/reconciliacao");
     expect(paths).toContain("/centro-fiscal");
     expect(paths).toContain("/relatorios");
   });
 
-  it("Definições group contains settings pages", () => {
-    const paths = navigation[2].items.map((i) => i.path);
+  it("Negócio group contains business pages", () => {
+    const byLabel = navigation.find((g) => g.label === "Negócio")!;
+    const paths = byLabel.items.map((i) => i.path);
+    expect(paths).toContain("/inventario");
+    expect(paths).toContain("/fornecedores");
+    expect(paths).toContain("/produtos");
+  });
+
+  it("Sistema group contains settings pages", () => {
+    const byLabel = navigation.find((g) => g.label === "Sistema")!;
+    const paths = byLabel.items.map((i) => i.path);
     expect(paths).toContain("/entidade");
     expect(paths).toContain("/definicoes");
     expect(paths).toContain("/guia");

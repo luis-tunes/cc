@@ -5,7 +5,6 @@ import {
   FileText,
   ArrowDownLeft,
   ArrowUpRight,
-  ArrowLeftRight,
   CheckCircle2,
   AlertTriangle,
   Clock,
@@ -97,12 +96,7 @@ export function MatchCard({ pair, onApprove, onReview, onFlag, className }: Matc
         {/* Center: Match indicator */}
         {!isUnmatched && (
           <div className="flex flex-row items-center justify-center gap-3 border-t px-4 py-3 sm:flex-col sm:border-t-0 sm:border-x sm:py-4">
-            <div className={cn("rounded-full p-2", pair.confidence >= 80 ? "bg-tim-success/10" : pair.confidence >= 50 ? "bg-tim-warning/10" : "bg-tim-danger/10")}>
-              <ArrowLeftRight className={cn("h-4 w-4", pair.confidence >= 80 ? "text-tim-success" : pair.confidence >= 50 ? "text-tim-warning" : "text-tim-danger")} />
-            </div>
-            <span className={cn("text-lg font-bold font-mono tabular-nums sm:mt-2", pair.confidence >= 80 ? "text-tim-success" : pair.confidence >= 50 ? "text-tim-warning" : "text-tim-danger")}>
-              {pair.confidence}%
-            </span>
+            <ConfidenceIndicator value={pair.confidence} size="md" variant="donut" />
             {pair.amountDelta === 0 && (
               <span className="text-xs text-tim-success sm:mt-1">Valor exato</span>
             )}

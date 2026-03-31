@@ -5,6 +5,7 @@ import { LayoutDashboard, Inbox, GitMerge, MoreHorizontal, User } from "lucide-r
 import { useState } from "react";
 import { navigation } from "@/lib/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const MOBILE_TABS = [
   { title: "Painel", path: "/painel", icon: LayoutDashboard },
@@ -12,19 +13,23 @@ const MOBILE_TABS = [
   { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge },
 ];
 
+const MOBILE_TAB_PATHS = new Set(MOBILE_TABS.map((t) => t.path));
+
 export function MobileNav() {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // All nav items not in the bottom bar + Perfil (not in navigation.ts)
-  const moreItems = [
-    ...navigation.flatMap((g) => g.items).filter(
-      (item) => !MOBILE_TABS.some((t) => t.path === item.path)
-    ),
-    { title: "Perfil", path: "/perfil", icon: User, status: "active" as const },
-  ];
+  // Build grouped "more" items — skip items already in bottom bar
+  const moreGroups = navigation
+    .map((group) => ({
+      label: group.label,
+      items: group.items.filter((item) => !MOBILE_TAB_PATHS.has(item.path)),
+    }))
+    .filter((g) => g.items.length > 0);
 
-  const isOnMorePage = moreItems.some((item) => location.pathname === item.path);
+  // Flat list for "is on more page" check
+  const allMorePaths = moreGroups.flatMap((g) => g.items.map((i) => i.path));
+  const isOnMorePage = allMorePaths.includes(location.pathname) || location.pathname === "/perfil";
 
   return (
     <>
@@ -32,7 +37,7 @@ export function MobileNav() {
         aria-label="Navegação principal"
         aria-hidden={moreOpen}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card md:hidden transition-opacity duration-200",
+          "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card/90 backdrop-blur-lg md:hidden transition-opacity duration-200",
           moreOpen && "opacity-0 pointer-events-none"
         )}
         style={{ height: "calc(4rem + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -68,29 +73,58 @@ export function MobileNav() {
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="max-h-[70vh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
+        <SheetContent side="bottom" className="max-h-[75vh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
           <SheetHeader>
             <SheetTitle className="text-base">Navegação</SheetTitle>
           </SheetHeader>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {moreItems.map((item) => {
-              const active = location.pathname === item.path;
-              return (
+          <ScrollArea className="mt-3 max-h-[60vh]">
+            <div className="space-y-4 pb-4">
+              {moreGroups.map((group) => (
+                <div key={group.label}>
+                  <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    {group.label}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {group.items.map((item) => {
+                      const active = location.pathname === item.path;
+                      return (
+                        <NavLink
+                          key={item.path}
+                          to={item.path}
+                          className={cn(
+                            "flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors",
+                            active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                          )}
+                          onClick={() => setMoreOpen(false)}
+                        >
+                          <item.icon className="h-5 w-5" />
+                          <span className="text-xs font-medium leading-tight">{item.title}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {/* Perfil — always at the bottom */}
+              <div>
+                <div className="my-2 h-px bg-border" />
                 <NavLink
-                  key={item.path}
-                  to={item.path}
+                  to="/perfil"
                   className={cn(
-                    "flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors",
-                    active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                    "flex items-center gap-3 rounded-xl p-3 transition-colors",
+                    location.pathname === "/perfil"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
                   )}
                   onClick={() => setMoreOpen(false)}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-xs font-medium leading-tight">{item.title}</span>
+                  <User className="h-5 w-5" />
+                  <span className="text-sm font-medium">Perfil</span>
                 </NavLink>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
     </>

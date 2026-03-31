@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -27,14 +27,34 @@ export function AppLayout() {
   const location = useLocation();
   const pageTitle = getPageTitle(location.pathname);
   const isMobile = useIsMobile();
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  // Move focus to main content area on route change for keyboard/screen reader users
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
 
   return (
     <SidebarProvider>
+      {/* Skip-to-content link for keyboard navigation */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground focus:shadow-lg"
+      >
+        Ir para conteúdo
+      </a>
+
       <div className="flex min-h-screen w-full">
         {!isMobile && <AppSidebar />}
         <main className="flex flex-1 flex-col">
           <AppTopbar title={pageTitle} />
-          <div className={isMobile ? "pb-[calc(4rem+env(safe-area-inset-bottom))]" : ""}>
+          <div
+            id="main-content"
+            ref={mainRef}
+            tabIndex={-1}
+            className={`outline-none ${isMobile ? "pb-[calc(4rem+env(safe-area-inset-bottom))]" : ""}`}
+            aria-live="polite"
+          >
             <Suspense fallback={
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />

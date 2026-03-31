@@ -3,6 +3,55 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { useChartColors } from "@/hooks/use-chart-colors";
+import { useEffect, useRef, useState } from "react";
+
+/* ── Animated number ───────────────────────────────────────────────── */
+
+function AnimatedValue({ value, className }: { value: string; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [display, setDisplay] = useState(value);
+  const prevValue = useRef(value);
+
+  useEffect(() => {
+    if (value === prevValue.current) {
+      setDisplay(value);
+      return;
+    }
+    prevValue.current = value;
+
+    // Try to animate numeric portions
+    const numericPart = value.replace(/[^0-9]/g, "");
+    const prevNumeric = display.replace(/[^0-9]/g, "");
+    const targetNum = parseInt(numericPart, 10);
+    const startNum = parseInt(prevNumeric, 10);
+
+    if (isNaN(targetNum) || isNaN(startNum) || targetNum === startNum) {
+      setDisplay(value);
+      return;
+    }
+
+    const prefix = value.match(/^[^0-9]*/)?.[0] ?? "";
+    const suffix = value.match(/[^0-9]*$/)?.[0] ?? "";
+
+    const duration = 600;
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const current = Math.round(startNum + (targetNum - startNum) * eased);
+      setDisplay(`${prefix}${current}${suffix}`);
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <span ref={ref} className={className}>
+      {display}
+    </span>
+  );
+}
 
 interface KpiCardProps {
   label: string;
@@ -84,8 +133,9 @@ export function KpiCard({
               variant === "danger" && "text-tim-danger",
               variant === "warning" && "text-tim-warning"
             )}
+            role="status"
           >
-            {value}
+            <AnimatedValue value={value} />
           </p>
           {trend && (
             <div className="mt-1.5 flex items-center gap-1">
