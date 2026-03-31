@@ -12,7 +12,7 @@ from app.auth import AuthInfo, require_auth
 from app.cache import cache_invalidate
 from app.db import get_conn, log_activity
 from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, limiter
-from app.reconcile import reconcile_all, suggest_matches
+from app.reconcile import flag_unmatched_movements, get_reconciliation_summary, reconcile_all, suggest_matches
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,10 @@ def _auto_reconcile(tenant_id: str) -> None:
         result = reconcile_all(tenant_id)
         if result:
             logger.info("auto-reconcile: tenant=%s matched=%d", tenant_id, len(result))
+        # Flag movements without documents after reconciliation
+        flagged = flag_unmatched_movements(tenant_id)
+        if flagged:
+            logger.info("auto-reconcile: tenant=%s missing_docs=%d", tenant_id, len(flagged))
         cache_invalidate(f"dashboard:{tenant_id}")
     except Exception:
         logger.exception("auto-reconcile failed for tenant=%s", tenant_id)
@@ -99,9 +103,21 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
     text = content.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text), delimiter=";")
-    if not reader.fieldnames or not {"date", "description", "amount"}.issubset(set(reader.fieldnames)):
-        raise HTTPException(status_code=422, detail="CSV must have columns: date, description, amount")
+
+    # Try bank-specific parsers first (auto-detect)
+    from app.bank_parsers import detect_bank, parse_bank_csv
+    detected_bank = detect_bank(text)
+    parsed_rows = parse_bank_csv(text, detected_bank)
+
+    if not parsed_rows:
+        # Fallback: try the original generic format
+        reader = csv.DictReader(io.StringIO(text), delimiter=";")
+        if not reader.fieldnames or not {"date", "description", "amount"}.issubset(set(reader.fieldnames)):
+            raise HTTPException(status_code=422, detail="Formato CSV não reconhecido. Formatos suportados: CGD, Millennium BCP, BPI, Novo Banco, Santander, ou formato genérico (date;description;amount)")
+        parsed_rows = []
+        for row in reader:
+            parsed_rows.append({"date": row["date"].strip(), "description": row["description"].strip(), "amount": row["amount"].strip().replace(",", ".")})
+
     tid = auth.tenant_id
     count = 0
     skipped = 0
@@ -113,18 +129,20 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
         ).fetchall()
         existing_set = {(str(r["date"]), r["description"], r["amount"]) for r in existing}
 
-        for line_num, row in enumerate(reader, start=2):
+        for line_num, row in enumerate(parsed_rows, start=2):
             if count >= MAX_CSV_ROWS:
                 errors.append(f"Limite de {MAX_CSV_ROWS} linhas atingido, restantes ignoradas")
                 break
             try:
-                tx_date = datetime.date.fromisoformat(row["date"].strip())
+                raw_date = row["date"]
+                tx_date = raw_date if isinstance(raw_date, datetime.date) else datetime.date.fromisoformat(raw_date.strip())
             except (ValueError, AttributeError):
                 errors.append(f"Linha {line_num}: data inválida '{row.get('date', '')}'")
                 continue
-            description = row["description"].strip()
+            description = row["description"].strip() if isinstance(row["description"], str) else str(row["description"])
             try:
-                amount = Decimal(row["amount"].strip().replace(",", "."))
+                raw_amt = row["amount"]
+                amount = raw_amt if isinstance(raw_amt, Decimal) else Decimal(raw_amt.strip().replace(",", "."))
             except Exception:
                 errors.append(f"Linha {line_num}: valor inválido '{row.get('amount', '')}'")
                 continue
@@ -144,7 +162,7 @@ async def upload_bank_csv(request: Request, file: UploadFile, background_tasks: 
     cache_invalidate(f"dashboard:{tid}")
     background_tasks.add_task(_auto_classify, tid)
     background_tasks.add_task(_auto_reconcile, tid)
-    return {"imported": count, "skipped": skipped, "errors": errors[:10]}
+    return {"imported": count, "skipped": skipped, "errors": errors[:10], "bank_detected": detected_bank}
 
 
 @router.get("/bank-transactions", response_model=list[BankTransactionOut])
@@ -449,3 +467,104 @@ async def export_reconciliations_csv(request: Request, auth: AuthInfo = Depends(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reconciliacoes.csv"},
     )
+
+
+# --- Monthly Summary ---
+
+@router.get("/reconciliation-summary")
+async def reconciliation_summary(
+    year: int = Query(...),
+    month: int = Query(..., ge=1, le=12),
+    auth: AuthInfo = Depends(require_auth),
+):
+    return get_reconciliation_summary(auth.tenant_id, year, month)
+
+
+@router.get("/reconciliation-summary/range")
+async def reconciliation_summary_range(
+    months: int = Query(default=6, ge=1, le=24),
+    auth: AuthInfo = Depends(require_auth),
+):
+    """Return monthly summaries for the last N months."""
+    import datetime as _dt
+
+    today = _dt.date.today()
+    results = []
+    for i in range(months):
+        y = today.year
+        m = today.month - i
+        while m <= 0:
+            m += 12
+            y -= 1
+        results.append(get_reconciliation_summary(auth.tenant_id, y, m))
+    return results
+
+
+# --- Manual Reconciliation (1:N support) ---
+
+class ManualReconciliation(BaseModel):
+    document_id: int
+    bank_transaction_id: int
+
+
+@router.post("/reconciliations", status_code=201)
+async def create_reconciliation(body: ManualReconciliation, auth: AuthInfo = Depends(require_auth)):
+    """Manually link a document to a bank transaction (supports 1:N)."""
+    tid = auth.tenant_id
+    with get_conn() as conn:
+        doc = conn.execute(
+            "SELECT id FROM documents WHERE id = %s AND tenant_id = %s",
+            (body.document_id, tid),
+        ).fetchone()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento não encontrado")
+        tx = conn.execute(
+            "SELECT id FROM bank_transactions WHERE id = %s AND tenant_id = %s",
+            (body.bank_transaction_id, tid),
+        ).fetchone()
+        if not tx:
+            raise HTTPException(status_code=404, detail="Movimento bancário não encontrado")
+        row = conn.execute(
+            """INSERT INTO reconciliations (document_id, bank_transaction_id, match_confidence, status, tenant_id)
+               VALUES (%s, %s, %s, 'pendente', %s)
+               ON CONFLICT (document_id, bank_transaction_id) DO NOTHING
+               RETURNING id, document_id, bank_transaction_id, match_confidence, status""",
+            (body.document_id, body.bank_transaction_id, Decimal("1.00"), tid),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=409, detail="Esta reconciliação já existe")
+        log_activity(conn, tid, "reconciliation", row["id"], "manual_link",
+                     f"doc={body.document_id} tx={body.bank_transaction_id}")
+        conn.commit()
+    cache_invalidate(f"dashboard:{tid}")
+    return row
+
+
+# --- Unmatched Movements ---
+
+@router.get("/bank-transactions/unmatched")
+async def list_unmatched_movements(
+    date_from: datetime.date | None = None,
+    date_to: datetime.date | None = None,
+    auth: AuthInfo = Depends(require_auth),
+):
+    """List bank transactions without any reconciled document."""
+    tid = auth.tenant_id
+    clauses = ["bt.tenant_id = %s", "bt.id NOT IN (SELECT bank_transaction_id FROM reconciliations)"]
+    params: list = [tid]
+    if date_from:
+        clauses.append("bt.date >= %s")
+        params.append(date_from)
+    if date_to:
+        clauses.append("bt.date <= %s")
+        params.append(date_to)
+    where = " AND ".join(clauses)
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"""SELECT bt.id, bt.date, bt.description, bt.amount, bt.category, bt.snc_account
+                FROM bank_transactions bt
+                WHERE {where}
+                ORDER BY bt.date DESC""",
+            params,
+        ).fetchall()
+    return rows

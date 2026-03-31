@@ -263,7 +263,7 @@ def test_upload_bank_csv_missing_columns():
         files={"file": ("bad.csv", csv_data.encode(), "text/csv")},
     )
     assert r.status_code == 422
-    assert "columns" in r.json()["detail"]
+    assert "reconhecido" in r.json()["detail"] or "columns" in r.json()["detail"]
 
 
 def test_upload_bank_csv_success():
