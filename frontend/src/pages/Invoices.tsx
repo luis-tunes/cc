@@ -39,6 +39,8 @@ import {
   CheckCircle2,
   XCircle,
   Send,
+  CreditCard,
+  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -50,10 +52,14 @@ import {
   useFinalizeInvoice,
   useVoidInvoice,
   useDeleteInvoice,
+  useInvoicePayments,
+  useCreatePayment,
+  useDeletePayment,
   type Invoice,
 } from "@/hooks/use-invoices";
 import { useCustomers } from "@/hooks/use-customers";
 import type { InvoiceLineIn } from "@/lib/api";
+import { invoiceHtmlUrl } from "@/lib/api";
 
 const DOC_TYPES: Record<string, string> = {
   FT: "Fatura",
@@ -460,6 +466,13 @@ function ViewInvoiceDialog({
   const { data: inv } = useInvoice(invoiceId);
   const finalize = useFinalizeInvoice();
   const voidMut = useVoidInvoice();
+  const { data: payments } = useInvoicePayments(invoiceId);
+  const createPayment = useCreatePayment();
+  const removePayment = useDeletePayment();
+  const [showPayForm, setShowPayForm] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState("");
 
   if (!inv) return null;
 
@@ -555,6 +568,83 @@ function ViewInvoiceDialog({
             </div>
           )}
 
+          {/* Payments section — only for finalized invoices */}
+          {inv.status === "emitida" && (
+            <div className="border-t pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold flex items-center gap-1">
+                  <CreditCard className="h-4 w-4" /> Pagamentos
+                </h4>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setShowPayForm(!showPayForm); setPayAmount(""); }}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Registar
+                </Button>
+              </div>
+
+              {showPayForm && (
+                <div className="flex gap-2 items-end mb-3 p-2 bg-muted/50 rounded">
+                  <div className="flex-1">
+                    <Label className="text-xs">Valor (€)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Data</Label>
+                    <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Método</Label>
+                    <Input value={payMethod} onChange={(e) => setPayMethod(e.target.value)} placeholder="Transferência" />
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={!payAmount || createPayment.isPending}
+                    onClick={() => {
+                      createPayment.mutate(
+                        { invoiceId: inv.id, data: { amount: payAmount, payment_date: payDate, method: payMethod } },
+                        { onSuccess: () => { setShowPayForm(false); setPayAmount(""); setPayMethod(""); } },
+                      );
+                    }}
+                  >
+                    {createPayment.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "OK"}
+                  </Button>
+                </div>
+              )}
+
+              {payments && payments.length > 0 ? (
+                <div className="text-sm space-y-1">
+                  {payments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50">
+                      <span>
+                        {new Date(p.payment_date).toLocaleDateString("pt-PT")}
+                        {p.method && <span className="text-muted-foreground ml-1">({p.method})</span>}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{fmt(p.amount)}</span>
+                        <button
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => removePayment.mutate({ invoiceId: inv.id, paymentId: p.id })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhum pagamento registado.</p>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4 border-t">
             {inv.status === "rascunho" && (
@@ -571,18 +661,27 @@ function ViewInvoiceDialog({
               </Button>
             )}
             {inv.status === "emitida" && (
-              <Button
-                variant="destructive"
-                onClick={() => voidMut.mutate(inv.id, { onSuccess: onClose })}
-                disabled={voidMut.isPending}
-              >
-                {voidMut.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <XCircle className="mr-2 h-4 w-4" />
-                )}
-                Anular
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(invoiceHtmlUrl(inv.id), "_blank")}
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir / PDF
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => voidMut.mutate(inv.id, { onSuccess: onClose })}
+                  disabled={voidMut.isPending}
+                >
+                  {voidMut.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="mr-2 h-4 w-4" />
+                  )}
+                  Anular
+                </Button>
+              </>
             )}
           </div>
         </div>

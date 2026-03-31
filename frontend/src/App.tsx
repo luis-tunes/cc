@@ -50,6 +50,7 @@ const BalanceSheetPage = lazy(() => import("@/pages/BalanceSheet"));
 const ProfitLossPage = lazy(() => import("@/pages/ProfitLoss"));
 const CustomersPage = lazy(() => import("@/pages/Customers"));
 const InvoicesPage = lazy(() => import("@/pages/Invoices"));
+const AgedReceivablesPage = lazy(() => import("@/pages/AgedReceivables"));
 const MovementRulesPage = lazy(() => import("@/pages/MovementRules"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="/reconciliacao" element={<UpgradeGate title="Reconciliação" subtitle="Correspondência entre documentos e movimentos bancários"><Reconciliation /></UpgradeGate>} />
             <Route path="/clientes" element={<UpgradeGate title="Clientes" subtitle="Gestão de clientes e parceiros"><CustomersPage /></UpgradeGate>} />
             <Route path="/faturas" element={<UpgradeGate title="Faturas" subtitle="Emissão e gestão de faturas"><InvoicesPage /></UpgradeGate>} />
+            <Route path="/contas-receber" element={<UpgradeGate title="Contas a Receber" subtitle="Análise de antiguidade de faturas"><AgedReceivablesPage /></UpgradeGate>} />
             <Route path="/inventario" element={<UpgradeGate title="Inventário" subtitle="Gestão de stock e ingredientes"><Inventory /></UpgradeGate>} />
             <Route path="/fornecedores" element={<UpgradeGate title="Fornecedores" subtitle="Gestão de fornecedores"><Suppliers /></UpgradeGate>} />
             <Route path="/produtos" element={<UpgradeGate title="Produtos" subtitle="Gestão de produtos e receitas"><Products /></UpgradeGate>} />

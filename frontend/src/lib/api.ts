@@ -1726,3 +1726,111 @@ export async function fetchInvoiceSummary(year?: number): Promise<InvoiceSummary
   const qs = sp.toString();
   return request<InvoiceSummary>(`/invoices/summary${qs ? `?${qs}` : ""}`);
 }
+
+// ── Invoice Payments ───────────────────────────────────────────────
+
+export interface InvoicePayment {
+  id: number;
+  invoice_id: number;
+  tenant_id: string;
+  amount: number | string;
+  payment_date: string;
+  method: string;
+  reference: string;
+  notes: string;
+  created_at: string;
+  payment_status?: string;
+  amount_paid?: string;
+}
+
+export interface PaymentCreate {
+  amount: string;
+  payment_date: string;
+  method?: string;
+  reference?: string;
+  notes?: string;
+}
+
+export async function fetchInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
+  return request<InvoicePayment[]>(`/invoices/${invoiceId}/payments`);
+}
+
+export async function createInvoicePayment(invoiceId: number, data: PaymentCreate): Promise<InvoicePayment> {
+  return request<InvoicePayment>(`/invoices/${invoiceId}/payments`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function deleteInvoicePayment(invoiceId: number, paymentId: number): Promise<void> {
+  return request<void>(`/invoices/${invoiceId}/payments/${paymentId}`, { method: "DELETE" });
+}
+
+// ── Aged Receivables ───────────────────────────────────────────────
+
+export interface AgedBucket {
+  items: Array<{
+    id: number;
+    number: number;
+    document_type: string;
+    customer_name: string;
+    customer_nif: string;
+    issue_date: string;
+    due_date: string;
+    net_total: number | string;
+    amount_paid: number | string;
+    payment_status: string;
+    series_code: string;
+    outstanding: string;
+    days_overdue?: number;
+  }>;
+  total: string;
+}
+
+export interface AgedReceivablesReport {
+  current: AgedBucket;
+  overdue_1_30: AgedBucket;
+  overdue_31_60: AgedBucket;
+  overdue_61_90: AgedBucket;
+  overdue_90_plus: AgedBucket;
+  total_outstanding: string;
+}
+
+export async function fetchAgedReceivables(): Promise<AgedReceivablesReport> {
+  return request<AgedReceivablesReport>("/invoices/aged-receivables");
+}
+
+export function invoiceHtmlUrl(invoiceId: number): string {
+  return `${BASE}/invoices/${invoiceId}/html`;
+}
+
+// ── IVA Declaration ────────────────────────────────────────────────
+
+export interface IvaAccountDetail {
+  code: string;
+  name: string;
+  total_debit: string;
+  total_credit: string;
+  balance: string;
+}
+
+export interface IvaDeclaration {
+  period: string;
+  date_from: string;
+  date_to: string;
+  iva_dedutivel: string;
+  iva_liquidado: string;
+  iva_apurado: string;
+  a_pagar: string;
+  a_recuperar: string;
+  accounts: Record<string, IvaAccountDetail>;
+}
+
+export async function fetchIvaDeclaration(params: {
+  year: number;
+  quarter?: number;
+  month?: number;
+}): Promise<IvaDeclaration> {
+  const sp = new URLSearchParams();
+  sp.set("year", String(params.year));
+  if (params.quarter) sp.set("quarter", String(params.quarter));
+  if (params.month) sp.set("month", String(params.month));
+  return request<IvaDeclaration>(`/reports/iva-declaration?${sp}`);
+}

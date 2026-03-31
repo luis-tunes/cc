@@ -93,6 +93,7 @@ export const navigation: NavGroup[] = [
     items: [
       { title: "Clientes", path: "/clientes", icon: Users, status: "active", proOnly: true },
       { title: "Faturas", path: "/faturas", icon: Receipt, status: "active", proOnly: true },
+      { title: "Contas a Receber", path: "/contas-receber", icon: Calculator, status: "active", proOnly: true },
       { title: "Inventário", path: "/inventario", icon: Package, status: "active", proOnly: true },
       { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active", proOnly: true },
       { title: "Produtos", path: "/produtos", icon: UtensilsCrossed, status: "active", proOnly: true },
