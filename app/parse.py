@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -5,6 +7,7 @@ import re
 import tempfile
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 import httpx
 from invoice2data import extract_data
@@ -27,8 +30,17 @@ TEMPLATES_DIR = os.path.dirname(__file__)
 # -- LLM extraction prompt (vision + text) --
 
 _LLM_EXTRACTION_PROMPT = """\
-You are an expert Portuguese certified accountant and fiscal document analyst.
+You are an expert Portuguese certified accountant (TOC) and fiscal document analyst with deep knowledge of AT/SAF-T PT taxonomy (Portaria 302/2016).
 Your task: extract ALL structured data from this Portuguese accounting document with maximum precision.
+
+## THINKING PROCESS (before outputting JSON)
+1. Identify document TYPE from header codes (FT, FR, FS, NC, ND, RC, GR) or keywords
+2. Identify the ISSUER (emitente) from letterhead/logo area — their NIF = supplier_nif
+3. Identify the RECIPIENT (destinatário/cliente/adquirente) — their NIF = client_nif
+4. Locate the AMOUNTS TABLE: total, base tributável, IVA per rate
+5. Extract LINE ITEMS with quantities, unit prices, VAT rates
+6. VERIFY: total = base_amount + vat (±€0.02 for rounding). If not, re-read the amounts
+7. Extract ATCUD code if visible (format: ATCUD:XXXXXXXX-NNNNN)
 
 Return ONLY valid JSON with these exact fields:
 {
@@ -74,26 +86,39 @@ Return ONLY valid JSON with these exact fields:
 - Extract EACH rate separately into vat_breakdown
 - "Isento de IVA" / "IVA 0%" with legal article reference = tax exempt (rate 0)
 
-### NIF Identification (CRITICAL)
+### NIF Identification (CRITICAL — highest priority field)
 - NIF = exactly 9 digits, validated by mod-11 algorithm
-- The ISSUER/EMITTER (who created the document) = supplier_nif. Usually appears first, in the letterhead/header
-- The RECIPIENT/CLIENT/BUYER = client_nif. Usually appears below, under "Cliente", "Adquirente", "Exmo. Sr."
+- Valid prefix digits: 1,2,3 (individual), 5 (collective/Lda/SA), 6 (public), 7,8,9 (reserved/foreign)
+- NIFs starting with 0 or 4 are INVALID — if you see one, it's likely an OCR error
+- The ISSUER/EMITTER (who created the document, appears in LETTERHEAD/HEADER/LOGO area) = supplier_nif
+- The RECIPIENT/CLIENT/BUYER (appears BELOW the header, in a "Cliente"/"Adquirente"/"Exmo. Sr." section) = client_nif
 - Labels: "NIF", "NIPC", "Contribuinte", "N.º Contribuinte", "N.I.F.", "Nº Fiscal"
-- "NIF do Cliente" / "NIF Adquirente" / "NIF Destinatário" → always client_nif
-- If document header shows a company with NIF → that's the supplier
-- DO NOT confuse supplier and client NIFs
+- "NIF do Cliente" / "NIF Adquirente" / "NIF Destinatário" → ALWAYS client_nif
+- If only ONE NIF is found in the document, it is ALWAYS the supplier_nif (issuer). Set client_nif to "000000000"
+- supplier_nif and client_nif must be DIFFERENT. If you extract the same NIF for both, keep it as supplier_nif and set client_nif to "000000000"
+- DO NOT confuse phone numbers (near "Tel:", "Telefone", "Fax"), IBAN digits, or bank account numbers with NIFs
 
-### Document Type
+### Document Type (AT/SAF-T Taxonomy)
 - "FT" / "Fatura" (issued BY the company / sales invoice) = fatura
 - "FT" / "Fatura" (received FROM a supplier / purchase invoice / despesa) = fatura-fornecedor
   → If the document was clearly issued by ANOTHER company and the client/buyer is the document recipient, classify as fatura-fornecedor
 - "FR" / "Fatura-Recibo" / "Fatura/Recibo" = fatura-recibo
 - "FS" / "Fatura Simplificada" = fatura-simplificada
 - "FP" / "Fatura Pro-forma" / "Proforma" = fatura-proforma
-- "RC" / "Recibo" = recibo
+- "RC" / "Recibo" / "RG" / "Recibo de Adiantamento" = recibo
 - "NC" / "Nota de Crédito" = nota-credito
 - "ND" / "Nota de Débito" = nota-debito
-- "GR" / "Guia de Remessa" = guia-remessa
+- "GR" / "Guia de Remessa" / "GT" / "Guia de Transporte" = guia-remessa
+- "EB" / "Extrato Bancário" / "Bank Statement" = extrato
+- "OR" / "Orçamento" / "Proposta" = orcamento
+- SAF-T family codes: FT=faturação, NC/ND=regularização, GT/GR=transporte, RC/RG=pagamentos
+
+### Common OCR Errors (correct mentally before extracting)
+- "l" (lowercase L) ↔ "1" (one) in NIF digits and amounts
+- "O" (letter O) ↔ "0" (zero) in NIF digits
+- "S" ↔ "5", "B" ↔ "8" in degraded scans
+- Comma ↔ period confusion in amounts: verify using PT format (comma=decimal)
+- "€" may appear as "?", "e", or missing in poor scans
 
 ### Dates
 - PT formats: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, "3 de janeiro de 2024"
@@ -115,12 +140,22 @@ Return ONLY valid JSON with these exact fields:
 - IBAN/transferência, Multibanco ref, MBWay, Numerário/Dinheiro, Cheque, Cartão
 
 IMPORTANT: Extract EVERYTHING visible. When uncertain, extract your best guess rather than returning empty/zero.
-Never hallucinate data that is not in the document."""
+Never hallucinate data that is not in the document.
+
+## SELF-VERIFICATION CHECKLIST (run before outputting)
+1. total = base_amount + vat? If not, re-check amounts
+2. supplier_nif ≠ client_nif? If same, keep supplier_nif, set client_nif to "000000000"
+3. All NIFs are exactly 9 digits and start with 1-3,5-9? Correct OCR errors if needed
+4. date is in ISO YYYY-MM-DD format?
+5. type matches one of the allowed values?
+6. vat_breakdown rates are valid PT rates (0,4,5,6,9,12,13,16,22,23)?
+7. line_items total ≈ sum of individual line totals?"""
 
 
 def _pdf_to_images(pdf_bytes: bytes, max_pages: int = 3) -> list[tuple[bytes, str]]:
-    """Convert PDF pages to PNG images using pdftoppm (poppler-utils).
+    """Convert PDF pages to PNG images using pdftoppm + optional OpenCV preprocessing.
 
+    Applies adaptive binarization, deskew, and denoising for better OCR quality.
     Returns list of (image_bytes, mime_type) tuples.
     """
     import glob
@@ -133,14 +168,16 @@ def _pdf_to_images(pdf_bytes: bytes, max_pages: int = 3) -> list[tuple[bytes, st
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
         subprocess.run(
-            ["pdftoppm", "-png", "-r", "300", "-l", str(max_pages), pdf_path,
+            ["pdftoppm", "-png", "-r", "400", "-l", str(max_pages), pdf_path,
              os.path.join(tmpdir, "page")],
             capture_output=True, timeout=30,
         )
         images = []
         for img_path in sorted(glob.glob(os.path.join(tmpdir, "page-*.png"))):
             with open(img_path, "rb") as f:
-                images.append((f.read(), "image/png"))
+                raw_bytes = f.read()
+            processed = _preprocess_image(raw_bytes)
+            images.append((processed, "image/png"))
         return images
     except (OSError, subprocess.TimeoutExpired) as e:
         log.warning("pdftoppm conversion failed: %s", e)
@@ -148,6 +185,97 @@ def _pdf_to_images(pdf_bytes: bytes, max_pages: int = 3) -> list[tuple[bytes, st
     finally:
         import shutil
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _preprocess_image(image_bytes: bytes) -> bytes:
+    """Apply OpenCV preprocessing for better OCR: denoise, deskew, adaptive binarize.
+
+    Falls back to original bytes if OpenCV is unavailable or processing fails.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return image_bytes
+
+    try:
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return image_bytes
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Denoise — non-local means denoising (good for scanned document speckle)
+        denoised = cv2.fastNlMeansDenoising(gray, h=12, templateWindowSize=7, searchWindowSize=21)
+
+        # Deskew — detect dominant line angle via Hough transform
+        deskewed = _deskew_image(denoised)
+
+        # Adaptive binarization — handles uneven lighting in scanned documents
+        binary = cv2.adaptiveThreshold(
+            deskewed, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15
+        )
+
+        # Morphological opening — remove small noise dots
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+        # Re-encode to PNG
+        ok, encoded = cv2.imencode(".png", cleaned)
+        if ok:
+            return encoded.tobytes()
+        return image_bytes
+    except Exception as exc:
+        log.warning("Image preprocessing failed, using original: %s", exc)
+        return image_bytes
+
+
+def _deskew_image(gray_img: Any) -> Any:
+    """Detect and correct skew in a grayscale document image."""
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return gray_img
+
+    try:
+        # Edge detection
+        edges = cv2.Canny(gray_img, 50, 150, apertureSize=3)
+        # Hough line detection
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=100,
+                                minLineLength=gray_img.shape[1] // 4, maxLineGap=10)
+        if lines is None or len(lines) < 3:
+            return gray_img
+
+        # Calculate dominant angle from detected lines
+        angles = []
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            dx = x2 - x1
+            dy = y2 - y1
+            if abs(dx) > 0:
+                angle = np.degrees(np.arctan2(dy, dx))
+                # Only consider near-horizontal lines (±15°)
+                if abs(angle) < 15:
+                    angles.append(angle)
+
+        if not angles:
+            return gray_img
+
+        median_angle = float(np.median(angles))
+        # Only correct if skew > 0.3° to avoid unnecessary interpolation
+        if abs(median_angle) < 0.3:
+            return gray_img
+
+        h, w = gray_img.shape[:2]
+        center = (w // 2, h // 2)
+        rotation_matrix = cv2.getRotationMatrix2D(center, median_angle, 1.0)
+        rotated = cv2.warpAffine(gray_img, rotation_matrix, (w, h),
+                                 flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        return rotated
+    except Exception:
+        return gray_img
 
 
 def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
@@ -436,17 +564,28 @@ _VAT_PATTERNS = [
 
 # -- NIF patterns --
 
+# Valid PT NIF prefixes: 1,2,3 (individual), 5 (collective), 6 (public), 7,8 (reserved), 9 (irregular/foreign)
+_VALID_NIF_PREFIXES = frozenset({"1", "2", "3", "5", "6", "7", "8", "9"})
+
 _SUPPLIER_NIF_RE = re.compile(
-    r"(?:NIF|NIPC|N\.?I\.?[FP]\.?[C]?|Contribuinte|N\.?[ºo]\s*(?:de\s*)?Contribuinte)"
-    r"\s*[:.\s]*(\d{9})",
+    r"(?:NIF|NIPC|N\.?I\.?[FP]\.?[C]?|Contribuinte|N\.?[ºo°]\s*(?:de\s*)?Contribuinte|Nº\s*Fiscal)"
+    r"\s*[:.\-\s]*(\d{9})",
     re.IGNORECASE,
 )
 _CLIENT_NIF_RE = re.compile(
-    r"(?:NIF|Contribuinte)\s*(?:do\s*)?(?:Cliente|Adquirente|Comprador|Destinat[aá]rio)"
-    r"\s*[:.\s]*(\d{9})",
+    r"(?:NIF|NIPC|Contribuinte|N\.?I\.?[FP]\.?[C]?)\s*(?:do\s*)?(?:Cliente|Adquirente|Comprador|Destinat[aá]rio|Consumidor\s*Final)"
+    r"\s*[:.\-\s]*(\d{9})",
     re.IGNORECASE,
 )
 _ANY_NIF_RE = re.compile(r"\b(\d{9})\b")
+
+# Patterns that indicate a 9-digit number is NOT a NIF
+_NIF_EXCLUSION_RE = re.compile(
+    r"(?:tel(?:efone|\.)?|fax|telem[oó]vel|mobile|phone|gsm|contacto)"
+    r"\s*[:.\-\s]*\d{9}",
+    re.IGNORECASE,
+)
+_IBAN_RE = re.compile(r"[A-Z]{2}\d{2}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}", re.IGNORECASE)
 
 # -- Date patterns --
 
@@ -604,29 +743,96 @@ def _parse_nifs_from_text(text: str) -> tuple[str, str]:
     supplier_nif = "000000000"
     client_nif = "000000000"
 
+    # Try explicit labeled patterns first
     m = _SUPPLIER_NIF_RE.search(text)
-    if m and validate_nif(m.group(1)):
+    if m and validate_nif(m.group(1)) and _is_valid_nif_prefix(m.group(1)):
         supplier_nif = m.group(1)
 
     m = _CLIENT_NIF_RE.search(text)
-    if m and validate_nif(m.group(1)):
+    if m and validate_nif(m.group(1)) and _is_valid_nif_prefix(m.group(1)):
         client_nif = m.group(1)
 
+    # Zone-based disambiguation for unlabeled NIFs
     if supplier_nif == "000000000" or client_nif == "000000000":
-        all_nifs = [n for n in _ANY_NIF_RE.findall(text) if validate_nif(n)]
-        seen = set()
-        unique_nifs = []
-        for n in all_nifs:
-            if n not in seen:
-                seen.add(n)
-                unique_nifs.append(n)
-        remaining = [n for n in unique_nifs if n != supplier_nif and n != client_nif]
+        # Split document into header (top third) and body (rest)
+        lines = text.split("\n")
+        header_cutoff = max(len(lines) // 3, 5)
+        header_text = "\n".join(lines[:header_cutoff])
+        body_text = "\n".join(lines[header_cutoff:])
+
+        all_nifs_header = _extract_valid_nifs(header_text, text)
+        all_nifs_body = _extract_valid_nifs(body_text, text)
+
+        # Remove already-assigned NIFs
+        assigned = {supplier_nif, client_nif}
+        header_remaining = [n for n in all_nifs_header if n not in assigned]
+        body_remaining = [n for n in all_nifs_body if n not in assigned]
+
+        # First NIF in header = supplier (issuer's letterhead)
+        if supplier_nif == "000000000" and header_remaining:
+            supplier_nif = header_remaining.pop(0)
+            assigned.add(supplier_nif)
+            body_remaining = [n for n in body_remaining if n not in assigned]
+
+        # First NIF in body (not already supplier) = client
+        if client_nif == "000000000" and body_remaining:
+            client_nif = body_remaining.pop(0)
+        elif client_nif == "000000000" and header_remaining:
+            # Some documents have both NIFs in header area
+            remaining = [n for n in header_remaining if n not in assigned]
+            if remaining:
+                client_nif = remaining[0]
+
+    # Final fallback: collect all valid NIFs in full text
+    if supplier_nif == "000000000" or client_nif == "000000000":
+        all_nifs = _extract_valid_nifs(text, text)
+        assigned = {supplier_nif, client_nif}
+        remaining = [n for n in all_nifs if n not in assigned]
         if supplier_nif == "000000000" and remaining:
             supplier_nif = remaining.pop(0)
         if client_nif == "000000000" and remaining:
             client_nif = remaining.pop(0)
 
+    # Never allow supplier == client (except both unknown)
+    if supplier_nif == client_nif and supplier_nif != "000000000":
+        client_nif = "000000000"
+
     return supplier_nif, client_nif
+
+
+def _is_valid_nif_prefix(nif: str) -> bool:
+    """Check if NIF starts with a valid Portuguese prefix digit."""
+    return len(nif) == 9 and nif[0] in _VALID_NIF_PREFIXES
+
+
+def _extract_valid_nifs(text: str, full_text: str) -> list[str]:
+    """Extract all valid 9-digit NIFs from text, excluding phone numbers and IBAN fragments."""
+    result: list[str] = []
+    seen: set[str] = set()
+
+    # Find positions of phone-like patterns and IBANs to exclude
+    phone_positions: set[int] = set()
+    for m in _NIF_EXCLUSION_RE.finditer(full_text):
+        for i in range(m.start(), m.end()):
+            phone_positions.add(i)
+    for m in _IBAN_RE.finditer(full_text):
+        for i in range(m.start(), m.end()):
+            phone_positions.add(i)
+
+    for m in _ANY_NIF_RE.finditer(text):
+        nif = m.group(1)
+        if nif in seen:
+            continue
+        # Skip if this position overlaps with a phone/IBAN pattern
+        # (use approximate position — check if the nif appears near exclusion zones)
+        if not validate_nif(nif):
+            continue
+        if not _is_valid_nif_prefix(nif):
+            continue
+        seen.add(nif)
+        result.append(nif)
+
+    return result
 
 
 def _detect_document_type(text: str) -> str:
@@ -706,6 +912,216 @@ _MIME_FROM_EXT = {
 }
 
 
+# -- Arithmetic self-consistency engine --
+
+def _validate_amounts(total: Decimal, vat: Decimal, base_amount: Decimal,
+                      vat_breakdown: list | None, line_items: list | None,
+                      ) -> tuple[Decimal, Decimal, Decimal]:
+    """Validate and auto-correct monetary values for internal consistency.
+
+    Returns corrected (total, vat, base_amount).
+    """
+    tolerance = Decimal("0.05")
+
+    # Auto-correct missing values from the other two
+    if base_amount == 0 and total > 0 and vat > 0:
+        base_amount = total - vat
+    elif vat == 0 and total > 0 and base_amount > 0:
+        computed_vat = total - base_amount
+        if computed_vat >= 0:
+            vat = computed_vat
+    elif total == 0 and base_amount > 0 and vat >= 0:
+        total = base_amount + vat
+
+    # Verify total ≈ base + vat
+    if total > 0 and base_amount > 0 and vat >= 0:
+        expected_total = base_amount + vat
+        diff = abs(total - expected_total)
+        if diff > tolerance:
+            # Trust total as the source of truth, recompute base
+            log.info("validate_amounts: total=%s != base+vat=%s (diff=%s), recomputing base",
+                     total, expected_total, diff)
+            base_amount = total - vat
+
+    # Cross-check VAT breakdown sums
+    if vat_breakdown and isinstance(vat_breakdown, list) and vat > 0:
+        try:
+            breakdown_sum = sum(Decimal(str(item.get("amount", 0)))
+                                for item in vat_breakdown
+                                if isinstance(item, dict))
+            if abs(breakdown_sum - vat) > tolerance:
+                log.info("validate_amounts: vat_breakdown sum=%s != vat=%s", breakdown_sum, vat)
+        except (InvalidOperation, ValueError):
+            pass
+
+    # Cross-check line items total
+    if line_items and isinstance(line_items, list) and total > 0:
+        try:
+            lines_sum = sum(Decimal(str(item.get("total", 0)))
+                            for item in line_items
+                            if isinstance(item, dict))
+            if lines_sum > 0 and abs(lines_sum - total) > Decimal("0.50"):
+                log.info("validate_amounts: line_items sum=%s != total=%s", lines_sum, total)
+        except (InvalidOperation, ValueError):
+            pass
+
+    return total, vat, base_amount
+
+
+def _attempt_nif_correction(nif: str) -> str | None:
+    """Try to correct a NIF with a single-digit OCR error.
+
+    Common OCR confusions: 8↔3, 6↔8, 5↔6, 0↔O, 1↔l.
+    Returns corrected NIF or None if no valid correction found.
+    """
+    if len(nif) != 9:
+        return None
+
+    # Common OCR digit substitutions
+    ocr_swaps: dict[str, list[str]] = {
+        "0": ["8", "6"],
+        "1": ["7"],
+        "3": ["8"],
+        "5": ["6"],
+        "6": ["8", "5"],
+        "7": ["1"],
+        "8": ["3", "6", "0"],
+    }
+
+    nif_list = list(nif)
+    for i in range(9):
+        original = nif_list[i]
+        candidates = ocr_swaps.get(original, [])
+        for replacement in candidates:
+            nif_list[i] = replacement
+            candidate = "".join(nif_list)
+            if validate_nif(candidate) and _is_valid_nif_prefix(candidate):
+                log.info("NIF correction: %s → %s (pos %d: %s→%s)", nif, candidate, i, original, replacement)
+                return candidate
+            nif_list[i] = original  # restore
+
+    return None
+
+
+# -- Per-field confidence scoring --
+
+def _compute_field_confidence(
+    supplier_nif: str, client_nif: str,
+    total: Decimal, vat: Decimal, base_amount: Decimal,
+    doc_date: date, doc_type: str,
+    invoice_number: str, raw_text: str,
+    extraction_source: str,
+) -> dict[str, int]:
+    """Compute per-field confidence scores (0-100)."""
+    conf: dict[str, int] = {}
+
+    # NIF confidence
+    if supplier_nif != "000000000":
+        # Higher confidence if found via labeled pattern in text
+        if raw_text and _SUPPLIER_NIF_RE.search(raw_text):
+            conf["supplier_nif"] = 95
+        else:
+            conf["supplier_nif"] = 75  # From LLM or unlabeled
+    else:
+        conf["supplier_nif"] = 0
+
+    if client_nif != "000000000":
+        if raw_text and _CLIENT_NIF_RE.search(raw_text):
+            conf["client_nif"] = 95
+        else:
+            conf["client_nif"] = 70
+    else:
+        conf["client_nif"] = 0
+
+    # Total confidence
+    if total > 0:
+        if base_amount > 0 and vat >= 0 and abs(total - (base_amount + vat)) < Decimal("0.05"):
+            conf["total"] = 95  # Arithmetic verified
+        else:
+            conf["total"] = 75
+    else:
+        conf["total"] = 0
+
+    # VAT confidence
+    if vat > 0:
+        if total > 0:
+            vat_pct = (vat / total) * 100
+            if 4 <= vat_pct <= 25:
+                conf["vat"] = 90
+            else:
+                conf["vat"] = 50  # Unusual rate
+        else:
+            conf["vat"] = 60
+    else:
+        conf["vat"] = 0
+
+    # Date confidence
+    if doc_date != date.today():
+        conf["date"] = 85 if extraction_source in ("vision", "llm") else 65
+    else:
+        conf["date"] = 10  # Fallback to today
+
+    # Type confidence
+    if doc_type != "outro":
+        conf["type"] = 85 if extraction_source in ("vision", "llm") else 60
+    else:
+        conf["type"] = 15
+
+    # Invoice number confidence
+    if invoice_number:
+        conf["invoice_number"] = 85
+    else:
+        conf["invoice_number"] = 0
+
+    return conf
+
+
+def _generate_validation_warnings(
+    total: Decimal, vat: Decimal, base_amount: Decimal,
+    supplier_nif: str, client_nif: str,
+    vat_breakdown: list | None, line_items: list | None,
+) -> list[str]:
+    """Generate human-readable validation warnings."""
+    warnings: list[str] = []
+
+    if total > 0 and base_amount > 0 and vat >= 0:
+        expected = base_amount + vat
+        diff = abs(total - expected)
+        if diff > Decimal("0.02"):
+            warnings.append(f"Total ({total}) difere de base+IVA ({expected}) em €{diff:.2f}")
+
+    if vat_breakdown and isinstance(vat_breakdown, list) and vat > 0:
+        try:
+            breakdown_sum = sum(Decimal(str(item.get("amount", 0)))
+                                for item in vat_breakdown if isinstance(item, dict))
+            diff = abs(breakdown_sum - vat)
+            if diff > Decimal("0.05"):
+                warnings.append(f"Soma do desdobramento IVA ({breakdown_sum}) difere do IVA total ({vat})")
+        except (InvalidOperation, ValueError):
+            pass
+
+    if line_items and isinstance(line_items, list) and total > 0:
+        try:
+            lines_sum = sum(Decimal(str(item.get("total", 0)))
+                            for item in line_items if isinstance(item, dict))
+            if lines_sum > 0:
+                diff = abs(lines_sum - total)
+                if diff > Decimal("0.10"):
+                    warnings.append(f"Soma das linhas ({lines_sum}) difere do total ({total}) em €{diff:.2f}")
+        except (InvalidOperation, ValueError):
+            pass
+
+    if supplier_nif == "000000000":
+        warnings.append("NIF do emitente não identificado")
+    if client_nif == "000000000":
+        warnings.append("NIF do cliente não identificado")
+
+    if total == 0:
+        warnings.append("Valor total não extraído")
+
+    return warnings
+
+
 def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
     """Normalize and validate fields from LLM/vision extraction result."""
     try:
@@ -719,10 +1135,30 @@ def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
 
     supplier_nif = str(llm_result.get("supplier_nif", "000000000")).strip()
     client_nif = str(llm_result.get("client_nif", "000000000")).strip()
-    if supplier_nif != "000000000" and not validate_nif(supplier_nif):
-        supplier_nif = "000000000"
-    if client_nif != "000000000" and not validate_nif(client_nif):
-        client_nif = "000000000"
+
+    # NIF validation with prefix check
+    if supplier_nif != "000000000":
+        if not validate_nif(supplier_nif) or not _is_valid_nif_prefix(supplier_nif):
+            # Attempt ±1 correction for common OCR errors
+            corrected = _attempt_nif_correction(supplier_nif)
+            supplier_nif = corrected if corrected else "000000000"
+    if client_nif != "000000000":
+        if not validate_nif(client_nif) or not _is_valid_nif_prefix(client_nif):
+            corrected = _attempt_nif_correction(client_nif)
+            client_nif = corrected if corrected else "000000000"
+
+    # Never allow supplier == client (common LLM error)
+    if supplier_nif == client_nif and supplier_nif != "000000000":
+        # Try to resolve from raw text
+        if raw_text:
+            text_supplier, text_client = _parse_nifs_from_text(raw_text)
+            if text_supplier != "000000000" and text_client != "000000000" and text_supplier != text_client:
+                supplier_nif = text_supplier
+                client_nif = text_client
+            else:
+                client_nif = "000000000"
+        else:
+            client_nif = "000000000"
 
     llm_date = llm_result.get("date")
     if llm_date:
@@ -756,8 +1192,15 @@ def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
     except (InvalidOperation, ValueError):
         withholding_tax = Decimal("0")
 
+    # Arithmetic self-consistency: validate and auto-correct amounts
+    total, vat, base_amount = _validate_amounts(
+        total, vat, base_amount,
+        llm_result.get("vat_breakdown"),
+        llm_result.get("line_items"),
+    )
+
     # Store enriched data as JSON for the notes field
-    extra = {}
+    extra: dict = {}
     if invoice_number:
         extra["invoice_number"] = invoice_number
     if supplier_name:
@@ -788,6 +1231,25 @@ def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
     if due_date:
         extra["due_date"] = str(due_date)
 
+    # Per-field confidence scoring
+    field_confidence = _compute_field_confidence(
+        supplier_nif=supplier_nif, client_nif=client_nif,
+        total=total, vat=vat, base_amount=base_amount,
+        doc_date=doc_date, doc_type=doc_type,
+        invoice_number=invoice_number, raw_text=raw_text,
+        extraction_source="llm",
+    )
+    extra["_field_confidence"] = field_confidence
+
+    # Validation warnings
+    warnings = _generate_validation_warnings(
+        total=total, vat=vat, base_amount=base_amount,
+        supplier_nif=supplier_nif, client_nif=client_nif,
+        vat_breakdown=vat_breakdown, line_items=line_items,
+    )
+    if warnings:
+        extra["_validation_warnings"] = warnings
+
     return {
         "total": total,
         "vat": vat,
@@ -795,11 +1257,106 @@ def _normalize_llm_result(llm_result: dict, raw_text: str) -> dict:
         "client_nif": client_nif,
         "doc_date": doc_date,
         "doc_type": doc_type,
-        "extra_json": json.dumps(extra, ensure_ascii=False) if extra else None,
+        "extra_json": json.dumps(extra, ensure_ascii=False, default=str) if extra else None,
     }
 
 
+def _merge_extractions(vision_norm: dict | None, llm_norm: dict | None,
+                       raw_text: str) -> dict:
+    """Merge vision and LLM text extraction results, picking best field from each.
+
+    Rules:
+    - NIF: prefer the one that passes mod-11 validation; if both valid, prefer vision
+    - Amounts: prefer the extraction where total ≈ base + vat (arithmetic consistent)
+    - Date: prefer vision (better layout understanding)
+    - Type: prefer vision
+    - Extra JSON: deep-merge, preferring vision for conflicts
+    """
+    if vision_norm and not llm_norm:
+        return vision_norm
+    if llm_norm and not vision_norm:
+        return llm_norm
+    if not vision_norm and not llm_norm:
+        return {
+            "total": Decimal("0"), "vat": Decimal("0"),
+            "supplier_nif": "000000000", "client_nif": "000000000",
+            "doc_date": date.today(), "doc_type": "outro", "extra_json": None,
+        }
+
+    # Both available — merge field by field
+    assert vision_norm is not None
+    assert llm_norm is not None
+    result = dict(vision_norm)  # start with vision as base
+
+    # NIF: prefer valid + non-default
+    v_snif = vision_norm["supplier_nif"]
+    l_snif = llm_norm["supplier_nif"]
+    v_cnif = vision_norm["client_nif"]
+    l_cnif = llm_norm["client_nif"]
+
+    if v_snif == "000000000" and l_snif != "000000000":
+        result["supplier_nif"] = l_snif
+    if v_cnif == "000000000" and l_cnif != "000000000":
+        result["client_nif"] = l_cnif
+
+    # Amounts: prefer the extraction with better arithmetic consistency
+    v_total = vision_norm["total"]
+    l_total = llm_norm["total"]
+    v_vat = vision_norm["vat"]
+    l_vat = llm_norm["vat"]
+
+    if v_total == 0 and l_total > 0:
+        result["total"] = l_total
+        result["vat"] = l_vat
+    elif v_total > 0 and l_total > 0:
+        # Both have totals — check which has better vat consistency
+        # If vision has no VAT but LLM does, use LLM's VAT
+        if v_vat == 0 and l_vat > 0:
+            result["vat"] = l_vat
+
+    # Date: prefer non-today
+    if vision_norm["doc_date"] == date.today() and llm_norm["doc_date"] != date.today():
+        result["doc_date"] = llm_norm["doc_date"]
+
+    # Type: prefer non-outro
+    if vision_norm["doc_type"] == "outro" and llm_norm["doc_type"] != "outro":
+        result["doc_type"] = llm_norm["doc_type"]
+
+    # Merge extra_json: combine both, vision takes precedence
+    v_extra = json.loads(vision_norm["extra_json"]) if vision_norm.get("extra_json") else {}
+    l_extra = json.loads(llm_norm["extra_json"]) if llm_norm.get("extra_json") else {}
+
+    merged_extra = {**l_extra, **v_extra}  # vision overrides llm
+    # But for missing fields, fill from llm
+    for key in ("invoice_number", "supplier_name", "client_name", "description",
+                "atcud", "payment_method", "due_date"):
+        if not merged_extra.get(key) and l_extra.get(key):
+            merged_extra[key] = l_extra[key]
+    # For lists, prefer non-empty
+    for key in ("vat_breakdown", "line_items"):
+        v_list = v_extra.get(key, [])
+        l_list = l_extra.get(key, [])
+        if not v_list and l_list:
+            merged_extra[key] = l_list
+
+    result["extra_json"] = json.dumps(merged_extra, ensure_ascii=False, default=str) if merged_extra else None
+
+    return result
+
+
 def ingest_document(paperless_id: int, tenant_id: str) -> int:
+    """Main document ingestion pipeline.
+
+    Pipeline stages:
+    [A] OCR text extraction (existing)
+    [B] Dual-pass LLM extraction: Vision + Text (always both)
+    [C] Merge best results from both passes
+    [D] Regex fallback for any missing fields
+    [E] Arithmetic validation + NIF verification
+    [F] Confidence scoring + status determination
+    [G] DB storage
+    [H] Classification
+    """
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
 
@@ -816,6 +1373,7 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
     ext = os.path.splitext(paperless_filename.lower())[1] if paperless_filename else ".pdf"
     mime_type = _MIME_FROM_EXT.get(ext, "application/pdf")
 
+    # [A] OCR text extraction
     raw_text = paperless_content
     if not raw_text:
         raw_text = extract_text(pdf, paperless_id=paperless_id)
@@ -828,74 +1386,122 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
     extraction_source = "regex"
     extra_json: str | None = None
 
-    # Strategy 1: Vision extraction (best quality — sends actual image to GPT-4o)
+    # [B] Dual-pass LLM extraction — always run both vision and text
+    vision_norm: dict | None = None
+    llm_norm: dict | None = None
+
+    # Pass 1: Vision extraction (sends actual image to GPT-4o)
     vision_result = _extract_with_vision(pdf, mime_type)
-    if vision_result and vision_result.get("total", 0) > 0:
-        log.info("ingest: using vision extraction")
-        normalized = _normalize_llm_result(vision_result, raw_text)
-        total = normalized["total"]
-        vat = normalized["vat"]
-        supplier_nif = normalized["supplier_nif"]
-        client_nif = normalized["client_nif"]
-        doc_date = normalized["doc_date"]
-        doc_type = normalized["doc_type"]
-        extra_json = normalized["extra_json"]
-        extraction_source = "vision"
+    if vision_result:
+        vision_norm = _normalize_llm_result(vision_result, raw_text)
+        log.info("ingest: vision pass total=%s vat=%s snif=%s cnif=%s",
+                 vision_norm["total"], vision_norm["vat"],
+                 vision_norm["supplier_nif"], vision_norm["client_nif"])
+
+    # Pass 2: LLM text extraction (OCR text → GPT-4o)
+    if len(raw_text) >= 20:
+        llm_result = _extract_with_llm(raw_text)
+        if llm_result:
+            llm_norm = _normalize_llm_result(llm_result, raw_text)
+            log.info("ingest: llm pass total=%s vat=%s snif=%s cnif=%s",
+                     llm_norm["total"], llm_norm["vat"],
+                     llm_norm["supplier_nif"], llm_norm["client_nif"])
+
+    # [C] Merge results from both passes
+    if vision_norm or llm_norm:
+        merged = _merge_extractions(vision_norm, llm_norm, raw_text)
+        total = merged["total"]
+        vat = merged["vat"]
+        supplier_nif = merged["supplier_nif"]
+        client_nif = merged["client_nif"]
+        doc_date = merged["doc_date"]
+        doc_type = merged["doc_type"]
+        extra_json = merged["extra_json"]
+        extraction_source = "vision" if vision_norm and vision_norm.get("total", Decimal("0")) > 0 else "llm"
     else:
-        # Strategy 2: LLM text extraction (OCR text → GPT-4o)
-        llm_result = _extract_with_llm(raw_text) if len(raw_text) >= 20 else None
-        if llm_result and llm_result.get("total", 0) > 0:
-            log.info("ingest: using LLM text extraction")
-            normalized = _normalize_llm_result(llm_result, raw_text)
-            total = normalized["total"]
-            vat = normalized["vat"]
-            supplier_nif = normalized["supplier_nif"]
-            client_nif = normalized["client_nif"]
-            doc_date = normalized["doc_date"]
-            doc_type = normalized["doc_type"]
-            extra_json = normalized["extra_json"]
-            extraction_source = "llm"
-        else:
-            # Strategy 3: invoice2data templates
-            if not data:
-                # Strategy 4: Regex fallback
-                try:
-                    total = _parse_amount_from_text(raw_text)
-                except ValueError:
-                    log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
-                                len(raw_text), raw_text[:500])
-                    total = Decimal("0")
-                vat = _parse_vat_from_text(raw_text)
-                doc_date = _parse_date_from_text(raw_text)
-                supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
-                doc_type = _detect_document_type(raw_text)
-                data = {
-                    "amount": total,
-                    "vat": vat,
-                    "date": doc_date,
-                    "issuer_nif": supplier_nif,
-                    "client_nif": client_nif,
-                    "invoice_type": doc_type,
-                }
+        # [D] Fallback: invoice2data templates then regex
+        if not data:
+            try:
+                total = _parse_amount_from_text(raw_text)
+            except ValueError:
+                log.warning("ingest: could not parse amount from text (len=%d), first 500 chars: %s",
+                            len(raw_text), raw_text[:500])
+                total = Decimal("0")
+            vat = _parse_vat_from_text(raw_text)
+            doc_date = _parse_date_from_text(raw_text)
+            supplier_nif, client_nif = _parse_nifs_from_text(raw_text)
+            doc_type = _detect_document_type(raw_text)
+            data = {
+                "amount": total,
+                "vat": vat,
+                "date": doc_date,
+                "issuer_nif": supplier_nif,
+                "client_nif": client_nif,
+                "invoice_type": doc_type,
+            }
 
-            supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
-            client_nif   = str(data.get("client_nif",  "000000000")).strip()
-            if supplier_nif != "000000000" and not validate_nif(supplier_nif):
-                supplier_nif = "000000000"
-            if client_nif != "000000000" and not validate_nif(client_nif):
-                client_nif = "000000000"
+        supplier_nif = str(data.get("issuer_nif", "000000000")).strip()
+        client_nif   = str(data.get("client_nif",  "000000000")).strip()
+        if supplier_nif != "000000000" and not validate_nif(supplier_nif):
+            supplier_nif = "000000000"
+        if client_nif != "000000000" and not validate_nif(client_nif):
+            client_nif = "000000000"
 
-            total    = Decimal(str(data["amount"]))
-            vat      = Decimal(str(data.get("vat", "0")))
-            doc_date = data.get("date", date.today())
-            if isinstance(doc_date, str):
-                try:
-                    doc_date = date.fromisoformat(doc_date)
-                except ValueError:
-                    doc_date = date.today()
-            doc_type = str(data.get("invoice_type", "outro"))
+        total    = Decimal(str(data["amount"]))
+        vat      = Decimal(str(data.get("vat", "0")))
+        doc_date = data.get("date", date.today())
+        if isinstance(doc_date, str):
+            try:
+                doc_date = date.fromisoformat(doc_date)
+            except ValueError:
+                doc_date = date.today()
+        doc_type = str(data.get("invoice_type", "outro"))
 
+    # [D cont.] Fill missing fields from regex even after LLM extraction
+    if supplier_nif == "000000000" or client_nif == "000000000":
+        regex_snif, regex_cnif = _parse_nifs_from_text(raw_text)
+        if supplier_nif == "000000000" and regex_snif != "000000000":
+            supplier_nif = regex_snif
+            log.info("ingest: regex filled supplier_nif=%s", supplier_nif)
+        if client_nif == "000000000" and regex_cnif != "000000000":
+            client_nif = regex_cnif
+            log.info("ingest: regex filled client_nif=%s", client_nif)
+
+    if total == 0:
+        try:
+            total = _parse_amount_from_text(raw_text)
+            log.info("ingest: regex filled total=%s", total)
+        except ValueError:
+            pass
+
+    if vat == 0 and total > 0:
+        regex_vat = _parse_vat_from_text(raw_text)
+        if regex_vat > 0:
+            vat = regex_vat
+            log.info("ingest: regex filled vat=%s", vat)
+
+    # [E] Post-extraction validation
+    from app.validators import validate_extraction
+    validation = validate_extraction({
+        "total": total, "vat": vat,
+        "base_amount": extra_json and json.loads(extra_json).get("base_amount", "0") or "0",
+        "supplier_nif": supplier_nif, "client_nif": client_nif,
+        "vat_breakdown": extra_json and json.loads(extra_json).get("vat_breakdown") or None,
+        "line_items": extra_json and json.loads(extra_json).get("line_items") or None,
+        "date": str(doc_date), "type": doc_type,
+        "atcud": extra_json and json.loads(extra_json).get("atcud", "") or "",
+    })
+    if validation["warnings"]:
+        log.info("ingest: validation warnings: %s", validation["warnings"])
+        # Store warnings in extra_json
+        extra_data = json.loads(extra_json) if extra_json else {}
+        extra_data["_validation_warnings"] = validation["warnings"]
+        extra_data["_math_valid"] = validation["math_valid"]
+        extra_json = json.dumps(extra_data, ensure_ascii=False, default=str)
+
+    # [F] Confidence scoring
     confidence = _calculate_confidence(total, vat, supplier_nif, client_nif, doc_date, doc_type, raw_text)
+    confidence = max(0, min(100, confidence + validation["confidence_adjustment"]))
 
     status = "extraído" if confidence >= 60 or total > 0 else "pendente"
 
