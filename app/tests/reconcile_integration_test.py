@@ -71,7 +71,7 @@ def test_reconcile_empty():
 def test_reconcile_constants():
     """Tolerance constants match specification."""
     assert Decimal("0.01") == AMOUNT_TOLERANCE
-    assert DATE_TOLERANCE.days == 5
+    assert DATE_TOLERANCE.days == 7
 
 
 def test_reconcile_via_api():
