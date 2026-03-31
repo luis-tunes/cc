@@ -5,6 +5,7 @@ import { DocumentFiltersBar, type DocumentFilters } from "@/components/documents
 import { DocumentList } from "@/components/documents/DocumentList";
 import { BulkActionsBar } from "@/components/documents/BulkActionsBar";
 import { DocumentReviewDrawer } from "@/components/documents/DocumentReviewDrawer";
+import { DocumentReviewPanel } from "@/components/documents/DocumentReviewPanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { TableSkeleton } from "@/components/shared/LoadingSkeletons";
@@ -15,11 +16,13 @@ import { type DocumentRecord, type UploadingFile } from "@/lib/documents-data";
 import { uploadDocument } from "@/lib/api";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
 export default function InboxPage() {
   const { documents: allDocuments, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
+  const isMobile = useIsMobile();
   const [uploadQueue, setUploadQueue] = useState<UploadingFile[]>([]);
   const [showIntake, setShowIntake] = useState(false);
 
@@ -72,6 +75,7 @@ export default function InboxPage() {
       size: f.size,
       progress: 0,
       status: "uploading" as const,
+      previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
     }));
     setUploadQueue((prev) => [...prev, ...newItems]);
     setShowIntake(true);
@@ -149,8 +153,8 @@ export default function InboxPage() {
 
   const openDocument = useCallback((doc: DocumentRecord) => {
     setReviewDoc(doc);
-    setDrawerOpen(true);
-  }, []);
+    if (isMobile) setDrawerOpen(true);
+  }, [isMobile]);
 
   const bulkAction = (action: string) => {
     toast.info(`${action}: ${selectedIds.size} documentos`);
@@ -224,32 +228,49 @@ export default function InboxPage() {
             onClear={() => setSelectedIds(new Set())}
           />
 
-          {/* Document list */}
-          {filtered.length > 0 ? (
-            <DocumentList
-              documents={filtered}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onToggleAll={toggleAll}
-              onOpenDocument={openDocument}
-              onDelete={actions.onDelete}
-            />
-          ) : (
-            <EmptyState
-              title="Nenhum documento encontrado"
-              description="Ajuste os filtros ou importe novos documentos."
-            />
-          )}
+          {/* Document list + side panel */}
+          <div className={reviewDoc && !isMobile ? "flex gap-4" : ""}>
+            <div className={reviewDoc && !isMobile ? "w-[55%] min-w-0" : "w-full"}>
+              {filtered.length > 0 ? (
+                <DocumentList
+                  documents={filtered}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onToggleAll={toggleAll}
+                  onOpenDocument={openDocument}
+                  onDelete={actions.onDelete}
+                />
+              ) : (
+                <EmptyState
+                  title="Nenhum documento encontrado"
+                  description="Ajuste os filtros ou importe novos documentos."
+                />
+              )}
+            </div>
+
+            {/* Desktop: inline side panel */}
+            {reviewDoc && !isMobile && (
+              <div className="w-[45%] min-w-0">
+                <DocumentReviewPanel
+                  document={allDocuments.find((d) => d.id === reviewDoc.id) || reviewDoc}
+                  actions={actions}
+                  onClose={() => setReviewDoc(null)}
+                />
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 
-      {/* Review drawer */}
-      <DocumentReviewDrawer
-        document={reviewDoc}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        actions={actions}
-      />
+      {/* Mobile: review drawer */}
+      {isMobile && (
+        <DocumentReviewDrawer
+          document={reviewDoc}
+          open={drawerOpen}
+          onClose={() => { setDrawerOpen(false); setReviewDoc(null); }}
+          actions={actions}
+        />
+      )}
 
       <ConfirmDialog
         open={bulkDeleteOpen}

@@ -5,6 +5,7 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { DocumentFiltersBar, type DocumentFilters } from "@/components/documents/DocumentFiltersBar";
 import { DocumentReviewDrawer } from "@/components/documents/DocumentReviewDrawer";
+import { DocumentReviewPanel } from "@/components/documents/DocumentReviewPanel";
 import { BulkActionsBar } from "@/components/documents/BulkActionsBar";
 import { GlobalUploadModal } from "@/components/global/GlobalUploadModal";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import {
 import { type DocumentRecord } from "@/lib/documents-data";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { downloadWithAuth } from "@/lib/api";
 import { toast } from "sonner";
 import { TableSkeleton, KpiSkeleton } from "@/components/shared/LoadingSkeletons";
@@ -31,6 +33,7 @@ export default function Documents() {
   const queryClient = useQueryClient();
   const { documents, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
+  const isMobile = useIsMobile();
   const [filters, setFilters] = useState<DocumentFilters>({
     search: "",
     status: "all",
@@ -102,8 +105,8 @@ export default function Documents() {
 
   const handleOpenDocument = useCallback((doc: DocumentRecord) => {
     setActiveDoc(doc);
-    setDrawerOpen(true);
-  }, []);
+    if (isMobile) setDrawerOpen(true);
+  }, [isMobile]);
 
   const bulkApprove = useCallback(() => {
     const ids = [...selectedIds];
@@ -217,20 +220,35 @@ export default function Documents() {
           onClear={() => setSelectedIds(new Set())}
         />
 
-        {/* Document List */}
+        {/* Document List + Side Panel */}
         {error ? (
           <ErrorState onRetry={refetch} />
         ) : isLoading ? (
           <TableSkeleton rows={6} cols={5} />
         ) : filtered.length > 0 ? (
-          <DocumentList
-            documents={filtered}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onToggleAll={handleToggleAll}
-            onOpenDocument={handleOpenDocument}
-            onDelete={actions.onDelete}
-          />
+          <div className={activeDoc && !isMobile ? "flex gap-4" : ""}>
+            <div className={activeDoc && !isMobile ? "w-[55%] min-w-0" : "w-full"}>
+              <DocumentList
+                documents={filtered}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleAll={handleToggleAll}
+                onOpenDocument={handleOpenDocument}
+                onDelete={actions.onDelete}
+              />
+            </div>
+
+            {/* Desktop: inline side panel */}
+            {activeDoc && !isMobile && (
+              <div className="w-[45%] min-w-0">
+                <DocumentReviewPanel
+                  document={documents.find((d) => d.id === activeDoc.id) || activeDoc}
+                  actions={actions}
+                  onClose={() => setActiveDoc(null)}
+                />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 py-16">
             <FileText className="h-10 w-10 text-muted-foreground/40" />
@@ -248,13 +266,15 @@ export default function Documents() {
         )}
       </div>
 
-      {/* Review Drawer */}
-      <DocumentReviewDrawer
-        document={activeDoc ? documents.find((d) => d.id === activeDoc.id) || activeDoc : null}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        actions={actions}
-      />
+      {/* Mobile: Review Drawer */}
+      {isMobile && (
+        <DocumentReviewDrawer
+          document={activeDoc ? documents.find((d) => d.id === activeDoc.id) || activeDoc : null}
+          open={drawerOpen}
+          onClose={() => { setDrawerOpen(false); setActiveDoc(null); }}
+          actions={actions}
+        />
+      )}
 
       {/* Unified Upload Modal */}
       <GlobalUploadModal
