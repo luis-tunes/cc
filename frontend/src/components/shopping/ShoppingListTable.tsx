@@ -121,7 +121,7 @@ function groupItems(items: ShoppingListItem[], by: "supplier" | "urgency"): Grou
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     }
-    const labels: Record<string, string> = { urgente: "🔴 Urgente", alta: "🟠 Alta", normal: "🔵 Normal" };
+    const labels: Record<string, string> = { urgente: "Urgente", alta: "Alta", normal: "Normal" };
     return Array.from(map.entries())
       .filter(([, items]) => items.length > 0)
       .map(([key, items]) => ({

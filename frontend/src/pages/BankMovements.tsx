@@ -155,7 +155,7 @@ export default function BankMovements() {
         />
       ) : isEmpty && !showImport ? (
         <EmptyState
-          illustration="🏦"
+          icon={Landmark}
           title="Sem movimentos bancários"
           description="Importe o extrato CSV do seu banco para classificar e reconciliar transações — tudo automático."
           tutorial="No homebanking, exporte o extrato em CSV. O ficheiro deve ter colunas: data, descrição e valor."

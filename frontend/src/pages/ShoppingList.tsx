@@ -129,7 +129,7 @@ export default function ShoppingList() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <Input
           placeholder="Pesquisar ingrediente ou fornecedor…"
           value={search}
@@ -167,7 +167,7 @@ export default function ShoppingList() {
           title={items.length === 0 ? "Nada para repor" : "Nenhum resultado"}
           description={
             items.length === 0
-              ? "Todos os ingredientes estão acima do stock mínimo. 🎉"
+              ? "Todos os ingredientes estão acima do stock mínimo."
               : "Tente alterar os filtros."
           }
         />

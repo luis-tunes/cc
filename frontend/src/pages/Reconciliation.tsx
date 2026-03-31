@@ -152,7 +152,7 @@ export default function Reconciliation() {
         </div>
       ) : isEmpty ? (
         <EmptyState
-          illustration="🔗"
+          icon={GitMerge}
           title="Pronto para reconciliar"
           description="Importe documentos e movimentos bancários — o sistema encontra as correspondências automaticamente."
           tutorial="A reconciliação liga cada fatura ao respetivo pagamento no banco. Comece por carregar faturas e o extrato CSV."

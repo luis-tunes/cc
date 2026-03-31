@@ -32,6 +32,8 @@ export default function InboxPage() {
     status: "all",
     documentType: "all",
     needsReview: null,
+    dateFrom: "",
+    dateTo: "",
   });
 
   // Selection
@@ -63,6 +65,8 @@ export default function InboxPage() {
           .toLowerCase();
         if (!haystack.includes(q)) return false;
       }
+      if (filters.dateFrom && (!doc.date || doc.date < filters.dateFrom)) return false;
+      if (filters.dateTo && (!doc.date || doc.date > filters.dateTo)) return false;
       return true;
     });
   }, [filters]);
@@ -191,7 +195,7 @@ export default function InboxPage() {
       ) : isEmpty && !showIntake ? (
         /* First-use empty state */
         <EmptyState
-          illustration="📬"
+          icon={FileText}
           title="A caixa de entrada está vazia"
           description="Importe a sua primeira fatura, recibo ou nota de crédito. O xtim.ai extrai os campos automaticamente e sugere classificações — em segundos."
           actionLabel="Importar primeiro documento"

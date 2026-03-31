@@ -154,7 +154,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {alerts.filter((a) => !a.read).length === 0 ? (
-                  <p className="px-4 py-6 text-center text-xs text-muted-foreground">Sem alertas pendentes ✓</p>
+                  <p className="px-4 py-6 text-center text-xs text-muted-foreground">Sem alertas pendentes</p>
                 ) : (
                   alerts
                     .filter((a) => !a.read)
