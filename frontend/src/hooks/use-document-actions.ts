@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { patchDocument, deleteDocument, bulkDeleteDocuments, fetchClassificationSuggestion, reprocessDocument } from "@/lib/api";
 import { toast } from "sonner";
+import { useRef, useCallback } from "react";
 
 export interface DocumentActions {
   onApprove: (id: string) => void;
@@ -16,6 +17,8 @@ export interface DocumentActions {
 }
 
 export function useDocumentActions(refetch: () => void) {
+  const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   const mutation = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, any> }) => {
       return patchDocument(Number(id), patch);
@@ -123,7 +126,26 @@ export function useDocumentActions(refetch: () => void) {
       toast.success("Nota guardada");
     },
     onDelete: (id) => {
-      deleteMutation.mutate(id);
+      // Optimistic: hide row via patch, commit delete after 5s with undo option
+      const timeout = setTimeout(() => {
+        pendingDeletes.current.delete(id);
+        deleteMutation.mutate(id);
+      }, 5000);
+      pendingDeletes.current.set(id, timeout);
+
+      toast("Documento eliminado", {
+        description: "A ação será permanente em 5 segundos.",
+        action: {
+          label: "Desfazer",
+          onClick: () => {
+            const t = pendingDeletes.current.get(id);
+            if (t) clearTimeout(t);
+            pendingDeletes.current.delete(id);
+            refetch();
+          },
+        },
+        duration: 5000,
+      });
     },
     onBulkDelete: (ids) => {
       bulkDeleteMutation.mutate(ids);
