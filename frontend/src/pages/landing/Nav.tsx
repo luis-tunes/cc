@@ -40,15 +40,9 @@ export function Nav() {
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-        {/* Logo with visual anchor */}
-        <Link to="/" className="flex items-center gap-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/20">
-            <span className="text-sm font-extrabold text-primary-foreground">X</span>
-          </div>
-          <div className="flex items-baseline ml-1.5">
-            <span className="text-xl font-extrabold tracking-tight text-foreground">xtim</span>
-            <span className="text-xl font-extrabold tracking-tight text-primary">.ai</span>
-          </div>
+        <Link to="/" className="flex items-baseline">
+          <span className="text-xl font-extrabold tracking-tight text-foreground">xtim</span>
+          <span className="text-xl font-extrabold tracking-tight text-primary">.ai</span>
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -67,7 +61,7 @@ export function Nav() {
           {!isSignedIn && (
             <Link
               to="/auth/sign-in"
-              className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Entrar
             </Link>
@@ -89,7 +83,6 @@ export function Nav() {
         </div>
       </div>
 
-      {/* Mobile menu overlay with per-item slide-in */}
       <div
         className={`fixed inset-x-0 top-0 bottom-0 z-40 bg-background/95 backdrop-blur-md transition-all duration-300 md:hidden ${
           open ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"

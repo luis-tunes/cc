@@ -1,60 +1,5 @@
-import {
-  Eye,
-  Bot,
-  Receipt,
-  BarChart3,
-  TrendingUp,
-  Shield,
-  Utensils,
-  Store,
-  Briefcase,
-  Hotel,
-  HardHat,
-  HeartPulse,
-} from "lucide-react";
-import { FadeIn } from "./shared";
-
-/* ── Sectors strip ─────────────────────────────────────────────────── */
-
-const SECTORS = [
-  { label: "Restauração", icon: Utensils },
-  { label: "Comércio", icon: Store },
-  { label: "Serviços", icon: Briefcase },
-  { label: "Hotelaria", icon: Hotel },
-  { label: "Construção", icon: HardHat },
-  { label: "Saúde", icon: HeartPulse },
-];
-
-export function Sectors() {
-  return (
-    <section className="border-y bg-muted/30 py-10 sm:py-14">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <FadeIn>
-          <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/60">
-            Pensado para negócios portugueses
-          </p>
-          <div className="mt-8 grid grid-cols-3 gap-3 sm:mt-10 sm:grid-cols-6 sm:gap-4">
-            {SECTORS.map((sector) => (
-              <div
-                key={sector.label}
-                className="group flex flex-col items-center gap-2.5 rounded-xl border border-transparent bg-card/60 px-3 py-4 text-center transition-all hover:border-primary/20 hover:bg-card hover:shadow-md sm:py-5"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/8 transition-all group-hover:bg-primary/15 group-hover:scale-110">
-                  <sector.icon className="h-5 w-5 text-primary/70 transition-colors group-hover:text-primary" />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-                  {sector.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </FadeIn>
-      </div>
-    </section>
-  );
-}
-
-/* ── Features — Bento grid with unique accents ─────────────────────── */
+import { Eye, Bot, Receipt, BarChart3, TrendingUp, Shield } from "lucide-react";
+import { FadeIn, CountUp } from "./shared";
 
 const FEATURES: {
   icon: typeof Eye;
@@ -62,82 +7,86 @@ const FEATURES: {
   description: string;
   highlight: string;
   large: boolean;
+  stat?: { value: string; suffix: string; label: string };
   accent: string;
   accentBg: string;
   accentText: string;
   accentBadge: string;
+  borderAccent: string;
 }[] = [
   {
     icon: Eye,
     title: "OCR inteligente",
-    description:
-      "Digitalize faturas, recibos e notas de crédito. Extração automática de NIF, valores, IVA e datas com reconhecimento ótico avançado.",
-    highlight: "< 30 segundos",
+    description: "Digitalize faturas, recibos e notas de crédito. Extração automática de NIF, valores, IVA e datas.",
+    highlight: "Extração automática",
     large: true,
+    stat: { value: "30", suffix: "s", label: "tempo médio de extração" },
     accent: "from-tim-info/10 to-tim-info/[0.02]",
     accentBg: "bg-tim-info/10 group-hover:bg-tim-info/20",
     accentText: "text-tim-info",
     accentBadge: "border-tim-info/20 bg-tim-info/[0.08] text-tim-info",
+    borderAccent: "border-l-tim-info/40",
   },
   {
     icon: Bot,
     title: "Classificação por IA",
-    description:
-      "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
+    description: "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
     highlight: "Aprende consigo",
     large: true,
+    stat: { value: "95", suffix: "%", label: "taxa de acerto" },
     accent: "from-primary/10 to-primary/[0.02]",
     accentBg: "bg-primary/10 group-hover:bg-primary/20",
     accentText: "text-primary",
     accentBadge: "border-primary/20 bg-primary/[0.08] text-primary",
+    borderAccent: "border-l-primary/40",
   },
   {
     icon: Receipt,
     title: "Reconciliação automática",
-    description:
-      "Associação inteligente entre documentos e movimentos bancários por valor e data. Taxa de correspondência média de 95%.",
+    description: "Associação inteligente entre documentos e movimentos bancários por valor, data e NIF.",
     highlight: "95% automático",
     large: false,
     accent: "from-tim-success/10 to-tim-success/[0.02]",
     accentBg: "bg-tim-success/10 group-hover:bg-tim-success/20",
     accentText: "text-tim-success",
     accentBadge: "border-tim-success/20 bg-tim-success/[0.08] text-tim-success",
+    borderAccent: "border-l-tim-success/40",
   },
   {
     icon: BarChart3,
     title: "Dashboard financeiro",
-    description:
-      "Visão completa do estado financeiro: faturação, despesas, IVA a entregar e fluxo de caixa em tempo real.",
+    description: "Faturação, despesas, IVA e fluxo de caixa em tempo real. Pronto para decisões.",
     highlight: "Tempo real",
     large: false,
     accent: "from-tim-warning/10 to-tim-warning/[0.02]",
     accentBg: "bg-tim-warning/10 group-hover:bg-tim-warning/20",
     accentText: "text-tim-warning",
     accentBadge: "border-tim-warning/20 bg-tim-warning/[0.08] text-tim-warning",
+    borderAccent: "border-l-tim-warning/40",
   },
   {
     icon: TrendingUp,
     title: "Relatórios e insights",
-    description:
-      "Demonstração de resultados, análise de fornecedores e tendências — pronto para o seu contabilista.",
-    highlight: "Pronto a exportar",
+    description: "Demonstração de resultados, análise de fornecedores e tendências — pronto para o contabilista.",
+    highlight: "Exportável",
     large: false,
     accent: "from-[hsl(270_60%_55%)]/10 to-[hsl(270_60%_55%)]/[0.02]",
     accentBg: "bg-[hsl(270_60%_55%)]/10 group-hover:bg-[hsl(270_60%_55%)]/20",
     accentText: "text-[hsl(270_60%_55%)]",
-    accentBadge: "border-[hsl(270_60%_55%)]/20 bg-[hsl(270_60%_55%)]/[0.08] text-[hsl(270_60%_55%)]",
+    accentBadge: "bg-[hsl(270_60%_55%)]/[0.08] text-[hsl(270_60%_55%)] border-[hsl(270_60%_55%)]/20",
+    borderAccent: "border-l-[hsl(270_60%_55%)]/40",
   },
   {
     icon: Shield,
     title: "Seguro e conforme",
-    description:
-      "Dados encriptados, em conformidade com RGPD. Interface 100% em português, pensada para quem não é contabilista.",
+    description: "Dados encriptados, RGPD. Interface 100% em português, pensada para quem não é contabilista.",
     highlight: "RGPD",
     large: false,
     accent: "from-tim-danger/8 to-tim-danger/[0.02]",
     accentBg: "bg-tim-danger/10 group-hover:bg-tim-danger/20",
     accentText: "text-tim-danger",
     accentBadge: "border-tim-danger/20 bg-tim-danger/[0.08] text-tim-danger",
+    borderAccent: "border-l-tim-danger/40",
   },
 ];
 
@@ -157,16 +106,14 @@ export function Features() {
           </div>
         </FadeIn>
 
-        {/* Bento grid: 2 large cards on top, 4 small cards below */}
         <div className="mt-14 grid gap-4 sm:mt-16 sm:gap-5 md:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f, i) => (
             <FadeIn key={f.title} delay={i * 80}>
               <div
-                className={`group relative h-full overflow-hidden rounded-2xl border bg-card p-6 transition-all tim-card-hover sm:p-7 ${
+                className={`group relative h-full overflow-hidden rounded-2xl border border-l-2 ${f.borderAccent} bg-card p-6 transition-all tim-card-hover sm:p-7 ${
                   f.large ? "lg:col-span-2" : ""
                 }`}
               >
-                {/* Gradient accent overlay */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${f.accent} opacity-0 transition-opacity duration-500 group-hover:opacity-100`} />
 
                 <div className="relative">
@@ -180,6 +127,16 @@ export function Features() {
                   </div>
                   <h3 className="mt-5 text-lg font-bold text-foreground">{f.title}</h3>
                   <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
+
+                  {/* Embedded stat for large cards */}
+                  {f.stat && (
+                    <div className="mt-5 flex items-baseline gap-2 border-t border-border/50 pt-4">
+                      <span className={`text-3xl font-extrabold tabular-nums ${f.accentText}`}>
+                        {"<"}<CountUp value={f.stat.value} suffix={f.stat.suffix} />
+                      </span>
+                      <span className="text-xs text-muted-foreground">{f.stat.label}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </FadeIn>
