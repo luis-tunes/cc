@@ -182,9 +182,6 @@
 }
 
 /* Signature sidebar warm edge — golden ink wash at the boundary */
-.tim-sidebar-glow {
-  position: relative;
-}
 .tim-sidebar-glow::after {
   content: "";
   position: absolute;
