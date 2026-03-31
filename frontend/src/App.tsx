@@ -42,6 +42,15 @@ const LandingPage = lazy(() => import("@/pages/Landing"));
 const PrivacyPage = lazy(() => import("@/pages/Privacy"));
 const AdminPage = lazy(() => import("@/pages/Admin"));
 const MonitoringPage = lazy(() => import("@/pages/Monitoring"));
+const ChartOfAccounts = lazy(() => import("@/pages/ChartOfAccounts"));
+const JournalEntries = lazy(() => import("@/pages/JournalEntries"));
+const TrialBalance = lazy(() => import("@/pages/TrialBalance"));
+const GeneralLedger = lazy(() => import("@/pages/GeneralLedger"));
+const BalanceSheetPage = lazy(() => import("@/pages/BalanceSheet"));
+const ProfitLossPage = lazy(() => import("@/pages/ProfitLoss"));
+const CustomersPage = lazy(() => import("@/pages/Customers"));
+const InvoicesPage = lazy(() => import("@/pages/Invoices"));
+const MovementRulesPage = lazy(() => import("@/pages/MovementRules"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -89,7 +98,10 @@ export default function App() {
             <Route path="/caixa-entrada" element={<InboxPage />} />
             <Route path="/documentos" element={<Documents />} />
             <Route path="/movimentos" element={<BankMovements />} />
+            <Route path="/regras-movimentos" element={<UpgradeGate title="Regras de Movimentos" subtitle="Classificação automática de movimentos bancários"><MovementRulesPage /></UpgradeGate>} />
             <Route path="/reconciliacao" element={<UpgradeGate title="Reconciliação" subtitle="Correspondência entre documentos e movimentos bancários"><Reconciliation /></UpgradeGate>} />
+            <Route path="/clientes" element={<UpgradeGate title="Clientes" subtitle="Gestão de clientes e parceiros"><CustomersPage /></UpgradeGate>} />
+            <Route path="/faturas" element={<UpgradeGate title="Faturas" subtitle="Emissão e gestão de faturas"><InvoicesPage /></UpgradeGate>} />
             <Route path="/inventario" element={<UpgradeGate title="Inventário" subtitle="Gestão de stock e ingredientes"><Inventory /></UpgradeGate>} />
             <Route path="/fornecedores" element={<UpgradeGate title="Fornecedores" subtitle="Gestão de fornecedores"><Suppliers /></UpgradeGate>} />
             <Route path="/produtos" element={<UpgradeGate title="Produtos" subtitle="Gestão de produtos e receitas"><Products /></UpgradeGate>} />
@@ -100,6 +112,12 @@ export default function App() {
             <Route path="/centro-fiscal" element={<UpgradeGate title="Centro Fiscal" subtitle="IVA, IRC e obrigações fiscais"><TaxCenter /></UpgradeGate>} />
             <Route path="/obrigacoes" element={<UpgradeGate title="Obrigações Fiscais" subtitle="Calendário de prazos"><Obligations /></UpgradeGate>} />
             <Route path="/ativos" element={<UpgradeGate title="Ativos Fixos" subtitle="Gestão de imobilizado e depreciações"><Assets /></UpgradeGate>} />
+            <Route path="/plano-contas" element={<UpgradeGate title="Plano de Contas" subtitle="Sistema de Normalização Contabilística"><ChartOfAccounts /></UpgradeGate>} />
+            <Route path="/lancamentos" element={<UpgradeGate title="Lançamentos" subtitle="Diário de lançamentos contabilísticos"><JournalEntries /></UpgradeGate>} />
+            <Route path="/balancete" element={<UpgradeGate title="Balancete" subtitle="Balancete de verificação"><TrialBalance /></UpgradeGate>} />
+            <Route path="/razao" element={<UpgradeGate title="Razão" subtitle="Razão geral por conta"><GeneralLedger /></UpgradeGate>} />
+            <Route path="/balanco" element={<UpgradeGate title="Balanço" subtitle="Balanço patrimonial"><BalanceSheetPage /></UpgradeGate>} />
+            <Route path="/dem-resultados" element={<UpgradeGate title="Dem. Resultados" subtitle="Demonstração de Resultados"><ProfitLossPage /></UpgradeGate>} />
             <Route path="/relatorios" element={<UpgradeGate title="Relatórios" subtitle="Demonstração de resultados e análise"><Reports /></UpgradeGate>} />
             <Route path="/assistente" element={<UpgradeGate title="Assistente IA" subtitle="Consultas em linguagem natural"><AiAssistant /></UpgradeGate>} />
             <Route path="/insights" element={<UpgradeGate title="Insights" subtitle="Análises financeiras"><Insights /></UpgradeGate>} />

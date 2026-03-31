@@ -1258,3 +1258,471 @@ export async function fetchTenantActivity(): Promise<TenantActivity> {
 export async function fetchChurnRisk(): Promise<ChurnRiskTenant[]> {
   return request<ChurnRiskTenant[]>("/admin/churn-risk");
 }
+
+// ── Accounting ────────────────────────────────────────────────────────
+
+export interface Account {
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  parent_code: string;
+  active: boolean;
+}
+
+export interface FiscalPeriod {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  lock_date: string | null;
+}
+
+export interface AccountingJournal {
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  active: boolean;
+}
+
+export interface JournalEntryLine {
+  id: number;
+  account_code: string;
+  account_name: string;
+  debit: string;
+  credit: string;
+  description: string;
+}
+
+export interface JournalEntry {
+  id: number;
+  journal_code: string;
+  journal_name: string;
+  period_name: string | null;
+  entry_date: string;
+  reference: string;
+  description: string;
+  source_type: string | null;
+  source_id: number | null;
+  status: string;
+  lines?: JournalEntryLine[];
+}
+
+export interface JournalEntryLineIn {
+  account_code: string;
+  debit: string;
+  credit: string;
+  description?: string;
+}
+
+export interface JournalEntryCreate {
+  journal_id: number;
+  entry_date: string;
+  lines: JournalEntryLineIn[];
+  reference?: string;
+  description?: string;
+  period_id?: number;
+}
+
+export interface TrialBalanceRow {
+  code: string;
+  name: string;
+  type: string;
+  total_debit: string;
+  total_credit: string;
+  balance: string;
+}
+
+export interface TrialBalanceReport {
+  rows: TrialBalanceRow[];
+  total_debit: string;
+  total_credit: string;
+  balanced: boolean;
+}
+
+export interface GeneralLedgerRow {
+  id: number;
+  entry_date: string;
+  reference: string;
+  entry_description: string;
+  debit: string;
+  credit: string;
+  balance: string;
+  line_description: string;
+  journal_code: string;
+}
+
+export interface BalanceSheetDetail {
+  code: string;
+  name: string;
+  balance: string;
+}
+
+export interface BalanceSheetReport {
+  as_of: string;
+  assets: string;
+  liabilities: string;
+  equity: string;
+  net_income: string;
+  equity_plus_liabilities: string;
+  balanced: boolean;
+  detail: Record<string, BalanceSheetDetail[]>;
+}
+
+export async function seedAccounting(): Promise<{ accounts_seeded: number; journals_seeded: number }> {
+  return request("/accounting/seed", { method: "POST" });
+}
+
+export async function fetchAccounts(type?: string, activeOnly = true): Promise<Account[]> {
+  const params = new URLSearchParams();
+  if (type) params.set("type", type);
+  if (!activeOnly) params.set("active_only", "false");
+  const qs = params.toString();
+  return request<Account[]>(`/accounts${qs ? `?${qs}` : ""}`);
+}
+
+export async function createAccount(data: { code: string; name: string; type: string; parent_code?: string }): Promise<Account> {
+  return request<Account>("/accounts", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function patchAccount(id: number, data: { name?: string; active?: boolean }): Promise<Account> {
+  return request<Account>(`/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchFiscalPeriods(): Promise<FiscalPeriod[]> {
+  return request<FiscalPeriod[]>("/fiscal-periods");
+}
+
+export async function createFiscalPeriod(data: { name: string; start_date: string; end_date: string }): Promise<FiscalPeriod> {
+  return request<FiscalPeriod>("/fiscal-periods", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function closeFiscalPeriod(id: number): Promise<FiscalPeriod> {
+  return request<FiscalPeriod>(`/fiscal-periods/${id}/close`, { method: "POST" });
+}
+
+export async function fetchAccountingJournals(): Promise<AccountingJournal[]> {
+  return request<AccountingJournal[]>("/accounting-journals");
+}
+
+export async function fetchJournalEntries(params?: {
+  journal_id?: number;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<JournalEntry[]> {
+  const sp = new URLSearchParams();
+  if (params?.journal_id) sp.set("journal_id", String(params.journal_id));
+  if (params?.date_from) sp.set("date_from", params.date_from);
+  if (params?.date_to) sp.set("date_to", params.date_to);
+  if (params?.limit) sp.set("limit", String(params.limit));
+  if (params?.offset) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  return request<JournalEntry[]>(`/journal-entries${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchJournalEntry(id: number): Promise<JournalEntry> {
+  return request<JournalEntry>(`/journal-entries/${id}`);
+}
+
+export async function createJournalEntry(data: JournalEntryCreate): Promise<JournalEntry> {
+  return request<JournalEntry>("/journal-entries", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function generateEntryFromDocument(docId: number, journalId: number): Promise<JournalEntry> {
+  return request<JournalEntry>(`/documents/${docId}/generate-entry`, {
+    method: "POST",
+    body: JSON.stringify({ journal_id: journalId }),
+  });
+}
+
+export async function generateEntryFromBankTx(txId: number, journalId: number): Promise<JournalEntry> {
+  return request<JournalEntry>(`/bank-transactions/${txId}/generate-entry`, {
+    method: "POST",
+    body: JSON.stringify({ journal_id: journalId }),
+  });
+}
+
+export async function fetchTrialBalance(dateFrom?: string, dateTo?: string): Promise<TrialBalanceReport> {
+  const sp = new URLSearchParams();
+  if (dateFrom) sp.set("date_from", dateFrom);
+  if (dateTo) sp.set("date_to", dateTo);
+  const qs = sp.toString();
+  return request<TrialBalanceReport>(`/reports/trial-balance${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchGeneralLedger(accountCode: string, dateFrom?: string, dateTo?: string): Promise<GeneralLedgerRow[]> {
+  const sp = new URLSearchParams();
+  if (dateFrom) sp.set("date_from", dateFrom);
+  if (dateTo) sp.set("date_to", dateTo);
+  const qs = sp.toString();
+  return request<GeneralLedgerRow[]>(`/reports/general-ledger/${encodeURIComponent(accountCode)}${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchBalanceSheet(asOf?: string): Promise<BalanceSheetReport> {
+  const sp = new URLSearchParams();
+  if (asOf) sp.set("as_of", asOf);
+  const qs = sp.toString();
+  return request<BalanceSheetReport>(`/reports/balance-sheet${qs ? `?${qs}` : ""}`);
+}
+
+// ── Profit & Loss (from Journal Entries) ──────────────────────────────
+
+export interface ProfitLossAccount {
+  code: string;
+  name: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface ProfitLossReport {
+  year: number;
+  date_from: string;
+  date_to: string;
+  rendimentos: ProfitLossAccount[];
+  gastos: ProfitLossAccount[];
+  total_rendimentos: number;
+  total_gastos: number;
+  resultado_liquido: number;
+}
+
+export async function fetchProfitLoss(params?: {
+  year?: number;
+  date_from?: string;
+  date_to?: string;
+}): Promise<ProfitLossReport> {
+  const sp = new URLSearchParams();
+  if (params?.year) sp.set("year", String(params.year));
+  if (params?.date_from) sp.set("date_from", params.date_from);
+  if (params?.date_to) sp.set("date_to", params.date_to);
+  const qs = sp.toString();
+  return request<ProfitLossReport>(`/reports/profit-loss${qs ? `?${qs}` : ""}`);
+}
+
+// ── Customers ─────────────────────────────────────────────────────────
+
+export interface Customer {
+  id: number;
+  name: string;
+  nif: string;
+  email: string;
+  phone: string;
+  address: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  notes: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface CustomerCreate {
+  name: string;
+  nif?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  postal_code?: string;
+  city?: string;
+  country?: string;
+  notes?: string;
+}
+
+export async function fetchCustomers(search?: string, activeOnly = true): Promise<Customer[]> {
+  const sp = new URLSearchParams();
+  if (search) sp.set("search", search);
+  if (!activeOnly) sp.set("active_only", "false");
+  const qs = sp.toString();
+  return request<Customer[]>(`/customers${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchCustomer(id: number): Promise<Customer> {
+  return request<Customer>(`/customers/${id}`);
+}
+
+export async function createCustomer(data: CustomerCreate): Promise<Customer> {
+  return request<Customer>("/customers", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function patchCustomer(id: number, data: Partial<CustomerCreate> & { active?: boolean }): Promise<Customer> {
+  return request<Customer>(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteCustomer(id: number): Promise<void> {
+  return request<void>(`/customers/${id}`, { method: "DELETE" });
+}
+
+// ── SAF-T Export ──────────────────────────────────────────────────────
+
+export function getSaftExportUrl(year: number, month?: number): string {
+  const sp = new URLSearchParams({ year: String(year) });
+  if (month) sp.set("month", String(month));
+  return `${BASE}/export/saft?${sp.toString()}`;
+}
+
+// ── Invoice Series ───────────────────────────────────────────────────
+
+export interface InvoiceSeries {
+  id: number;
+  tenant_id: string;
+  series_code: string;
+  document_type: string;
+  current_number: number;
+  atcud_validation_code: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface InvoiceSeriesCreate {
+  series_code: string;
+  document_type: string;
+  atcud_validation_code?: string;
+}
+
+export async function fetchInvoiceSeries(): Promise<InvoiceSeries[]> {
+  return request<InvoiceSeries[]>("/invoice-series");
+}
+
+export async function createInvoiceSeries(data: InvoiceSeriesCreate): Promise<InvoiceSeries> {
+  return request<InvoiceSeries>("/invoice-series", { method: "POST", body: JSON.stringify(data) });
+}
+
+// ── Invoices ─────────────────────────────────────────────────────────
+
+export interface InvoiceLine {
+  id: number;
+  invoice_id: number;
+  line_number: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  discount_pct: number;
+  vat_rate: number;
+  subtotal: number;
+  vat_amount: number;
+  total: number;
+  snc_account: string;
+}
+
+export interface Invoice {
+  id: number;
+  tenant_id: string;
+  series_id: number;
+  series_code: string;
+  number: number;
+  document_type: string;
+  atcud: string;
+  customer_id: number | null;
+  customer_name: string;
+  customer_nif: string;
+  issue_date: string;
+  due_date: string | null;
+  subtotal: number;
+  vat_total: number;
+  total: number;
+  withholding_tax: number;
+  net_total: number;
+  currency: string;
+  notes: string;
+  status: string;
+  finalized_at: string | null;
+  voided_at: string | null;
+  created_at: string;
+  lines?: InvoiceLine[];
+  display_number?: string;
+}
+
+export interface InvoiceLineIn {
+  description: string;
+  quantity: number | string;
+  unit_price: number | string;
+  discount_pct?: number | string;
+  vat_rate?: number | string;
+  snc_account?: string;
+}
+
+export interface InvoiceCreate {
+  series_id: number;
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_nif?: string;
+  issue_date: string;
+  due_date?: string;
+  notes?: string;
+  withholding_tax_pct?: number | string;
+  lines: InvoiceLineIn[];
+}
+
+export interface InvoiceUpdate {
+  customer_id?: number | null;
+  customer_name?: string;
+  customer_nif?: string;
+  issue_date?: string;
+  due_date?: string;
+  notes?: string;
+  withholding_tax_pct?: number | string;
+  lines?: InvoiceLineIn[];
+}
+
+export interface InvoiceSummary {
+  by_status: Array<{ status: string; cnt: number; total_amount: number }>;
+  by_type: Array<{ document_type: string; cnt: number; total_amount: number }>;
+}
+
+export async function fetchInvoices(params?: {
+  status?: string;
+  document_type?: string;
+  customer_id?: number;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<Invoice[]> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.document_type) sp.set("document_type", params.document_type);
+  if (params?.customer_id) sp.set("customer_id", String(params.customer_id));
+  if (params?.date_from) sp.set("date_from", params.date_from);
+  if (params?.date_to) sp.set("date_to", params.date_to);
+  if (params?.search) sp.set("search", params.search);
+  if (params?.limit) sp.set("limit", String(params.limit));
+  if (params?.offset) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  return request<Invoice[]>(`/invoices${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchInvoice(id: number): Promise<Invoice> {
+  return request<Invoice>(`/invoices/${id}`);
+}
+
+export async function createInvoice(data: InvoiceCreate): Promise<Invoice> {
+  return request<Invoice>("/invoices", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function patchInvoice(id: number, data: InvoiceUpdate): Promise<Invoice> {
+  return request<Invoice>(`/invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function finalizeInvoice(id: number): Promise<{ status: string; finalized_at: string }> {
+  return request<{ status: string; finalized_at: string }>(`/invoices/${id}/finalize`, { method: "POST" });
+}
+
+export async function voidInvoice(id: number): Promise<{ status: string; voided_at: string }> {
+  return request<{ status: string; voided_at: string }>(`/invoices/${id}/void`, { method: "POST" });
+}
+
+export async function deleteInvoice(id: number): Promise<void> {
+  return request<void>(`/invoices/${id}`, { method: "DELETE" });
+}
+
+export async function fetchInvoiceSummary(year?: number): Promise<InvoiceSummary> {
+  const sp = new URLSearchParams();
+  if (year) sp.set("year", String(year));
+  const qs = sp.toString();
+  return request<InvoiceSummary>(`/invoices/summary${qs ? `?${qs}` : ""}`);
+}

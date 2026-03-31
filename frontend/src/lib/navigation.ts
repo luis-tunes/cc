@@ -23,6 +23,12 @@ import {
   Activity,
   BookOpen,
   Shield,
+  BookMarked,
+  FileSpreadsheet,
+  Calculator,
+  Scale,
+  Users,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -64,6 +70,7 @@ export const navigation: NavGroup[] = [
     label: "Financeiro",
     items: [
       { title: "Movimentos", path: "/movimentos", icon: Landmark, status: "active" },
+      { title: "Regras de Movimentos", path: "/regras-movimentos", icon: Wand2, status: "active", proOnly: true },
       { title: "Reconciliação", path: "/reconciliacao", icon: GitMerge, status: "active", proOnly: true },
       { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active", proOnly: true },
       { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active", proOnly: true },
@@ -71,8 +78,21 @@ export const navigation: NavGroup[] = [
     ],
   },
   {
+    label: "Contabilidade",
+    items: [
+      { title: "Plano de Contas", path: "/plano-contas", icon: BookMarked, status: "active", proOnly: true },
+      { title: "Lançamentos", path: "/lancamentos", icon: FileSpreadsheet, status: "active", proOnly: true },
+      { title: "Balancete", path: "/balancete", icon: Calculator, status: "active", proOnly: true },
+      { title: "Razão", path: "/razao", icon: BookOpen, status: "active", proOnly: true },
+      { title: "Balanço", path: "/balanco", icon: Scale, status: "active", proOnly: true },
+      { title: "Dem. Resultados", path: "/dem-resultados", icon: BarChart3, status: "active", proOnly: true },
+    ],
+  },
+  {
     label: "Negócio",
     items: [
+      { title: "Clientes", path: "/clientes", icon: Users, status: "active", proOnly: true },
+      { title: "Faturas", path: "/faturas", icon: Receipt, status: "active", proOnly: true },
       { title: "Inventário", path: "/inventario", icon: Package, status: "active", proOnly: true },
       { title: "Fornecedores", path: "/fornecedores", icon: Truck, status: "active", proOnly: true },
       { title: "Produtos", path: "/produtos", icon: UtensilsCrossed, status: "active", proOnly: true },
