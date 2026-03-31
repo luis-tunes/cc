@@ -48,39 +48,39 @@ import {
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "ok")
-    return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-  if (status === "error") return <XCircle className="h-4 w-4 text-red-600" />;
-  return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    return <CheckCircle2 className="h-4 w-4 text-tim-success" />;
+  if (status === "error") return <XCircle className="h-4 w-4 text-tim-danger" />;
+  return <AlertTriangle className="h-4 w-4 text-tim-warning" />;
 }
 
 function planBadge(plan: string, status: string) {
   if (plan === "pro" && status === "active")
     return (
-      <Badge className="bg-green-100 text-green-800 border-green-200">
+      <Badge className="bg-tim-success/10 text-tim-success border-tim-success/20">
         Pro
       </Badge>
     );
   if (status === "past_due")
     return (
-      <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+      <Badge className="bg-tim-warning/10 text-tim-warning border-tim-warning/20">
         Pagamento pendente
       </Badge>
     );
   if (status === "trialing")
     return (
-      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+      <Badge className="bg-tim-info/10 text-tim-info border-tim-info/20">
         Trial
       </Badge>
     );
   if (status === "trial_expired")
     return (
-      <Badge className="bg-red-100 text-red-800 border-red-200">
+      <Badge className="bg-tim-danger/10 text-tim-danger border-tim-danger/20">
         Expirado
       </Badge>
     );
   if (status === "cancelled")
     return (
-      <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+      <Badge className="bg-muted text-muted-foreground border-border">
         Cancelado
       </Badge>
     );
@@ -127,15 +127,15 @@ function formatUptime(seconds: number) {
 }
 
 function latencyColor(ms: number) {
-  if (ms < 100) return "text-green-600";
-  if (ms < 500) return "text-yellow-600";
-  return "text-red-600";
+  if (ms < 100) return "text-tim-success";
+  if (ms < 500) return "text-tim-warning";
+  return "text-tim-danger";
 }
 
 function errorRateColor(rate: number) {
-  if (rate === 0) return "text-green-600";
-  if (rate < 0.05) return "text-yellow-600";
-  return "text-red-600";
+  if (rate === 0) return "text-tim-success";
+  if (rate < 0.05) return "text-tim-warning";
+  return "text-tim-danger";
 }
 
 // ── VIEW 1: Revenue Command Center ──────────────────────────────────
@@ -262,7 +262,7 @@ function RevenueView() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-red-500" />
+            <ShieldAlert className="h-4 w-4 text-tim-danger" />
             Risco de churn ({churnRisk?.length || 0} tenants em risco)
           </CardTitle>
         </CardHeader>
@@ -299,14 +299,14 @@ function RevenueView() {
                           <Badge
                             key={r}
                             variant="outline"
-                            className="text-xs border-red-200 text-red-700"
+                            className="text-xs border-tim-danger/20 text-tim-danger"
                           >
                             {r}
                           </Badge>
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-bold text-red-600">
+                    <TableCell className="text-right font-bold text-tim-danger">
                       {t.risk_score}
                     </TableCell>
                   </TableRow>
@@ -317,7 +317,7 @@ function RevenueView() {
                       colSpan={6}
                       className="text-center text-sm text-muted-foreground py-8"
                     >
-                      <CheckCircle2 className="h-5 w-5 text-green-500 inline mr-2" />
+                      <CheckCircle2 className="h-5 w-5 text-tim-success inline mr-2" />
                       Sem tenants em risco
                     </TableCell>
                   </TableRow>
@@ -552,7 +552,7 @@ function InfraView() {
                       {ep.requests}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={ep.errors > 0 ? "text-red-600 font-medium" : ""}>
+                      <span className={ep.errors > 0 ? "text-tim-danger font-medium" : ""}>
                         {ep.errors}
                       </span>
                     </TableCell>
@@ -601,7 +601,7 @@ function InfraView() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-red-500" />
+            <XCircle className="h-4 w-4 text-tim-danger" />
             Erros recentes (5xx)
             {errors && errors.length > 0 && (
               <Badge variant="destructive" className="ml-2">
@@ -638,7 +638,7 @@ function InfraView() {
                     <TableCell className="font-mono text-xs">
                       {err.path}
                     </TableCell>
-                    <TableCell className="text-right text-red-600 font-medium">
+                    <TableCell className="text-right text-tim-danger font-medium">
                       {err.status}
                     </TableCell>
                     <TableCell className="text-right">
@@ -658,7 +658,7 @@ function InfraView() {
                       colSpan={7}
                       className="text-center text-sm text-muted-foreground py-8"
                     >
-                      <CheckCircle2 className="h-5 w-5 text-green-500 inline mr-2" />
+                      <CheckCircle2 className="h-5 w-5 text-tim-success inline mr-2" />
                       Sem erros recentes
                     </TableCell>
                   </TableRow>

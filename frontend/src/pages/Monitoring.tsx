@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 function StatusDot({ status }: { status: string }) {
-  const color = status === "ok" ? "bg-green-500" : status === "degraded" ? "bg-yellow-500" : "bg-red-500";
+  const color = status === "ok" ? "bg-tim-success" : status === "degraded" ? "bg-tim-warning" : "bg-tim-danger";
   return <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} />;
 }
 
@@ -28,7 +28,7 @@ function ServiceCard({ name, service }: { name: string; service: { status: strin
           <span className="text-xs text-muted-foreground">{service.latency_ms}ms</span>
         )}
         {service.detail && (
-          <span className="text-xs text-red-500">{service.detail}</span>
+          <span className="text-xs text-tim-danger">{service.detail}</span>
         )}
       </div>
     </div>
@@ -64,8 +64,8 @@ export default function Monitoring() {
     return (
       <PageContainer title="Monitorização">
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="rounded-full bg-red-500/10 p-4 mb-4">
-            <ShieldX className="h-8 w-8 text-red-500" />
+          <div className="rounded-full bg-tim-danger/10 p-4 mb-4">
+            <ShieldX className="h-8 w-8 text-tim-danger" />
           </div>
           <h2 className="text-lg font-semibold">Acesso restrito</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -172,7 +172,7 @@ export default function Monitoring() {
                           <td className="py-1.5 pr-4 text-right">{ep.requests}</td>
                           <td className="py-1.5 pr-4 text-right">
                             {ep.errors > 0 ? (
-                              <span className="text-red-500">{ep.errors}</span>
+                              <span className="text-tim-danger">{ep.errors}</span>
                             ) : (
                               <span className="text-muted-foreground">0</span>
                             )}
@@ -194,14 +194,14 @@ export default function Monitoring() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <AlertTriangle className="h-4 w-4 text-tim-danger" />
                   Erros Recentes
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   {errors.slice(0, 10).map((err, i) => (
-                    <div key={i} className="flex items-center gap-3 rounded-lg border border-red-500/10 bg-red-500/5 p-2.5 text-xs">
+                    <div key={i} className="flex items-center gap-3 rounded-lg border border-tim-danger/10 bg-tim-danger/5 p-2.5 text-xs">
                       <Badge variant="destructive" className="text-xs">{err.status}</Badge>
                       <span className="font-mono">{err.method} {err.path}</span>
                       <span className="ml-auto text-muted-foreground">{err.duration_ms.toFixed(0)}ms</span>
@@ -215,7 +215,7 @@ export default function Monitoring() {
 
           {/* No errors = good */}
           {errors && errors.length === 0 && (
-            <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 p-4 text-sm text-green-700">
+            <div className="flex items-center gap-2 rounded-lg border border-tim-success/20 bg-tim-success/5 p-4 text-sm text-tim-success">
               <CheckCircle2 className="h-4 w-4" />
               Sem erros recentes
             </div>
