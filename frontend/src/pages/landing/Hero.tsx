@@ -16,7 +16,7 @@ export function Hero() {
       <div className="absolute -right-32 top-32 hidden h-[400px] w-[400px] rounded-full bg-tim-info/[0.07] blur-[80px] animate-hero-glow-right lg:block" />
 
       {/* Ghost receipt — atmospheric */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] rotate-3 rounded-xl border border-foreground/[0.03] bg-foreground/[0.02] blur-[2px] opacity-[0.04] pointer-events-none sm:w-[340px] sm:h-[460px]">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] rotate-3 rounded-xl border border-foreground/[0.03] bg-foreground/[0.02] blur-[2px] opacity-[0.04] pointer-events-none animate-ghost-float sm:w-[340px] sm:h-[460px]">
         <div className="p-6 space-y-4">
           <div className="h-3 w-24 rounded bg-foreground/20" />
           <div className="h-2 w-full rounded bg-foreground/10" />
@@ -56,7 +56,7 @@ export function Hero() {
                     stroke="hsl(var(--primary))"
                     strokeWidth="3"
                     strokeLinecap="round"
-                    opacity="0.5"
+                    className="animate-draw-in"
                   />
                 </svg>
               </span>

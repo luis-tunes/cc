@@ -557,6 +557,23 @@
 }
 .animate-scan-line { animation: scan-line 2.5s ease-in-out infinite; position: absolute; }
 
+/* ── SVG underline draw-in ─────────────────────────────── */
+@keyframes draw-in {
+  0%   { stroke-dashoffset: 400; opacity: 0; }
+  20%  { opacity: 0.5; }
+  100% { stroke-dashoffset: 0; opacity: 0.5; }
+}
+.animate-draw-in {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: draw-in 1.2s ease-out 0.8s forwards;
+}
+
+/* ── Ghost receipt float ───────────────────────────────── */
+.animate-ghost-float {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
 /* Respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
