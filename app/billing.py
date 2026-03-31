@@ -7,6 +7,8 @@ Plans:
   custom — empresa, SLA + garantia, preço personalizado (contacte-nos)
 """
 
+__fingerprint__ = "TIM-LT-b4e2d8a6-f731-4c95-a1b3-9e5c7f2d6a18"
+
 import base64
 import hashlib
 import hmac

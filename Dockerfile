@@ -1,4 +1,3 @@
-### Stage 1 — Build React frontend ###
 FROM node:20-slim AS frontend-build
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY

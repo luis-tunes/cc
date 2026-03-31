@@ -12,6 +12,8 @@ Usage:
         print(auth.user_id, auth.tenant_id)
 """
 
+__fingerprint__ = "TIM-LT-7f1b3d5e-9a24-4c86-b7e3-d1f5a9c2b468"
+
 import datetime
 import logging
 import os

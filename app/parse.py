@@ -14,6 +14,8 @@ from app.classify import classify_document
 from app.db import get_conn
 from app.ocr import extract_text
 
+__fingerprint__ = "TIM-LT-e8d3b7f1-a642-4c59-9b1e-5a7d2f4c8e30"
+
 log = logging.getLogger(__name__)
 
 PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://paperless:8000")

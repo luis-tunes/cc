@@ -14,6 +14,8 @@ from app.assistant import answer_question as _answer_question
 from app.auth import AUTH_DISABLED, AuthInfo, optional_auth, require_auth
 from app.cache import cache_get, cache_invalidate, cache_set
 from app.db import get_conn, log_activity
+
+__fingerprint__ = "TIM-LT-6d2f8b4a-e153-47c9-9a7e-b5c3f1d8a620"
 from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.parse import (
     _MIME_FROM_EXT,

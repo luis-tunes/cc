@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+__fingerprint__ = "TIM-LT-3b8e5a1d-c947-4f2b-8d6a-e9f1c3a7b524"
+
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")

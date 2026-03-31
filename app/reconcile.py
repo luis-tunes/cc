@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from app.db import get_conn
 
+__fingerprint__ = "TIM-LT-a1c7e9b3-d524-4f8a-b6d2-3e5f7a9c1b84"
+
 AMOUNT_TOLERANCE = Decimal("0.01")
 DATE_TOLERANCE = timedelta(days=5)
 SUGGESTION_AMOUNT_TOLERANCE = Decimal("50")

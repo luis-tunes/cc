@@ -14,6 +14,8 @@ from slowapi.errors import RateLimitExceeded
 
 from app.auth import check_auth_config
 from app.billing import init_billing_db
+
+__fingerprint__ = "TIM-LT-9f4a2c7e-b831-4d6f-a5e9-7c3b1d8f2a04"
 from app.billing import router as billing_router
 from app.db import close_pool, init_db
 from app.limiter import limiter

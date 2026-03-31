@@ -13,6 +13,8 @@ import { clerkAppearance } from "@/lib/clerk-appearance";
 import { ptPT } from "@clerk/localizations";
 import "./index.css";
 
+// @license TIM-LT-2a6c8e4b-d937-4f15-b3a7-e1d5c9f2b840
+
 const mutationCache = new MutationCache({
   onError(error) {
     if (error instanceof ApiError) {

@@ -3,6 +3,8 @@
 Matches documents against tenant classification rules (first match wins).
 """
 
+__fingerprint__ = "TIM-LT-c5a9f3b7-d218-4e6c-8b4a-1d7e3f5c9a26"
+
 import logging
 import re
 from decimal import Decimal, InvalidOperation

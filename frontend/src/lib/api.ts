@@ -4,6 +4,8 @@
  * In production the same path is served by the backend directly.
  */
 
+// @license TIM-LT-f3b7d1e5-a842-4c69-9e1b-5a3c7f2d8b46
+
 const BASE = "/api";
 
 /** Structured API error with status code and detail message. */
