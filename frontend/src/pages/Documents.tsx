@@ -10,6 +10,7 @@ import { BulkActionsBar } from "@/components/documents/BulkActionsBar";
 import { GlobalUploadModal } from "@/components/global/GlobalUploadModal";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
   FileText,
   AlertTriangle,
@@ -21,9 +22,10 @@ import { type DocumentRecord } from "@/lib/documents-data";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUrlFilters } from "@/hooks/use-url-filters";
 import { downloadWithAuth } from "@/lib/api";
 import { toast } from "sonner";
-import { TableSkeleton, KpiSkeleton } from "@/components/shared/LoadingSkeletons";
+import { DocumentListSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
@@ -34,17 +36,27 @@ export default function Documents() {
   const { documents, isLoading, error, refetch } = useDocuments();
   const { actions } = useDocumentActions(refetch);
   const isMobile = useIsMobile();
-  const [filters, setFilters] = useState<DocumentFilters>({
+  const [urlFilters, setUrlFilters] = useUrlFilters({
     search: "",
     status: "all",
     documentType: "all",
-    needsReview: null,
+    tab: "todos",
   });
+  const filters: DocumentFilters = {
+    search: urlFilters.search,
+    status: urlFilters.status as DocumentFilters["status"],
+    documentType: urlFilters.documentType as DocumentFilters["documentType"],
+    needsReview: null,
+  };
+  const setFilters = useCallback((f: DocumentFilters) => {
+    setUrlFilters({ search: f.search, status: f.status, documentType: f.documentType });
+  }, [setUrlFilters]);
+  const activeTab = urlFilters.tab as ViewTab;
+  const setActiveTab = useCallback((tab: ViewTab) => setUrlFilters({ tab }), [setUrlFilters]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeDoc, setActiveDoc] = useState<DocumentRecord | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ViewTab>("todos");
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -224,10 +236,31 @@ export default function Documents() {
         {error ? (
           <ErrorState onRetry={refetch} />
         ) : isLoading ? (
-          <TableSkeleton rows={6} cols={5} />
+          <DocumentListSkeleton rows={6} />
         ) : filtered.length > 0 ? (
-          <div className={activeDoc && !isMobile ? "flex gap-4" : ""}>
-            <div className={activeDoc && !isMobile ? "w-[55%] min-w-0" : "w-full"}>
+          <div className={activeDoc && !isMobile ? "" : ""}>
+            {activeDoc && !isMobile ? (
+              <ResizablePanelGroup orientation="horizontal" className="rounded-lg">
+                <ResizablePanel defaultSize={55} minSize={35}>
+                  <DocumentList
+                    documents={filtered}
+                    selectedIds={selectedIds}
+                    onToggleSelect={handleToggleSelect}
+                    onToggleAll={handleToggleAll}
+                    onOpenDocument={handleOpenDocument}
+                    onDelete={actions.onDelete}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className="mx-1" />
+                <ResizablePanel defaultSize={45} minSize={30}>
+                  <DocumentReviewPanel
+                    document={documents.find((d) => d.id === activeDoc.id) || activeDoc}
+                    actions={actions}
+                    onClose={() => setActiveDoc(null)}
+                  />
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            ) : (
               <DocumentList
                 documents={filtered}
                 selectedIds={selectedIds}
@@ -236,17 +269,6 @@ export default function Documents() {
                 onOpenDocument={handleOpenDocument}
                 onDelete={actions.onDelete}
               />
-            </div>
-
-            {/* Desktop: inline side panel */}
-            {activeDoc && !isMobile && (
-              <div className="w-[45%] min-w-0">
-                <DocumentReviewPanel
-                  document={documents.find((d) => d.id === activeDoc.id) || activeDoc}
-                  actions={actions}
-                  onClose={() => setActiveDoc(null)}
-                />
-              </div>
             )}
           </div>
         ) : (
