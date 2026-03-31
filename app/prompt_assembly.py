@@ -8,10 +8,7 @@ prompt that is tailored to the specific document being processed.
 
 from __future__ import annotations
 
-import json
 import logging
-from decimal import Decimal
-from typing import Any
 
 from app.adapters import get_overlay_for_type
 from app.entity_resolver import OwnerEntity

@@ -24,7 +24,6 @@ Key fields:
 from __future__ import annotations
 
 import logging
-import re
 from decimal import Decimal, InvalidOperation
 
 from app.schemas.extraction import QRData, QRValidationStatus

@@ -12,9 +12,8 @@ Source states:
 
 from __future__ import annotations
 
-from datetime import date as _date
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -22,14 +21,14 @@ from pydantic import BaseModel, Field
 
 # -- Enums --
 
-class FieldSource(str, Enum):
+class FieldSource(StrEnum):
     raw = "raw"
     normalized = "normalized"
     computed = "computed"
     inferred = "inferred"
 
 
-class ExtractionOrigin(str, Enum):
+class ExtractionOrigin(StrEnum):
     vision = "vision"
     llm = "llm"
     regex = "regex"
@@ -38,14 +37,14 @@ class ExtractionOrigin(str, Enum):
     manual = "manual"
 
 
-class Direction(str, Enum):
+class Direction(StrEnum):
     issued_by_user = "issued_by_user"
     received_by_user = "received_by_user"
     internal = "internal"
     unknown = "unknown"
 
 
-class QRValidationStatus(str, Enum):
+class QRValidationStatus(StrEnum):
     validated = "validated"
     mismatch = "mismatch"
     not_present = "not_present"

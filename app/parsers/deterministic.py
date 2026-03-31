@@ -7,6 +7,7 @@ assembler and as fallback values when LLM extraction is incomplete.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -241,24 +242,18 @@ def extract_dates(text: str) -> list[date]:
         year = int(m.group(3))
         month_num = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
         if month_num:
-            try:
+            with contextlib.suppress(ValueError):
                 dates.append(date(year, month_num, day))
-            except ValueError:
-                pass
 
     m = _DATE_ISO_RE.search(text)
     if m:
-        try:
+        with contextlib.suppress(ValueError):
             dates.append(date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
-        except ValueError:
-            pass
 
     m = _DATE_NUMERIC_RE.search(text)
     if m:
-        try:
+        with contextlib.suppress(ValueError):
             dates.append(date(int(m.group(3)), int(m.group(2)), int(m.group(1))))
-        except ValueError:
-            pass
 
     m = _DATE_TEXTUAL_RE.search(text)
     if m:
@@ -267,10 +262,8 @@ def extract_dates(text: str) -> list[date]:
         year = int(m.group(3))
         month_num = _PT_MONTHS.get(month_str) or _PT_MONTHS.get(month_str[:3])
         if month_num:
-            try:
+            with contextlib.suppress(ValueError):
                 dates.append(date(year, month_num, day))
-            except ValueError:
-                pass
 
     # Deduplicate preserving order
     seen: set[str] = set()

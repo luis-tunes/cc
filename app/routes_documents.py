@@ -1,3 +1,4 @@
+import contextlib
 import csv
 import datetime
 import io
@@ -13,8 +14,8 @@ from pydantic import BaseModel
 from app.auth import AuthInfo, require_auth
 from app.cache import cache_invalidate
 from app.db import get_conn, log_activity
-from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.entity_resolver import owner_entities_from_settings
+from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.parse import (
     _MIME_FROM_EXT,
     _extract_with_vision,
@@ -572,10 +573,8 @@ async def get_extraction_data(doc_id: int, auth: AuthInfo = Depends(require_auth
     if row.get("extraction_data") and isinstance(row["extraction_data"], dict):
         extraction = row["extraction_data"]
     elif row.get("notes"):
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             extraction = _json.loads(row["notes"])
-        except (ValueError, TypeError):
-            pass
 
     return {
         "id": row["id"],
