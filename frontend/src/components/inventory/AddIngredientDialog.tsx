@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,15 @@ const CONS_CATEGORIES = [
   { value: "consumível", label: "Consumível" },
 ];
 
+interface FormValues {
+  name: string;
+  category: string;
+  unit: string;
+  minThreshold: string;
+  supplierId: string;
+  avgCost: string;
+}
+
 interface AddIngredientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,42 +50,35 @@ interface AddIngredientDialogProps {
 
 export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCategory }: AddIngredientDialogProps) {
   const create = useCreateIngredient();
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [unit, setUnit] = useState("kg");
-  const [minThreshold, setMinThreshold] = useState("0");
-  const [supplierId, setSupplierId] = useState<string>("");
-  const [avgCost, setAvgCost] = useState("0");
 
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
+    defaultValues: { name: "", category: "", unit: "kg", minThreshold: "0", supplierId: "", avgCost: "0" },
+  });
+
+  const category = watch("category");
   const isConsumivel = CONS_CATEGORIES.some((c) => c.value === (category || defaultCategory));
   const dialogTitle = isConsumivel ? "Novo Consumível" : "Nova Matéria Prima";
 
   useEffect(() => {
     if (open) {
-      setCategory(defaultCategory || "");
+      reset({ name: "", category: defaultCategory || "", unit: "kg", minThreshold: "0", supplierId: "", avgCost: "0" });
     }
-  }, [open, defaultCategory]);
+  }, [open, defaultCategory, reset]);
 
-  const handleSubmit = () => {
-    if (!name.trim()) return;
+  const onSubmit = (data: FormValues) => {
     create.mutate(
       {
-        name: name.trim(),
-        category,
-        unit,
-        min_threshold: parseFloat(minThreshold) || 0,
-        supplier_id: supplierId ? parseInt(supplierId) : null,
-        avg_cost: parseFloat(avgCost) || 0,
-        last_cost: parseFloat(avgCost) || 0,
+        name: data.name.trim(),
+        category: data.category,
+        unit: data.unit,
+        min_threshold: parseFloat(data.minThreshold) || 0,
+        supplier_id: data.supplierId ? parseInt(data.supplierId) : null,
+        avg_cost: parseFloat(data.avgCost) || 0,
+        last_cost: parseFloat(data.avgCost) || 0,
       },
       {
         onSuccess: () => {
-          setName("");
-          setCategory("");
-          setUnit("kg");
-          setMinThreshold("0");
-          setSupplierId("");
-          setAvgCost("0");
+          reset();
           onOpenChange(false);
         },
       }
@@ -88,15 +91,22 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCate
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-2">
           <div className="grid gap-1.5">
             <Label htmlFor="ing-name">Nome</Label>
-            <Input id="ing-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={isConsumivel ? "Ex: Caixa Take-Away 500ml" : "Ex: Arroz Carolino"} autoFocus />
+            <Input
+              id="ing-name"
+              {...register("name", { required: "Nome é obrigatório" })}
+              placeholder={isConsumivel ? "Ex: Caixa Take-Away 500ml" : "Ex: Arroz Carolino"}
+              autoFocus
+              className={errors.name ? "border-destructive" : ""}
+            />
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="ing-category">Categoria</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={(v) => setValue("category", v)}>
                 <SelectTrigger id="ing-category"><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
                 <SelectContent>
                   {isConsumivel ? (
@@ -119,7 +129,7 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCate
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ing-unit">Unidade</Label>
-              <Select value={unit} onValueChange={setUnit}>
+              <Select value={watch("unit")} onValueChange={(v) => setValue("unit", v)}>
                 <SelectTrigger id="ing-unit"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="kg">kg</SelectItem>
@@ -134,17 +144,17 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCate
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="ing-threshold">Stock Mínimo</Label>
-              <Input id="ing-threshold" type="number" step="0.1" min="0" value={minThreshold} onChange={(e) => setMinThreshold(e.target.value)} />
+              <Input id="ing-threshold" type="number" step="0.1" min="0" {...register("minThreshold")} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="ing-cost">Custo Médio (€)</Label>
-              <Input id="ing-cost" type="number" step="0.01" min="0" value={avgCost} onChange={(e) => setAvgCost(e.target.value)} />
+              <Input id="ing-cost" type="number" step="0.01" min="0" {...register("avgCost")} />
             </div>
           </div>
           {suppliers.length > 0 && (
             <div className="grid gap-1.5">
               <Label>Fornecedor</Label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
+              <Select value={watch("supplierId")} onValueChange={(v) => setValue("supplierId", v)}>
                 <SelectTrigger><SelectValue placeholder="Selecionar fornecedor" /></SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s) => (
@@ -154,13 +164,13 @@ export function AddIngredientDialog({ open, onOpenChange, suppliers, defaultCate
               </Select>
             </div>
           )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim() || create.isPending}>
-            {create.isPending ? "A criar…" : "Criar"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" disabled={create.isPending}>
+              {create.isPending ? "A criar…" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

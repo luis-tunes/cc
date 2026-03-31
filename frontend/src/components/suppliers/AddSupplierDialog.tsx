@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,14 @@ function validateNif(nif: string): boolean {
   return parseInt(nif[8]) === check;
 }
 
+interface FormValues {
+  name: string;
+  nif: string;
+  category: string;
+  deliveryDays: string;
+  reliability: string;
+}
+
 interface AddSupplierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,50 +37,43 @@ export function AddSupplierDialog({ open, onOpenChange, editSupplier }: AddSuppl
   const update = useUpdateSupplier();
   const isEditing = !!editSupplier;
 
-  const [name, setName] = useState("");
-  const [nif, setNif] = useState("");
-  const [category, setCategory] = useState("");
-  const [deliveryDays, setDeliveryDays] = useState("");
-  const [reliability, setReliability] = useState("100");
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
+    defaultValues: { name: "", nif: "", category: "", deliveryDays: "", reliability: "100" },
+  });
 
+  const nifValue = watch("nif");
   const nifError = useMemo(() => {
-    if (!nif.trim()) return null;
-    if (nif.length < 9) return null;
-    return validateNif(nif) ? null : "NIF inválido (mod 11)";
-  }, [nif]);
+    if (!nifValue.trim()) return null;
+    if (nifValue.length < 9) return null;
+    return validateNif(nifValue) ? null : "NIF inválido (mod 11)";
+  }, [nifValue]);
 
   useEffect(() => {
     if (editSupplier) {
-      setName(editSupplier.name);
-      setNif(editSupplier.nif || "");
-      setCategory(editSupplier.category || "");
-      setDeliveryDays(editSupplier.avg_delivery_days ? String(editSupplier.avg_delivery_days) : "");
-      setReliability(String(Math.round(editSupplier.reliability)));
+      reset({
+        name: editSupplier.name,
+        nif: editSupplier.nif || "",
+        category: editSupplier.category || "",
+        deliveryDays: editSupplier.avg_delivery_days ? String(editSupplier.avg_delivery_days) : "",
+        reliability: String(Math.round(editSupplier.reliability)),
+      });
     } else {
-      resetForm();
+      reset({ name: "", nif: "", category: "", deliveryDays: "", reliability: "100" });
     }
-  }, [editSupplier, open]);
+  }, [editSupplier, open, reset]);
 
-  const resetForm = () => {
-    setName("");
-    setNif("");
-    setCategory("");
-    setDeliveryDays("");
-    setReliability("100");
-  };
-
-  const handleSubmit = () => {
-    if (!name.trim()) return;
+  const onSubmit = (data: FormValues) => {
+    if (nifError) return;
     const payload = {
-      name: name.trim(),
-      nif: nif.trim() || undefined,
-      category: category.trim() || undefined,
-      avg_delivery_days: deliveryDays ? parseInt(deliveryDays) : undefined,
-      reliability: parseFloat(reliability) || 100,
+      name: data.name.trim(),
+      nif: data.nif.trim() || undefined,
+      category: data.category.trim() || undefined,
+      avg_delivery_days: data.deliveryDays ? parseInt(data.deliveryDays) : undefined,
+      reliability: parseFloat(data.reliability) || 100,
     };
 
     const onSuccess = () => {
-      resetForm();
+      reset();
       onOpenChange(false);
     };
 
@@ -90,27 +92,35 @@ export function AddSupplierDialog({ open, onOpenChange, editSupplier }: AddSuppl
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-2">
           <div className="grid gap-1.5">
             <Label htmlFor="sup-name">Nome</Label>
-            <Input id="sup-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Makro Portugal" autoFocus />
+            <Input
+              id="sup-name"
+              {...register("name", { required: "Nome é obrigatório" })}
+              placeholder="Ex: Makro Portugal"
+              autoFocus
+              className={errors.name ? "border-destructive" : ""}
+            />
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="sup-nif">NIF</Label>
               <Input
                 id="sup-nif"
-                value={nif}
-                onChange={(e) => setNif(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                {...register("nif", {
+                  onChange: (e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9); },
+                })}
                 placeholder="123456789"
                 maxLength={9}
-                className={nifError ? "border-red-500" : ""}
+                className={nifError ? "border-destructive" : ""}
               />
               {nifError && <p className="text-xs text-destructive">{nifError}</p>}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sup-category">Categoria</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={watch("category")} onValueChange={(v) => setValue("category", v)}>
                 <SelectTrigger id="sup-category"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="grossista">Grossista</SelectItem>
@@ -127,20 +137,20 @@ export function AddSupplierDialog({ open, onOpenChange, editSupplier }: AddSuppl
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="sup-delivery">Prazo Entrega (dias)</Label>
-              <Input id="sup-delivery" type="number" min="0" value={deliveryDays} onChange={(e) => setDeliveryDays(e.target.value)} placeholder="2" />
+              <Input id="sup-delivery" type="number" min="0" {...register("deliveryDays")} placeholder="2" />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sup-reliability">Fiabilidade (%)</Label>
-              <Input id="sup-reliability" type="number" min="0" max="100" value={reliability} onChange={(e) => setReliability(e.target.value)} />
+              <Input id="sup-reliability" type="number" min="0" max="100" {...register("reliability")} />
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim() || !!nifError || isPending}>
-            {isPending ? (isEditing ? "A guardar…" : "A criar…") : (isEditing ? "Guardar" : "Criar")}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" disabled={!!nifError || isPending}>
+              {isPending ? "A guardar…" : (isEditing ? "Guardar" : "Criar")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
