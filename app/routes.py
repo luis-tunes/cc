@@ -1602,8 +1602,7 @@ async def get_entity(auth: AuthInfo = Depends(require_auth)):
             (tid,),
         ).fetchone()
     if row:
-        import json as _json
-        return _json.loads(row["data"])
+        return row["data"]
     return {}
 
 
