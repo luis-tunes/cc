@@ -92,7 +92,7 @@ export function WizardForm({
       </div>
 
       {/* Step content */}
-      <div className="min-h-[120px]">{step.content}</div>
+      <div key={currentStep} className="min-h-[120px] animate-in fade-in slide-in-from-right-2 duration-300">{step.content}</div>
 
       {/* Navigation */}
       <div className="flex items-center justify-between border-t pt-4">

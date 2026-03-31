@@ -117,7 +117,7 @@ export default function GuidePage() {
   return (
     <PageContainer
       title="Guia do xtim.ai"
-      subtitle="Tudo o que precisas para dominar a tua contabilidade"
+      subtitle="Tudo o que precisa para dominar a sua contabilidade"
     >
       <div className="space-y-6">
         {/* Hero banner */}
@@ -130,9 +130,9 @@ export default function GuidePage() {
               Bem-vindo ao xtim.ai
             </h2>
             <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-              O xtim.ai trata da contabilidade para que te possas focar no teu
+              O xtim.ai trata da contabilidade para que se possa focar no seu
               negócio. Documentos entram, dados saem, tudo reconciliado. Este
-              guia mostra-te como tirar o máximo partido de cada funcionalidade.
+              guia mostra-lhe como tirar o máximo partido de cada funcionalidade.
             </p>
             <Legend />
           </div>
@@ -145,24 +145,24 @@ export default function GuidePage() {
         <GuideSection
           icon={LayoutDashboard}
           title="Painel"
-          badge="O teu quartel-general"
+          badge="O seu quartel-general"
           path="/painel"
         >
           <p className="text-sm text-muted-foreground">
-            O Painel dá-te uma visão geral instantânea: documentos pendentes,
+            O Painel dá-lhe uma visão geral instantânea: documentos pendentes,
             valor total reconciliado, e a saúde financeira do mês. É a primeira
-            coisa que vês ao entrar.
+            coisa que vê ao entrar.
           </p>
           <Steps
             items={[
-              "Consulta os KPIs no topo — documentos, valores, reconciliação.",
-              "Vê a atividade recente na timeline.",
-              "Clica em qualquer KPI para saltar diretamente para a secção.",
+              "Consulte os KPIs no topo — documentos, valores, reconciliação.",
+              "Veja a atividade recente na timeline.",
+              "Clique em qualquer KPI para saltar diretamente para a secção.",
             ]}
           />
           <ProTip>
-            Verifica o Painel de manhã para saber exatamente o que precisa da
-            tua atenção hoje.
+            Verifique o Painel de manhã para saber exatamente o que precisa da
+            sua atenção hoje.
           </ProTip>
         </GuideSection>
 
@@ -180,14 +180,14 @@ export default function GuidePage() {
           </p>
           <Steps
             items={[
-              "Clica em \"Importar\" ou arrasta ficheiros para a zona de upload.",
+              "Clique em \"Importar\" ou arraste ficheiros para a zona de upload.",
               "O xtim.ai processa o documento com OCR (demora segundos).",
-              "Revê os campos extraídos e corrige se necessário.",
-              "Aprova o documento para avançar para classificação.",
+              "Reveja os campos extraídos e corrija se necessário.",
+              "Aprove o documento para avançar para classificação.",
             ]}
           />
           <ProTip>
-            Podes arrastar vários ficheiros de uma vez. PDFs e imagens (JPG, PNG)
+            Pode arrastar vários ficheiros de uma vez. PDFs e imagens (JPG, PNG)
             são suportados.
           </ProTip>
         </GuideSection>
@@ -200,19 +200,19 @@ export default function GuidePage() {
           path="/documentos"
         >
           <p className="text-sm text-muted-foreground">
-            A vista completa de todos os teus documentos. Filtra por estado,
-            tipo ou fornecedor. Seleciona vários para ações em massa.
+            A vista completa de todos os seus documentos. Filtre por estado,
+            tipo ou fornecedor. Selecione vários para ações em massa.
           </p>
           <Steps
             items={[
-              "Usa os filtros no topo para encontrar documentos específicos.",
-              "Clica num documento para abrir o painel de revisão lateral.",
-              "Usa as tabs (Todos, Revisão, Classificados, Reconciliados) para navegar por estado.",
-              "Seleciona vários e usa \"Aprovar\" ou \"Eliminar\" em massa.",
+              "Use os filtros no topo para encontrar documentos específicos.",
+              "Clique num documento para abrir o painel de revisão lateral.",
+              "Use as tabs (Todos, Revisão, Classificados, Reconciliados) para navegar por estado.",
+              "Selecione vários e use \"Aprovar\" ou \"Eliminar\" em massa.",
             ]}
           />
           <ProTip>
-            Documentos com o ícone ⚠️ precisam da tua atenção — a extração teve
+            Documentos com o ícone de aviso precisam da sua atenção — a extração teve
             baixa confiança.
           </ProTip>
         </GuideSection>
@@ -225,18 +225,18 @@ export default function GuidePage() {
           path="/movimentos"
         >
           <p className="text-sm text-muted-foreground">
-            Importa os teus extratos bancários para que o xtim.ai possa cruzar
+            Importe os seus extratos bancários para que o xtim.ai possa cruzar
             movimentos com documentos automaticamente.
           </p>
           <Steps
             items={[
-              "Exporta o extrato do teu banco em CSV ou OFX.",
-              "Importa na página de Movimentos.",
+              "Exporte o extrato do seu banco em CSV ou OFX.",
+              "Importe na página de Movimentos.",
               "Os movimentos ficam disponíveis para reconciliação automática.",
             ]}
           />
           <ProTip>
-            Quanto mais movimentos importares, melhor funciona a reconciliação
+            Quanto mais movimentos importar, melhor funciona a reconciliação
             automática.
           </ProTip>
         </GuideSection>
@@ -249,13 +249,13 @@ export default function GuidePage() {
           path="/reconciliacao"
         >
           <p className="text-sm text-muted-foreground">
-            A magia do xtim.ai. A reconciliação cruza automaticamente os teus
+            A magia do xtim.ai. A reconciliação cruza automaticamente os seus
             documentos com os movimentos bancários — por valor e data.
           </p>
           <Steps
             items={[
               "O xtim.ai sugere correspondências automáticas (valor ±€0.01, data ±5 dias).",
-              "Revê as sugestões e aprova com um clique.",
+              "Reveja as sugestões e aprove com um clique.",
               "Correspondências manuais também são possíveis quando o automático não acerta.",
             ]}
           />
@@ -272,7 +272,7 @@ export default function GuidePage() {
             </p>
           </div>
           <ProTip>
-            Importa documentos e movimentos do mesmo mês para os melhores
+            Importe documentos e movimentos do mesmo mês para os melhores
             resultados.
           </ProTip>
         </GuideSection>
@@ -287,17 +287,17 @@ export default function GuidePage() {
           <p className="text-sm text-muted-foreground">
             Demonstração de resultados, análise de IVA, gastos por fornecedor —
             tudo num sítio. Os relatórios atualizam-se automaticamente com base
-            nos teus documentos.
+            nos seus documentos.
           </p>
           <Steps
             items={[
-              "Escolhe o período no filtro de datas.",
-              "Navega entre os diferentes tipos de relatório.",
-              "Exporta em PDF ou CSV para o teu contabilista.",
+              "Escolha o período no filtro de datas.",
+              "Navegue entre os diferentes tipos de relatório.",
+              "Exporte em PDF ou CSV para o seu contabilista.",
             ]}
           />
           <ProTip>
-            Partilha os relatórios mensais com o teu contabilista — poupa tempo
+            Partilhe os relatórios mensais com o seu contabilista — poupa tempo
             a ambos.
           </ProTip>
         </GuideSection>
@@ -310,20 +310,20 @@ export default function GuidePage() {
           path="/inventario"
         >
           <p className="text-sm text-muted-foreground">
-            Gere os teus ingredientes, controla stock, e define receitas com
+            Gira os seus ingredientes, controle stock, e defina receitas com
             custos calculados automaticamente. A lista de compras gera-se
             sozinha quando o stock baixa.
           </p>
           <Steps
             items={[
-              "Adiciona ingredientes com unidade, stock mínimo e fornecedor.",
-              "Regista entradas e saídas de stock.",
-              "Cria produtos com receitas — o custo calcula-se automaticamente.",
-              "Consulta a Lista de Compras para ingredientes abaixo do mínimo.",
+              "Adicione ingredientes com unidade, stock mínimo e fornecedor.",
+              "Registe entradas e saídas de stock.",
+              "Crie produtos com receitas — o custo calcula-se automaticamente.",
+              "Consulte a Lista de Compras para ingredientes abaixo do mínimo.",
             ]}
           />
           <ProTip>
-            Define sempre o stock mínimo — assim nunca ficas sem ingredientes
+            Defina sempre o stock mínimo — assim nunca fica sem ingredientes
             essenciais.
           </ProTip>
         </GuideSection>
@@ -332,22 +332,22 @@ export default function GuidePage() {
         <GuideSection
           icon={Settings}
           title="Definições"
-          badge="Configurar a tua conta"
+          badge="Configurar a sua conta"
           path="/definicoes"
         >
           <p className="text-sm text-muted-foreground">
-            Configura o perfil da tua empresa, gestão de conta e plano de
-            subscrição. Tudo o que precisas para personalizar o xtim.ai.
+            Configure o perfil da sua empresa, gestão de conta e plano de
+            subscrição. Tudo o que precisa para personalizar o xtim.ai.
           </p>
           <Steps
             items={[
-              "Va a \"Entidade\" para definir NIF, morada e dados fiscais.",
-              "Configura o teu plano em \"Definições\".",
-              "Personaliza o teu perfil pessoal em \"O Meu Perfil\".",
+              "Vá a \"Entidade\" para definir NIF, morada e dados fiscais.",
+              "Configure o seu plano em \"Definições\".",
+              "Personalize o seu perfil pessoal em \"O Meu Perfil\".",
             ]}
           />
           <ProTip>
-            Preenche os dados da entidade primeiro — isto melhora a
+            Preencha os dados da entidade primeiro — isto melhora a
             classificação automática dos documentos.
           </ProTip>
         </GuideSection>
@@ -358,7 +358,7 @@ export default function GuidePage() {
             Atalhos Rápidos
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Navega mais rápido com estes atalhos de teclado.
+            Navegue mais rápido com estes atalhos de teclado.
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {[

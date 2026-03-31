@@ -41,15 +41,19 @@ export default function Documents() {
     status: "all",
     documentType: "all",
     tab: "todos",
+    dateFrom: "",
+    dateTo: "",
   });
   const filters: DocumentFilters = {
     search: urlFilters.search,
     status: urlFilters.status as DocumentFilters["status"],
     documentType: urlFilters.documentType as DocumentFilters["documentType"],
     needsReview: null,
+    dateFrom: urlFilters.dateFrom ?? "",
+    dateTo: urlFilters.dateTo ?? "",
   };
   const setFilters = useCallback((f: DocumentFilters) => {
-    setUrlFilters({ search: f.search, status: f.status, documentType: f.documentType });
+    setUrlFilters({ search: f.search, status: f.status, documentType: f.documentType, dateFrom: f.dateFrom, dateTo: f.dateTo });
   }, [setUrlFilters]);
   const activeTab = urlFilters.tab as ViewTab;
   const setActiveTab = useCallback((tab: ViewTab) => setUrlFilters({ tab }), [setUrlFilters]);
@@ -84,6 +88,12 @@ export default function Documents() {
       docs = docs.filter((d) => d.documentType === filters.documentType);
     if (filters.needsReview === true)
       docs = docs.filter((d) => d.needsReview);
+    if (filters.dateFrom) {
+      docs = docs.filter((d) => d.date && d.date >= filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      docs = docs.filter((d) => d.date && d.date <= filters.dateTo);
+    }
     return docs;
   }, [documents, filters, activeTab]);
 

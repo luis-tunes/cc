@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { navigation } from "./navigation";
 
 describe("navigation config", () => {
-  it("has 6 groups", () => {
-    expect(navigation).toHaveLength(6);
+  it("has 7 groups", () => {
+    expect(navigation).toHaveLength(7);
     expect(navigation.map((g) => g.label)).toEqual([
-      "Home", "Documentos", "Financeiro", "Negócio", "Inteligência", "Sistema",
+      "Home", "Documentos", "Financeiro", "Contabilidade", "Negócio", "Inteligência", "Sistema",
     ]);
   });
 
@@ -66,6 +66,6 @@ describe("navigation config", () => {
   it("total nav items count is reasonable", () => {
     const total = navigation.reduce((sum, g) => sum + g.items.length, 0);
     expect(total).toBeGreaterThanOrEqual(15);
-    expect(total).toBeLessThanOrEqual(30);
+    expect(total).toBeLessThanOrEqual(35);
   });
 });

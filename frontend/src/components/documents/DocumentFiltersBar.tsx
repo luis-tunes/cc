@@ -19,6 +19,8 @@ export interface DocumentFilters {
   status: StatusType | "all";
   documentType: DocumentType | "all";
   needsReview: boolean | null;
+  dateFrom: string;
+  dateTo: string;
 }
 
 interface DocumentFiltersBarProps {
@@ -43,7 +45,9 @@ export function DocumentFiltersBar({
     filters.status !== "all" ||
     filters.documentType !== "all" ||
     filters.needsReview !== null ||
-    filters.search !== "";
+    filters.search !== "" ||
+    filters.dateFrom !== "" ||
+    filters.dateTo !== "";
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -103,6 +107,21 @@ export function DocumentFiltersBar({
           Requer revisão
         </Button>
 
+        <Input
+          type="date"
+          placeholder="De"
+          value={filters.dateFrom}
+          onChange={(e) => update({ dateFrom: e.target.value })}
+          className="h-8 w-32 text-xs"
+        />
+        <Input
+          type="date"
+          placeholder="Até"
+          value={filters.dateTo}
+          onChange={(e) => update({ dateTo: e.target.value })}
+          className="h-8 w-32 text-xs"
+        />
+
         {hasActiveFilters && (
           <Button
             variant="ghost"
@@ -114,6 +133,8 @@ export function DocumentFiltersBar({
                 status: "all",
                 documentType: "all",
                 needsReview: null,
+                dateFrom: "",
+                dateTo: "",
               })
             }
           >

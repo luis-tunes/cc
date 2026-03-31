@@ -3,6 +3,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard, Loader2, Mail, ArrowRight, ArrowLeft, Shield, Zap, Clock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function PricingPage() {
   const { data: plans = [], isLoading: plansLoading, isError: plansError } = useBillingPlans();
@@ -17,8 +18,13 @@ export default function PricingPage() {
   const daysLeft = billing?.trial_days_left ?? 0;
 
   // If user already has a paid plan, redirect to dashboard
+  useEffect(() => {
+    if (billing && (currentPlan === "pro" || currentPlan === "custom")) {
+      navigate("/painel", { replace: true });
+    }
+  }, [billing, currentPlan, navigate]);
+
   if (billing && (currentPlan === "pro" || currentPlan === "custom")) {
-    navigate("/painel", { replace: true });
     return null;
   }
 

@@ -8,7 +8,7 @@ import {
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { pt } from "date-fns/locale";
 
 const ACTION_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   uploaded: { label: "Documento enviado", icon: Upload, color: "text-tim-info" },
@@ -30,7 +30,7 @@ const ENTITY_CONFIG: Record<string, { label: string; icon: React.ElementType }> 
 
 function relTime(iso: string) {
   try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true, locale: ptBR });
+    return formatDistanceToNow(new Date(iso), { addSuffix: true, locale: pt });
   } catch {
     return iso;
   }
