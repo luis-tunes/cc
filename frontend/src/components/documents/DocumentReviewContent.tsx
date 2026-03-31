@@ -257,10 +257,10 @@ export function DocumentReviewContent({
         <div className="px-5 py-4">
           <SectionTitle>Informação da Entidade</SectionTitle>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <InfoItem label={document.supplier ? "Fornecedor" : "Cliente"} value={document.supplier || document.customer || "—"} />
-            <InfoItem label="NIF" value={document.nif || "—"} mono help="NIF" />
-            <InfoItem label="Tipo" value={documentTypeLabels[document.documentType]} />
-            <InfoItem label="Data" value={document.date || "—"} />
+            <InfoItem label={document.supplier ? "Fornecedor" : "Cliente"} value={document.supplier || document.customer || "—"} confidence={document.fieldConfidence?.supplier_nif} />
+            <InfoItem label="NIF" value={document.nif || "—"} mono help="NIF" confidence={document.fieldConfidence?.supplier_nif} />
+            <InfoItem label="Tipo" value={documentTypeLabels[document.documentType]} confidence={document.fieldConfidence?.type} />
+            <InfoItem label="Data" value={document.date || "—"} confidence={document.fieldConfidence?.date} />
           </div>
         </div>
 
@@ -268,11 +268,25 @@ export function DocumentReviewContent({
         <div className="px-5 py-4">
           <SectionTitle>Valores</SectionTitle>
           <div className="mt-3 grid grid-cols-3 gap-3">
-            <InfoItem label="Total" value={document.total != null ? `€${Math.abs(document.total).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large />
-            <InfoItem label="IVA" value={document.vat != null ? `€${Math.abs(document.vat).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="IVA" />
+            <InfoItem label="Total" value={document.total != null ? `€${Math.abs(document.total).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large confidence={document.fieldConfidence?.total} />
+            <InfoItem label="IVA" value={document.vat != null ? `€${Math.abs(document.vat).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="IVA" confidence={document.fieldConfidence?.vat} />
             <InfoItem label="Base Tributável" value={document.total != null && document.vat != null ? `€${(Math.abs(document.total) - Math.abs(document.vat)).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : "—"} large help="Base Tributável" />
           </div>
         </div>
+
+        {/* Validation warnings */}
+        {document.validationWarnings && document.validationWarnings.length > 0 && (
+          <div className="px-5 py-3">
+            <div className="rounded-md bg-tim-warning/10 p-3 space-y-1">
+              {document.validationWarnings.map((w, i) => (
+                <p key={i} className="text-xs text-tim-warning flex items-center gap-1.5">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  {w}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Line items */}
         {document.lineItems && document.lineItems.length > 0 && (
@@ -580,11 +594,20 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{children}</h4>;
 }
 
-function InfoItem({ label, value, mono, large, help }: { label: string; value: string; mono?: boolean; large?: boolean; help?: string }) {
+function InfoItem({ label, value, mono, large, help, confidence }: { label: string; value: string; mono?: boolean; large?: boolean; help?: string; confidence?: number }) {
   return (
     <div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
         {help ? <HelpTooltip term={help}>{label}</HelpTooltip> : label}
+        {confidence != null && confidence > 0 && (
+          <span
+            className={cn(
+              "inline-block h-2 w-2 rounded-full",
+              confidence >= 80 ? "bg-tim-success" : confidence >= 50 ? "bg-tim-warning" : "bg-tim-danger"
+            )}
+            title={`Confiança: ${confidence}%`}
+          />
+        )}
       </p>
       <p className={cn("mt-0.5 text-foreground", large ? "text-base font-semibold" : "text-sm", mono && "font-mono")}>{value}</p>
     </div>

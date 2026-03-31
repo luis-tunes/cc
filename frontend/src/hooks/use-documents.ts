@@ -2,16 +2,35 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchDocuments, type Document } from "@/lib/api";
 import { type DocumentRecord, type DocumentType } from "@/lib/documents-data";
 
+function parseNotesMetadata(notes: string | null): Pick<DocumentRecord, "fieldConfidence" | "validationWarnings"> {
+  if (!notes) return {};
+  try {
+    const parsed = JSON.parse(notes);
+    return {
+      fieldConfidence: parsed._field_confidence ?? undefined,
+      validationWarnings: parsed._validation_warnings ?? undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Map a backend Document to the frontend DocumentRecord shape.
  */
 export function toDocumentRecord(doc: Document): DocumentRecord {
   const typeMap: Record<string, DocumentType> = {
     fatura: "fatura",
+    "fatura-fornecedor": "fatura-fornecedor",
+    "fatura-recibo": "fatura-recibo",
+    "fatura-simplificada": "fatura-simplificada",
+    "fatura-proforma": "fatura-proforma",
     recibo: "recibo",
     "nota-credito": "nota-credito",
     "nota-debito": "nota-debito",
+    "guia-remessa": "guia-remessa",
     extrato: "extrato",
+    orcamento: "orcamento",
   };
 
   const statusMap: Record<string, DocumentRecord["classificationStatus"]> = {
@@ -58,6 +77,7 @@ export function toDocumentRecord(doc: Document): DocumentRecord {
     source: "upload",
     uploadedAt: doc.created_at || new Date().toISOString(),
     needsReview: ["pendente", "a processar", "extraído"].includes(doc.status),
+    ...parseNotesMetadata(doc.notes),
   };
 }
 

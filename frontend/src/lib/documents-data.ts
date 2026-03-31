@@ -1,6 +1,6 @@
 import { type StatusType } from "@/components/shared/StatusBadge";
 
-export type DocumentType = "fatura" | "recibo" | "nota-credito" | "nota-debito" | "extrato" | "outro";
+export type DocumentType = "fatura" | "fatura-fornecedor" | "fatura-recibo" | "fatura-simplificada" | "fatura-proforma" | "recibo" | "nota-credito" | "nota-debito" | "guia-remessa" | "extrato" | "orcamento" | "outro";
 
 export interface DocumentRecord {
   id: string;
@@ -22,6 +22,8 @@ export interface DocumentRecord {
   extractedFields?: ExtractedField[];
   lineItems?: LineItem[];
   notes?: string;
+  fieldConfidence?: Record<string, number>;
+  validationWarnings?: string[];
 }
 
 export interface ExtractedField {
@@ -52,10 +54,16 @@ export interface UploadingFile {
 
 export const documentTypeLabels: Record<DocumentType, string> = {
   fatura: "Fatura",
+  "fatura-fornecedor": "Fatura de Fornecedor",
+  "fatura-recibo": "Fatura-Recibo",
+  "fatura-simplificada": "Fatura Simplificada",
+  "fatura-proforma": "Fatura Pro-forma",
   recibo: "Recibo",
   "nota-credito": "Nota de Crédito",
   "nota-debito": "Nota de Débito",
+  "guia-remessa": "Guia de Remessa",
   extrato: "Extrato",
+  orcamento: "Orçamento",
   outro: "Outro",
 };
 
