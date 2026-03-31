@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { KpiSkeleton, TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ProductTable } from "@/components/products/ProductTable";
 import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { ProduceDialog } from "@/components/products/ProduceDialog";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  UtensilsCrossed, Plus, TrendingUp, ToggleRight, Loader2, History,
+  UtensilsCrossed, Plus, TrendingUp, ToggleRight, History,
 } from "lucide-react";
 import { useProducts, useDeleteProduct, useStockEvents } from "@/hooks/use-inventory";
 import type { Product } from "@/lib/api";
@@ -81,9 +82,10 @@ export default function Products() {
   if (isLoading) {
     return (
       <PageContainer title="Produto Acabado" subtitle="Produtos, receitas e custos">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => <KpiSkeleton key={i} />)}
         </div>
+        <div className="mt-6"><TableSkeleton rows={5} cols={4} /></div>
       </PageContainer>
     );
   }

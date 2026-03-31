@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { KpiSkeleton, TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { IngredientTable } from "@/components/inventory/IngredientTable";
 import { StockEventList } from "@/components/inventory/StockEventList";
 import { AddIngredientDialog } from "@/components/inventory/AddIngredientDialog";
@@ -13,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Package, Plus, ArrowDownToLine, AlertTriangle,
-  XCircle, TrendingUp, Loader2, Wheat, Wrench,
+  XCircle, TrendingUp, Wheat, Wrench,
 } from "lucide-react";
 import {
   useIngredients,
@@ -94,9 +95,10 @@ export default function Inventory() {
   if (isLoading) {
     return (
       <PageContainer title="Inventário" subtitle="Gestão de stock">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <KpiSkeleton key={i} />)}
         </div>
+        <div className="mt-6"><TableSkeleton rows={6} cols={5} /></div>
       </PageContainer>
     );
   }

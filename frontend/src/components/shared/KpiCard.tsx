@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { useChartColors } from "@/hooks/use-chart-colors";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 /* ── Animated number ───────────────────────────────────────────────── */
 
@@ -80,6 +80,7 @@ export function KpiCard({
   sparkline,
 }: KpiCardProps) {
   const chartColors = useChartColors();
+  const gradientId = useId();
   const borderClass = {
     default: accent ? "border-primary/30 shadow-[0_0_15px_-3px_hsl(var(--tim-gold)/0.12)]" : "",
     warning: "border-tim-warning/30",
@@ -97,7 +98,7 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card",
+        "rounded-lg border bg-card tim-card-hover",
         compact ? "px-3 py-2.5" : "p-4",
         borderClass[variant],
         className
@@ -166,7 +167,7 @@ export function KpiCard({
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id={`sg-${label}`} x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id={`sg${gradientId}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={sparkColor} stopOpacity={0.3} />
                     <stop offset="100%" stopColor={sparkColor} stopOpacity={0} />
                   </linearGradient>
@@ -176,7 +177,7 @@ export function KpiCard({
                   dataKey="v"
                   stroke={sparkColor}
                   strokeWidth={1.5}
-                  fill={`url(#sg-${label})`}
+                  fill={`url(#sg${gradientId})`}
                   dot={false}
                   isAnimationActive={false}
                 />

@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { KpiSkeleton, TableSkeleton } from "@/components/shared/LoadingSkeletons";
 import { SupplierTable } from "@/components/suppliers/SupplierTable";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
 import { PriceHistoryPanel } from "@/components/suppliers/PriceHistoryPanel";
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Truck, Plus, Users, Clock, ShieldCheck, Loader2, TrendingUp,
+  Truck, Plus, Users, Clock, ShieldCheck, TrendingUp,
 } from "lucide-react";
 import { useSuppliers, useDeleteSupplier } from "@/hooks/use-inventory";
 import type { Supplier } from "@/lib/api";
@@ -78,9 +79,10 @@ export default function Suppliers() {
   if (isLoading) {
     return (
       <PageContainer title="Fornecedores" subtitle="Gestão de fornecedores e preços">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-tim-gold" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => <KpiSkeleton key={i} />)}
         </div>
+        <div className="mt-6"><TableSkeleton rows={5} cols={4} /></div>
       </PageContainer>
     );
   }

@@ -115,7 +115,7 @@ export default function Dashboard() {
           </CarouselContent>
         </Carousel>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 tim-stagger-children">
           <KpiCard
             label="Documentos"
             value={String(docCount)}
