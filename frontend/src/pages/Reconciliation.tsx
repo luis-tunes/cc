@@ -152,10 +152,10 @@ export default function Reconciliation() {
         </div>
       ) : isEmpty ? (
         <EmptyState
-          icon={GitMerge}
-          title="Sem dados para reconciliar"
-          description="Importe documentos e movimentos bancários para iniciar a reconciliação automática."
-          tutorial="A reconciliação liga cada fatura ao respetivo pagamento no banco. Carregue faturas na página Documentos e importe o extrato CSV em Movimentos Bancários — o sistema faz a correspondência automaticamente."
+          illustration="🔗"
+          title="Pronto para reconciliar"
+          description="Importe documentos e movimentos bancários — o sistema encontra as correspondências automaticamente."
+          tutorial="A reconciliação liga cada fatura ao respetivo pagamento no banco. Comece por carregar faturas e o extrato CSV."
           className="py-20"
         />
       ) : (

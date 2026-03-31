@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 
 interface EmptyStateProps {
   icon?: LucideIcon;
+  illustration?: string;
   title: string;
   description?: string;
   tutorial?: string;
@@ -17,6 +18,7 @@ interface EmptyStateProps {
 
 export function EmptyState({
   icon: Icon = FolderOpen,
+  illustration,
   title,
   description,
   tutorial,
@@ -30,13 +32,17 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-xl border border-dashed bg-card/50 px-6 py-14 text-center",
-        className
+        "flex flex-col items-center justify-center rounded-xl border border-dashed bg-card/50 px-6 py-14 text-center animate-in fade-in slide-in-from-bottom-2 duration-300",
+        className,
       )}
     >
-      <div className="rounded-xl bg-primary/[0.08] p-4">
-        <Icon className="h-7 w-7 text-primary/70" />
-      </div>
+      {illustration ? (
+        <span className="text-4xl" role="img" aria-hidden="true">{illustration}</span>
+      ) : (
+        <div className="rounded-xl bg-primary/[0.08] p-4">
+          <Icon className="h-7 w-7 text-primary/70" />
+        </div>
+      )}
       <h3 className="mt-5 text-base font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>

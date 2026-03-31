@@ -191,9 +191,9 @@ export default function InboxPage() {
       ) : isEmpty && !showIntake ? (
         /* First-use empty state */
         <EmptyState
-          icon={FileText}
-          title="Nenhum documento importado"
-          description="Comece por importar faturas, recibos ou outros documentos. O xtim.ai irá extrair automaticamente os campos relevantes e sugerir classificações."
+          illustration="📬"
+          title="A caixa de entrada está vazia"
+          description="Importe a sua primeira fatura, recibo ou nota de crédito. O xtim.ai extrai os campos automaticamente e sugere classificações — em segundos."
           actionLabel="Importar primeiro documento"
           onAction={() => setShowIntake(true)}
           className="py-20"
