@@ -554,6 +554,11 @@ class FakeConn:
         if sql_lower.startswith("select"):
             tid = params[0] if params else None
             rows = [r for r in _tables["tenant_settings"] if r.get("tenant_id") == tid]
+            # Simulate JSONB: parse JSON strings in "data" field
+            for r in rows:
+                if isinstance(r.get("data"), str):
+                    import json as _json
+                    r["data"] = _json.loads(r["data"])
             return FakeCursor(rows)
         if sql_lower.startswith("insert"):
             entry = {"tenant_id": params[0], "key": "entity_profile", "data": params[1]}
