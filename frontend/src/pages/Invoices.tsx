@@ -628,10 +628,10 @@ function ViewInvoiceDialog({
                         {p.method && <span className="text-muted-foreground ml-1">({p.method})</span>}
                       </span>
                       <span className="flex items-center gap-2">
-                        <span className="font-medium">{fmt(p.amount)}</span>
+                        <span className="font-medium">{fmt(Number(p.amount))}</span>
                         <button
                           className="text-muted-foreground hover:text-destructive"
-                          onClick={() => removePayment.mutate({ invoiceId: inv.id, paymentId: p.id })}
+                          onClick={() => removePayment.mutate({ invoiceId: inv.id, paymentId: Number(p.id) })}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
