@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useRef } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
 import { MobileNav } from "./MobileNav";
 import { CommandMenu } from "@/components/shared/CommandMenu";
+import { KeyboardShortcuts } from "@/components/shared/KeyboardShortcuts";
 import { navigation } from "@/lib/navigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
@@ -25,6 +26,7 @@ function getPageTitle(pathname: string): string {
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const pageTitle = getPageTitle(location.pathname);
   const isMobile = useIsMobile();
   const mainRef = useRef<HTMLDivElement>(null);
@@ -33,6 +35,31 @@ export function AppLayout() {
   useEffect(() => {
     mainRef.current?.focus({ preventScroll: true });
   }, [location.pathname]);
+
+  // Global "G then ..." navigation shortcuts
+  useEffect(() => {
+    let pending = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const goMap: Record<string, string> = { h: "/painel", d: "/documentos", r: "/reconciliacao", m: "/movimentos", f: "/fornecedores" };
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey) {
+        pending = true;
+        clearTimeout(timer);
+        timer = setTimeout(() => { pending = false; }, 800);
+        return;
+      }
+      if (pending) {
+        pending = false;
+        clearTimeout(timer);
+        const dest = goMap[e.key];
+        if (dest) { e.preventDefault(); navigate(dest); }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => { document.removeEventListener("keydown", handler); clearTimeout(timer); };
+  }, [navigate]);
 
   return (
     <SidebarProvider>
@@ -67,6 +94,7 @@ export function AppLayout() {
       </div>
       {isMobile && <MobileNav />}
       <CommandMenu />
+      <KeyboardShortcuts />
     </SidebarProvider>
   );
 }
