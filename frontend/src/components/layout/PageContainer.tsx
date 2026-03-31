@@ -28,7 +28,7 @@ export function PageContainer({
         {!isMobile && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="tim-title-accent text-2xl font-bold tracking-tight text-foreground">
                 {title}
               </h1>
               {subtitle && (
@@ -43,7 +43,7 @@ export function PageContainer({
         )}
 
         {/* Page Content */}
-        <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">{children}</div>
+        <div className="mt-6 tim-section-enter">{children}</div>
       </div>
     </div>
   );

@@ -149,6 +149,8 @@ export default function Dashboard() {
       {/* === DETAIL PANELS (always visible when data exists) === */}
       {hasData && (
         <div className="mt-6 space-y-6">
+          {/* Golden divider */}
+          <div className="tim-gold-line" />
           <div className="grid gap-6 lg:grid-cols-2">
             <FinancialOverviewPanel />
             <ReconciliationHealthPanel />

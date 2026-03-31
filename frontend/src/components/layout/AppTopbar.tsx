@@ -64,7 +64,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
   return (
     <>
       <TrialBanner />
-      <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card/80 backdrop-blur-xl px-4 sticky top-0 z-40 touch-manipulation">
+      <header className="tim-topbar-wash flex h-14 shrink-0 items-center justify-between bg-card/80 backdrop-blur-xl px-4 sticky top-0 z-40 touch-manipulation">
         {/* Left */}
         <div className="flex items-center gap-3">
           {!isMobile && <SidebarTrigger className="text-muted-foreground" />}

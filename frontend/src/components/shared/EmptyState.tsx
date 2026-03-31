@@ -34,7 +34,7 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="rounded-xl bg-primary/[0.08] p-4">
+      <div className="rounded-xl bg-primary/[0.08] p-4 tim-empty-glow">
         <Icon className="h-7 w-7 text-primary/70" />
       </div>
       <h3 className="mt-5 text-base font-semibold text-foreground">{title}</h3>

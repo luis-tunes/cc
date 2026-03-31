@@ -163,6 +163,184 @@
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
 }
 
+/* ── "Golden Mist" Identity System ─────────────────────── */
+
+/* Warm ambient glow on page background — Ghibli sky warmth */
+.tim-ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 0%, hsl(var(--tim-gold) / 0.04), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 100%, hsl(var(--tim-info) / 0.03), transparent);
+}
+.dark .tim-ambient {
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 0%, hsl(var(--tim-gold) / 0.06), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 100%, hsl(var(--tim-info) / 0.04), transparent);
+}
+
+/* Signature sidebar warm edge — golden ink wash at the boundary */
+.tim-sidebar-glow {
+  position: relative;
+}
+.tim-sidebar-glow::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--tim-gold) / 0),
+    hsl(var(--tim-gold) / 0.15),
+    hsl(var(--tim-gold) / 0.08),
+    hsl(var(--tim-gold) / 0)
+  );
+}
+
+/* Interactive card with warm hover — organic feel */
+.tim-card-warm {
+  @apply transition-all duration-500 ease-out;
+  border-color: hsl(var(--border));
+}
+.tim-card-warm:hover {
+  border-color: hsl(var(--tim-gold) / 0.25);
+  box-shadow:
+    0 8px 30px -6px hsl(var(--tim-gold) / 0.06),
+    0 0 0 1px hsl(var(--tim-gold) / 0.05);
+  transform: translateY(-2px);
+}
+.dark .tim-card-warm:hover {
+  border-color: hsl(var(--tim-gold) / 0.20);
+  box-shadow:
+    0 8px 30px -6px hsl(var(--tim-gold) / 0.10),
+    0 0 0 1px hsl(var(--tim-gold) / 0.08);
+}
+
+/* KPI "breathing" glow — the numbers feel alive */
+@keyframes kpi-breathe {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 20px hsl(var(--tim-gold) / 0.15); }
+}
+.tim-kpi-glow {
+  animation: kpi-breathe 4s ease-in-out infinite;
+}
+.dark .tim-kpi-glow {
+  animation: kpi-breathe 4s ease-in-out infinite;
+}
+
+/* Page section entrance — organic fade with subtle scale */
+@keyframes section-appear {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.995);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.tim-section-enter {
+  animation: section-appear 0.6s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Topbar ink-wash separator — replaces hard border */
+.tim-topbar-wash {
+  border-bottom: none !important;
+  box-shadow: 0 1px 0 0 hsl(var(--border) / 0.5);
+}
+.tim-topbar-wash::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--border) / 0),
+    hsl(var(--tim-gold) / 0.15),
+    hsl(var(--border) / 0.5),
+    hsl(var(--tim-gold) / 0.15),
+    hsl(var(--border) / 0)
+  );
+}
+
+/* Empty state warm illustration glow */
+.tim-empty-glow {
+  background: radial-gradient(
+    circle at 50% 40%,
+    hsl(var(--tim-gold) / 0.06),
+    transparent 70%
+  );
+}
+
+/* Status dot pulse — gentle organic pulse */
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50% { box-shadow: 0 0 0 4px hsl(var(--tim-success) / 0); }
+}
+.tim-status-live {
+  animation: status-pulse 2.5s ease-in-out infinite;
+}
+
+/* Warm scrollbar track on hover */
+*:hover > ::-webkit-scrollbar-thumb {
+  background: hsl(var(--tim-gold) / 0.15);
+}
+*:hover > ::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--tim-gold) / 0.25);
+}
+
+/* Golden line accent — for KPI cards and section dividers */
+.tim-gold-line {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--tim-gold) / 0),
+    hsl(var(--tim-gold) / 0.4),
+    hsl(var(--tim-gold) / 0)
+  );
+}
+
+/* Page title warm gradient underline */
+.tim-title-accent {
+  position: relative;
+  display: inline-block;
+}
+.tim-title-accent::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--tim-gold) / 0.5),
+    hsl(var(--tim-gold) / 0.15)
+  );
+  transform: scaleX(0.3);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Mobile bottom nav warm glass */
+.tim-mobile-glass {
+  background: hsl(var(--card) / 0.85) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+.dark .tim-mobile-glass {
+  background: hsl(var(--card) / 0.80) !important;
+}
+
 /* Clerk component overrides — TIM brand integration */
 .cl-card {
   background: hsl(var(--card)) !important;
@@ -572,6 +750,90 @@
 /* ── Ghost receipt float ───────────────────────────────── */
 .animate-ghost-float {
   animation: float-slow 8s ease-in-out infinite;
+}
+
+/* ── Feature card mouse-tracking spotlight (Vercel/Linear) ── */
+.feature-card {
+  --mx: 50%;
+  --my: 50%;
+  --card-accent: var(--primary);
+  transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 0.5s;
+}
+.feature-card:hover {
+  transform: translateY(-8px);
+  border-color: hsl(var(--card-accent) / 0.2);
+  box-shadow:
+    0 25px 60px -12px hsl(var(--card-accent) / 0.08),
+    0 0 0 1px hsl(var(--card-accent) / 0.06);
+}
+.dark .feature-card:hover {
+  box-shadow:
+    0 25px 60px -12px hsl(var(--card-accent) / 0.15),
+    0 0 0 1px hsl(var(--card-accent) / 0.12);
+}
+.feature-card-spotlight {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.5s;
+  background: radial-gradient(600px circle at var(--mx) var(--my), hsl(var(--card-accent) / 0.07), transparent 40%);
+}
+.feature-card:hover .feature-card-spotlight {
+  opacity: 1;
+}
+.feature-card-border-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.5s;
+  background: radial-gradient(400px circle at var(--mx) var(--my), hsl(var(--card-accent) / 0.35), transparent 40%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px;
+}
+.feature-card:hover .feature-card-border-glow {
+  opacity: 1;
+}
+
+/* ── Gradient text shimmer ─────────────────────────────── */
+@keyframes text-shimmer {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+.animate-text-shimmer {
+  background-size: 300% auto;
+  animation: text-shimmer 8s ease-in-out infinite;
+}
+
+/* ── Floating stat badges ──────────────────────────────── */
+@keyframes float-badge-1 {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-16px) rotate(1deg); }
+}
+@keyframes float-badge-2 {
+  0%, 100% { transform: translateY(0) rotate(2deg); }
+  50% { transform: translateY(-12px) rotate(-1deg); }
+}
+@keyframes float-badge-3 {
+  0%, 100% { transform: translateY(0) rotate(1deg); }
+  50% { transform: translateY(-14px) rotate(-2deg); }
+}
+.animate-float-badge-1 {
+  animation: float-badge-1 7s ease-in-out infinite;
+}
+.animate-float-badge-2 {
+  animation: float-badge-2 9s ease-in-out infinite 1.5s;
+}
+.animate-float-badge-3 {
+  animation: float-badge-3 8s ease-in-out infinite 3s;
 }
 
 /* Respect reduced-motion preference */

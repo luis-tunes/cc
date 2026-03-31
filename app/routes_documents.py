@@ -665,12 +665,10 @@ async def bulk_delete_documents(request: Request, payload: BulkDeletePayload, au
 async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, paperless_id, tenant_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
+            "SELECT id, paperless_id, filename, tenant_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
-    if not row["paperless_id"]:
-        raise HTTPException(status_code=422, detail="document has no OCR source to reprocess")
 
     with get_conn() as conn:
         conn.execute(
@@ -679,12 +677,82 @@ async def reprocess_document(doc_id: int, auth: AuthInfo = Depends(require_auth)
         )
         conn.commit()
 
+    if row["paperless_id"]:
+        try:
+            new_id = ingest_document(row["paperless_id"], row["tenant_id"])
+        except Exception as e:
+            logger.exception("reprocess failed for doc %d", doc_id)
+            raise HTTPException(status_code=500, detail=f"reprocess failed: {e}") from None
+        return {"document_id": new_id}
+
+    # Local file reprocess — re-run GPT Vision extraction
+    tid = row["tenant_id"]
+    filename = row["filename"] or "document"
+    ext = os.path.splitext(filename.lower())[1] or ".pdf"
+    tenant_dir = _safe_path(UPLOADS_DIR, tid or "_global")
+    local_path = _safe_path(tenant_dir, f"{doc_id}{ext}")
+
+    if not os.path.exists(local_path):
+        raise HTTPException(status_code=422, detail="no source file found to reprocess")
+
+    with open(local_path, "rb") as f:
+        content = f.read()
+
+    owner_entities = []
+    with contextlib.suppress(Exception), get_conn() as conn:
+            settings_row = conn.execute(
+                "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
+                (tid,),
+            ).fetchone()
+            if settings_row and settings_row["data"]:
+                import json as _json
+                entity_data = settings_row["data"] if isinstance(settings_row["data"], dict) else _json.loads(settings_row["data"])
+                owner_entities = owner_entities_from_settings(entity_data)
+
+    hints = None
+    with contextlib.suppress(Exception):
+        from app.ocr import extract_text
+        raw_ocr = extract_text(content)
+        if raw_ocr and len(raw_ocr) >= 20:
+            hints = run_deterministic_extraction(raw_ocr)
+
+    saft_code = hints.type_candidates[0][0] if hints and hints.type_candidates else None
+    assembled_prompt = assemble_prompt(
+        owner_entities=owner_entities or None,
+        hints=hints,
+        saft_code=saft_code,
+    )
+
+    mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
     try:
-        new_id = ingest_document(row["paperless_id"], row["tenant_id"])
+        vision_result = _extract_with_vision(content, mime_for_vision, prompt=assembled_prompt)
     except Exception as e:
-        logger.exception("reprocess failed for doc %d", doc_id)
+        logger.exception("reprocess vision failed for doc %d", doc_id)
         raise HTTPException(status_code=500, detail=f"reprocess failed: {e}") from None
-    return {"document_id": new_id}
+
+    if vision_result and vision_result.get("total", 0) > 0:
+        raw_text = ""
+        normalized = _normalize_llm_result(vision_result, raw_text)
+        status = "extraído" if normalized["total"] > 0 else "pendente"
+        with get_conn() as conn:
+            conn.execute(
+                """UPDATE documents
+                   SET supplier_nif=%s, client_nif=%s, total=%s, vat=%s, date=%s,
+                       type=%s, raw_text=%s, status=%s, notes=%s, classification_source='vision'
+                   WHERE id = %s AND tenant_id = %s""",
+                (normalized["supplier_nif"], normalized["client_nif"],
+                 normalized["total"], normalized["vat"], normalized["doc_date"],
+                 normalized["doc_type"], raw_text, status,
+                 normalized["extra_json"], doc_id, tid),
+            )
+            conn.commit()
+    else:
+        with get_conn() as conn:
+            conn.execute("UPDATE documents SET status = 'pendente' WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+            conn.commit()
+
+    cache_invalidate(f"dashboard:{tid}")
+    return {"document_id": doc_id}
 
 
 @router.get("/documents/{doc_id}/preview")

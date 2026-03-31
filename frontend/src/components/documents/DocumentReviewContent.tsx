@@ -210,6 +210,25 @@ export function DocumentReviewContent({
                 </a>
               ) : null}
             </div>
+          ) : previewUrl && document.fileType === "pdf" ? (
+            <div className="relative">
+              <iframe
+                src={previewUrl}
+                title={document.fileName}
+                className={cn(
+                  "w-full border-0",
+                  largePreview ? "h-[50vh]" : "h-[300px]"
+                )}
+              />
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-2 rounded-md bg-background/80 px-2 py-1 text-xs font-medium text-foreground shadow hover:bg-background transition-colors"
+              >
+                <Eye className="mr-1 inline-block h-3 w-3" /> Abrir original
+              </a>
+            </div>
           ) : (
             <div className="flex items-center justify-center py-20 px-5">
               <div className="text-center">

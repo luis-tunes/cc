@@ -81,16 +81,21 @@ export function AppSidebar() {
     .slice(0, 2);
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
+    <Sidebar collapsible="icon" className="border-r-0 tim-sidebar-glow">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-primary">
-            xtim
-          </span>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <span className="text-sm font-extrabold text-primary">x</span>
+          </div>
           {!collapsed && (
-            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              .ai
-            </span>
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-xl font-bold tracking-tight text-foreground">
+                xtim
+              </span>
+              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                .ai
+              </span>
+            </div>
           )}
         </div>
       </SidebarHeader>

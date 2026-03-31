@@ -16,8 +16,9 @@ export function DashboardQuickUpload() {
           "active:scale-[0.99]"
         )}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15 relative">
           <Upload className="h-5 w-5 text-primary" />
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
         </div>
         <div className="flex-1 text-left">
           <p className="text-sm font-semibold text-foreground">

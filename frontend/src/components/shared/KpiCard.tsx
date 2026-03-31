@@ -98,7 +98,7 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card tim-card-hover",
+        "rounded-lg border bg-card tim-card-warm",
         compact ? "px-3 py-2.5" : "p-4",
         borderClass[variant],
         className
@@ -130,7 +130,7 @@ export function KpiCard({
             className={cn(
               "font-semibold tracking-tight",
               compact ? "mt-0.5 text-2xl" : "mt-1 text-3xl",
-              accent ? "text-primary" : "text-foreground",
+              accent ? "text-primary tim-kpi-glow" : "text-foreground",
               variant === "danger" && "text-tim-danger",
               variant === "warning" && "text-tim-warning"
             )}

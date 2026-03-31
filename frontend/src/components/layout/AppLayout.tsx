@@ -71,7 +71,10 @@ export function AppLayout() {
         Ir para conteúdo
       </a>
 
-      <div className="flex min-h-screen w-full">
+      {/* Golden Mist ambient glow */}
+      <div className="tim-ambient" aria-hidden="true" />
+
+      <div className="relative flex min-h-screen w-full">
         {!isMobile && <AppSidebar />}
         <main className="flex flex-1 flex-col">
           <AppTopbar title={pageTitle} />
@@ -83,8 +86,11 @@ export function AppLayout() {
             aria-live="polite"
           >
             <Suspense fallback={
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+                  <Loader2 className="relative h-6 w-6 animate-spin text-primary" />
+                </div>
               </div>
             }>
               <Outlet />

@@ -37,7 +37,7 @@ export function MobileNav() {
         aria-label="Navegação principal"
         aria-hidden={moreOpen}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card/90 backdrop-blur-lg md:hidden transition-opacity duration-200",
+          "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t tim-mobile-glass md:hidden transition-opacity duration-200",
           moreOpen && "opacity-40 pointer-events-none"
         )}
         style={{ height: "calc(4rem + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}

@@ -114,7 +114,11 @@ export function StatusBadge({ status, className, showIcon = false }: StatusBadge
       {showIcon ? (
         <Icon className="h-3 w-3 shrink-0" />
       ) : (
-        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", config.dotColor)} />
+        <span className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          config.dotColor,
+          (status === "atrasado" || status === "anomalia") && "animate-pulse"
+        )} />
       )}
       {config.label}
     </span>
