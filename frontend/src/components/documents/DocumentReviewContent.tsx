@@ -86,7 +86,7 @@ export function DocumentReviewContent({
 
     fetchAuthenticatedBlob(documentThumbnailUrl(Number(document.id)))
       .then((url) => { thumbnailUrlRef.current = url; setThumbnailUrl(url); })
-      .catch(() => setPreviewError(true));
+      .catch(() => {}); // thumbnail is optional — preview handles display
 
     fetchAuthenticatedBlob(documentPreviewUrl(Number(document.id)))
       .then((url) => { previewUrlRef.current = url; setPreviewUrl(url); })
@@ -187,10 +187,10 @@ export function DocumentReviewContent({
       <div className="space-y-0 divide-y">
         {/* File preview */}
         <div className="bg-muted/30">
-          {!previewError && thumbnailUrl ? (
+          {!previewError && (thumbnailUrl || (previewUrl && document.fileType !== "pdf")) ? (
             <div className="relative">
               <img
-                src={thumbnailUrl}
+                src={thumbnailUrl || previewUrl || ""}
                 alt={document.fileName}
                 className={cn(
                   "w-full object-contain cursor-zoom-in",

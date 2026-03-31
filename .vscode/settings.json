@@ -18,5 +18,6 @@
     "mcp/dist": true,
     "mcp/node_modules": true,
     "frontend/node_modules": true
-  }
+  },
+  "makefile.configureOnOpen": false
 }

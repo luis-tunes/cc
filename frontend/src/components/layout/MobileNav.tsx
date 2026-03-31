@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Inbox, GitMerge, MoreHorizontal, User } from "lucide-react";
+import { LayoutDashboard, Inbox, GitMerge, MoreHorizontal, User, X } from "lucide-react";
 import { useState } from "react";
 import { navigation } from "@/lib/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -82,7 +82,7 @@ export function MobileNav() {
             className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors"
             aria-label="Fechar"
           >
-            <MoreHorizontal className="h-4 w-4 rotate-90" />
+            <X className="h-4 w-4" />
           </button>
           <ScrollArea className="mt-3 max-h-[60vh]">
             <div className="space-y-4 pb-4">
