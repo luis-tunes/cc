@@ -404,7 +404,7 @@ function FormField({
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={cn("h-9 text-xs bg-muted/30", Icon && "pl-8")}
+          className={cn("h-9 text-sm bg-muted/30", Icon && "pl-8")}
           placeholder={placeholder}
           disabled={disabled}
         />
@@ -424,7 +424,7 @@ function SelectField({
     <div>
       <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 text-xs bg-muted/30">
+        <SelectTrigger className="h-9 text-sm bg-muted/30">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

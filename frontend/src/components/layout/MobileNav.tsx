@@ -38,7 +38,7 @@ export function MobileNav() {
         aria-hidden={moreOpen}
         className={cn(
           "fixed inset-x-0 bottom-0 z-[60] flex items-center justify-around border-t bg-card/90 backdrop-blur-lg md:hidden transition-opacity duration-200",
-          moreOpen && "opacity-0 pointer-events-none"
+          moreOpen && "opacity-40 pointer-events-none"
         )}
         style={{ height: "calc(4rem + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
@@ -77,6 +77,13 @@ export function MobileNav() {
           <SheetHeader>
             <SheetTitle className="text-base">Navegação</SheetTitle>
           </SheetHeader>
+          <button
+            onClick={() => setMoreOpen(false)}
+            className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors"
+            aria-label="Fechar"
+          >
+            <MoreHorizontal className="h-4 w-4 rotate-90" />
+          </button>
           <ScrollArea className="mt-3 max-h-[60vh]">
             <div className="space-y-4 pb-4">
               {moreGroups.map((group) => (
