@@ -29,3 +29,4 @@ make deploy  # deploy to production
 - Every table and query includes `tenant_id`.
 - `bin/` scripts are source of truth. Makefile calls `bin/`. CI calls `make`.
 - Test files: `thing_test.py`, not `test_thing.py`.
+- Test files: `thing_test.py`, not `test_thing.py`.
