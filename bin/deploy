@@ -44,6 +44,9 @@ $SSH "$HOST" "cd $DIR && if grep -qP 'REDIS_PASSWORD=.*[/@:]' .env.production 2>
   echo '→ fixed REDIS_PASSWORD (had URL-unsafe chars)'
 fi"
 
+# Clean up old Docker images/cache to prevent disk-full issues
+$SSH "$HOST" "docker image prune -af --filter 'until=168h' 2>/dev/null; docker builder prune -af --filter 'until=168h' 2>/dev/null" || true
+
 # Registry login (CI provides GHCR_TOKEN)
 if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
   $SSH "$HOST" "echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
