@@ -2,7 +2,9 @@ import {
   Sheet,
   SheetContent,
 } from "@/components/ui/sheet";
+import { MobileDrawer } from "@/components/shared/MobileDrawer";
 import { DocumentReviewContent } from "./DocumentReviewContent";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { DocumentRecord } from "@/lib/documents-data";
 import type { DocumentType } from "@/lib/documents-data";
 
@@ -31,16 +33,30 @@ export function DocumentReviewDrawer({
   onClose,
   actions,
 }: DocumentReviewDrawerProps) {
+  const isMobile = useIsMobile();
+
   if (!document) return null;
+
+  const content = (
+    <DocumentReviewContent
+      document={document}
+      actions={actions}
+      onClose={onClose}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <MobileDrawer open={open} onClose={onClose}>
+        {content}
+      </MobileDrawer>
+    );
+  }
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent className="w-full max-w-lg overflow-y-auto border-l bg-card p-0 sm:max-w-xl">
-        <DocumentReviewContent
-          document={document}
-          actions={actions}
-          onClose={onClose}
-        />
+        {content}
       </SheetContent>
     </Sheet>
   );
