@@ -15,7 +15,15 @@ from invoice2data.extract.loader import read_templates
 
 from app.classify import classify_document
 from app.db import get_conn
+from app.entity_resolver import (
+    OwnerEntity,
+    owner_entities_from_settings,
+    resolve_entities,
+)
 from app.ocr import extract_text
+from app.parsers.deterministic import run_deterministic_extraction
+from app.prompt_assembly import assemble_prompt
+from app.taxonomy import SAF_T_TYPES, classify_by_series_prefix
 
 __fingerprint__ = "TIM-LT-e8d3b7f1-a642-4c59-9b1e-5a7d2f4c8e30"
 
@@ -278,7 +286,8 @@ def _deskew_image(gray_img: Any) -> Any:
         return gray_img
 
 
-def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
+def _extract_with_vision(file_bytes: bytes, mime_type: str,
+                         prompt: str | None = None) -> dict | None:
     """Send document image directly to GPT-4o vision for extraction.
 
     For PDFs, converts pages to images first.
@@ -288,6 +297,8 @@ def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
         return None
 
     import base64
+
+    system_prompt = prompt or _LLM_EXTRACTION_PROMPT
 
     # Build image content parts
     image_parts: list[tuple[bytes, str]] = []
@@ -326,7 +337,7 @@ def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
                 json={
                     "model": OPENAI_MODEL,
                     "messages": [
-                        {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content},
                     ],
                     "temperature": 0,
@@ -354,11 +365,12 @@ def _extract_with_vision(file_bytes: bytes, mime_type: str) -> dict | None:
     return None
 
 
-def _extract_with_llm(text: str) -> dict | None:
+def _extract_with_llm(text: str, prompt: str | None = None) -> dict | None:
     """Fallback: extract structured data from OCR text via LLM. Returns parsed dict or None."""
     if not OPENAI_API_KEY:
         return None
 
+    system_prompt = prompt or _LLM_EXTRACTION_PROMPT
     truncated = text[:8000]
     import time as _time
     for _attempt in range(3):
@@ -372,7 +384,7 @@ def _extract_with_llm(text: str) -> dict | None:
                 json={
                     "model": OPENAI_MODEL,
                     "messages": [
-                        {"role": "system", "content": _LLM_EXTRACTION_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"OCR Text:\n{truncated}"},
                     ],
                     "temperature": 0,
@@ -1345,17 +1357,17 @@ def _merge_extractions(vision_norm: dict | None, llm_norm: dict | None,
 
 
 def ingest_document(paperless_id: int, tenant_id: str) -> int:
-    """Main document ingestion pipeline.
+    """Main document ingestion pipeline (8-step architecture).
 
     Pipeline stages:
-    [A] OCR text extraction (existing)
-    [B] Dual-pass LLM extraction: Vision + Text (always both)
-    [C] Merge best results from both passes
-    [D] Regex fallback for any missing fields
-    [E] Arithmetic validation + NIF verification
-    [F] Confidence scoring + status determination
-    [G] DB storage
-    [H] Classification
+    [A] OCR text extraction
+    [B] Deterministic parsing — extract NIFs, IBANs, dates, amounts, ATCUD (no LLM)
+    [C] Pre-classification — keyword + series prefix → document type candidates (no LLM)
+    [D] Entity resolution — match NIFs against owner_entities, determine direction (no LLM)
+    [E] Prompt assembly — base + owner context + hints + type adapter overlay (no LLM)
+    [F] Dual-pass LLM extraction — Vision + Text with assembled prompt (1 LLM call)
+    [G] Validation + reconciliation — math checks, NIF checks, type coherence (no LLM)
+    [H] Confidence scoring + status determination (no LLM)
     """
     pdf = fetch_document_file(paperless_id)
     data = parse_invoice(pdf)
@@ -1383,15 +1395,55 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
     if len(raw_text) < 50:
         log.warning("ingest: very short OCR text (%d chars): %r", len(raw_text), raw_text[:200])
 
+    # [B] Deterministic parsing — extract patterns before LLM
+    hints = None
+    if len(raw_text) >= 20:
+        try:
+            hints = run_deterministic_extraction(raw_text)
+            log.info("ingest: deterministic hints nifs=%d ibans=%d dates=%d amounts=%d atcud=%s type_candidates=%d",
+                     len(hints.nifs), len(hints.ibans), len(hints.dates),
+                     len(hints.amounts), hints.atcud, len(hints.type_candidates))
+        except Exception as exc:
+            log.warning("ingest: deterministic parsing failed: %s", exc)
+
+    # [C] Pre-classification — determine likely document type
+    saft_code = None
+    if hints and hints.type_candidates:
+        saft_code = hints.type_candidates[0][0]  # Top candidate SAF-T code
+        log.info("ingest: pre-classified as %s (conf=%.0f%%)",
+                 saft_code, hints.type_candidates[0][2] * 100)
+
+    # [D] Entity resolution — load owner entities and determine direction
+    owner_entities: list[OwnerEntity] = []
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
+                (tenant_id,),
+            ).fetchone()
+            if row and row["data"]:
+                entity_data = row["data"] if isinstance(row["data"], dict) else json.loads(row["data"])
+                owner_entities = owner_entities_from_settings(entity_data)
+                log.info("ingest: loaded %d owner entities for tenant %s", len(owner_entities), tenant_id)
+    except Exception as exc:
+        log.warning("ingest: could not load owner entities: %s", exc)
+
+    # [E] Prompt assembly — compose tailored prompt
+    assembled_prompt = assemble_prompt(
+        owner_entities=owner_entities if owner_entities else None,
+        hints=hints,
+        saft_code=saft_code,
+    )
+
     extraction_source = "regex"
     extra_json: str | None = None
 
-    # [B] Dual-pass LLM extraction — always run both vision and text
+    # [F] Dual-pass LLM extraction with assembled prompt
     vision_norm: dict | None = None
     llm_norm: dict | None = None
 
     # Pass 1: Vision extraction (sends actual image to GPT-4o)
-    vision_result = _extract_with_vision(pdf, mime_type)
+    vision_result = _extract_with_vision(pdf, mime_type, prompt=assembled_prompt)
     if vision_result:
         vision_norm = _normalize_llm_result(vision_result, raw_text)
         log.info("ingest: vision pass total=%s vat=%s snif=%s cnif=%s",
@@ -1400,14 +1452,14 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
 
     # Pass 2: LLM text extraction (OCR text → GPT-4o)
     if len(raw_text) >= 20:
-        llm_result = _extract_with_llm(raw_text)
+        llm_result = _extract_with_llm(raw_text, prompt=assembled_prompt)
         if llm_result:
             llm_norm = _normalize_llm_result(llm_result, raw_text)
             log.info("ingest: llm pass total=%s vat=%s snif=%s cnif=%s",
                      llm_norm["total"], llm_norm["vat"],
                      llm_norm["supplier_nif"], llm_norm["client_nif"])
 
-    # [C] Merge results from both passes
+    # Merge results from both passes
     if vision_norm or llm_norm:
         merged = _merge_extractions(vision_norm, llm_norm, raw_text)
         total = merged["total"]
@@ -1419,7 +1471,7 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
         extra_json = merged["extra_json"]
         extraction_source = "vision" if vision_norm and vision_norm.get("total", Decimal("0")) > 0 else "llm"
     else:
-        # [D] Fallback: invoice2data templates then regex
+        # Fallback: invoice2data templates then regex
         if not data:
             try:
                 total = _parse_amount_from_text(raw_text)
@@ -1457,7 +1509,7 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
                 doc_date = date.today()
         doc_type = str(data.get("invoice_type", "outro"))
 
-    # [D cont.] Fill missing fields from regex even after LLM extraction
+    # Fill missing fields from regex/hints even after LLM extraction
     if supplier_nif == "000000000" or client_nif == "000000000":
         regex_snif, regex_cnif = _parse_nifs_from_text(raw_text)
         if supplier_nif == "000000000" and regex_snif != "000000000":
@@ -1480,26 +1532,74 @@ def ingest_document(paperless_id: int, tenant_id: str) -> int:
             vat = regex_vat
             log.info("ingest: regex filled vat=%s", vat)
 
-    # [E] Post-extraction validation
+    # [D cont.] Entity resolution with final extracted NIFs
+    direction = "unknown"
+    if owner_entities:
+        try:
+            # Get direction hint from taxonomy
+            direction_hint = "either"
+            resolved_saft = saft_code
+            if not resolved_saft:
+                # Try to classify from extracted invoice_number
+                extra_data = json.loads(extra_json) if extra_json else {}
+                inv_num = extra_data.get("invoice_number", "")
+                if inv_num:
+                    resolved_saft = classify_by_series_prefix(inv_num)
+            if resolved_saft and resolved_saft in SAF_T_TYPES:
+                direction_hint = SAF_T_TYPES[resolved_saft][3]
+
+            supplier_name = ""
+            client_name = ""
+            if extra_json:
+                extra_data = json.loads(extra_json)
+                supplier_name = extra_data.get("supplier_name", "")
+                client_name = extra_data.get("client_name", "")
+
+            resolved = resolve_entities(
+                supplier_nif=supplier_nif,
+                client_nif=client_nif,
+                supplier_name=supplier_name,
+                client_name=client_name,
+                extracted_ibans=hints.ibans if hints else [],
+                owner_entities=owner_entities,
+                doc_type_direction_hint=direction_hint,
+            )
+            direction = resolved.direction.value
+            log.info("ingest: entity resolution direction=%s issuer_score=%.2f recipient_score=%.2f",
+                     direction, resolved.issuer_match_score, resolved.recipient_match_score)
+
+            # If direction indicates we received this, reclassify fatura → fatura-fornecedor
+            if direction == "received_by_user" and doc_type == "fatura":
+                doc_type = "fatura-fornecedor"
+                log.info("ingest: reclassified fatura → fatura-fornecedor (received_by_user)")
+        except Exception as exc:
+            log.warning("ingest: entity resolution failed: %s", exc)
+
+    # Store direction and SAF-T code in extra_json
+    extra_data = json.loads(extra_json) if extra_json else {}
+    extra_data["_direction"] = direction
+    if saft_code:
+        extra_data["_saft_code"] = saft_code
+    extra_json = json.dumps(extra_data, ensure_ascii=False, default=str)
+
+    # [G] Post-extraction validation
     from app.validators import validate_extraction
     validation = validate_extraction({
         "total": total, "vat": vat,
-        "base_amount": extra_json and json.loads(extra_json).get("base_amount", "0") or "0",
+        "base_amount": extra_data.get("base_amount", "0"),
         "supplier_nif": supplier_nif, "client_nif": client_nif,
-        "vat_breakdown": extra_json and json.loads(extra_json).get("vat_breakdown") or None,
-        "line_items": extra_json and json.loads(extra_json).get("line_items") or None,
+        "vat_breakdown": extra_data.get("vat_breakdown"),
+        "line_items": extra_data.get("line_items"),
         "date": str(doc_date), "type": doc_type,
-        "atcud": extra_json and json.loads(extra_json).get("atcud", "") or "",
+        "atcud": extra_data.get("atcud", ""),
     })
     if validation["warnings"]:
         log.info("ingest: validation warnings: %s", validation["warnings"])
-        # Store warnings in extra_json
-        extra_data = json.loads(extra_json) if extra_json else {}
         extra_data["_validation_warnings"] = validation["warnings"]
         extra_data["_math_valid"] = validation["math_valid"]
         extra_json = json.dumps(extra_data, ensure_ascii=False, default=str)
 
-    # [F] Confidence scoring
+    # [H] Confidence scoring
     confidence = _calculate_confidence(total, vat, supplier_nif, client_nif, doc_date, doc_type, raw_text)
     confidence = max(0, min(100, confidence + validation["confidence_adjustment"]))
 

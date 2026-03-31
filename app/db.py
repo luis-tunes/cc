@@ -134,6 +134,17 @@ def _init_db_schema():
             ALTER TABLE documents ALTER COLUMN type SET DEFAULT 'outro';
         """)
 
+        # Extraction data JSONB column (rich structured extraction output)
+        for col, typ in [
+            ("extraction_data", "JSONB"),
+        ]:
+            conn.execute(f"""
+                DO $$ BEGIN
+                    ALTER TABLE documents ADD COLUMN {col} {typ};
+                EXCEPTION WHEN duplicate_column THEN NULL;
+                END $$;
+            """)
+
         # Key-value settings per tenant (entity profile, preferences, etc.)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tenant_settings (
@@ -143,6 +154,24 @@ def _init_db_schema():
                 updated_at  TIMESTAMPTZ DEFAULT now(),
                 PRIMARY KEY (tenant_id, key)
             );
+        """)
+
+        # Counterparty registry — NIF → name/IBAN/address cache built from extractions
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS counterparties (
+                id          SERIAL PRIMARY KEY,
+                tenant_id   TEXT NOT NULL,
+                nif         VARCHAR(9) NOT NULL,
+                name        TEXT NOT NULL DEFAULT '',
+                iban        TEXT,
+                address     TEXT,
+                doc_count   INTEGER NOT NULL DEFAULT 1,
+                last_seen   TIMESTAMPTZ DEFAULT now(),
+                created_at  TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(tenant_id, nif)
+            );
+            CREATE INDEX IF NOT EXISTS idx_counterparties_tenant_nif
+                ON counterparties(tenant_id, nif);
         """)
 
         # ── Classification rules ──────────────────────────────────────
