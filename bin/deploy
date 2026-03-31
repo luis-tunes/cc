@@ -23,7 +23,7 @@ echo "→ deploying to $HOST"
 
 $SSH "$HOST" "mkdir -p $DIR/bin"
 $SCP docker-compose.yml Caddyfile "$HOST:$DIR/"
-$SCP bin/post-consume bin/init-db.sh "$HOST:$DIR/bin/"
+$SCP bin/post-consume bin/init-db "$HOST:$DIR/bin/"
 
 # Ensure .env.production exists on remote
 if ! $SSH "$HOST" "test -f $DIR/.env.production"; then
