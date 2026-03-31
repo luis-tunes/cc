@@ -6,10 +6,12 @@ import { DashboardQuickUpload } from "@/components/dashboard/DashboardQuickUploa
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { RecentDocumentsFeed } from "@/components/dashboard/RecentDocumentsFeed";
 import { GuidedTour } from "@/components/shared/GuidedTour";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { useDashboardSummary, useMonthlyData } from "@/hooks/use-dashboard";
 import { useTour } from "@/hooks/use-tour";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useMemo } from "react";
 import {
   FileText,
@@ -28,6 +30,7 @@ export default function Dashboard() {
   const { data: summary, isLoading, isError, refetch } = useDashboardSummary();
   const { data: monthly } = useMonthlyData();
   const tour = useTour();
+  const isMobile = useIsMobile();
 
   const docCount = summary?.documents?.count ?? 0;
   const docTotal = summary?.documents?.total ?? "0";
@@ -69,46 +72,79 @@ export default function Dashboard() {
       </div>
 
       {/* === TOP KPI ROW (4 cards) === */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {isLoading ? (
-          <>
-            <Skeleton className="h-28 rounded-lg" />
-            <Skeleton className="h-28 rounded-lg" />
-            <Skeleton className="h-28 rounded-lg" />
-            <Skeleton className="h-28 rounded-lg" />
-          </>
-        ) : (
-          <>
-            <KpiCard
-              label="Documentos"
-              value={String(docCount)}
-              trend={{ value: formatEUR(docTotal), direction: "neutral" }}
-              icon={FileText}
-              accent
-              sparkline={sparkDocs}
-            />
-            <KpiCard
-              label="Movimentos"
-              value={String(txCount)}
-              trend={{ value: formatEUR(txTotal), direction: "neutral" }}
-              icon={Landmark}
-            />
-            <KpiCard
-              label="Reconciliados"
-              value={String(reconciled)}
-              trend={{ value: `de ${docCount}`, direction: "neutral" }}
-              icon={CheckCircle2}
-            />
-            <KpiCard
-              label="Pendentes"
-              value={String(unmatched)}
-              trend={{ value: `por reconciliar`, direction: "neutral" }}
-              icon={Clock}
-              variant="warning"
-            />
-          </>
-        )}
-      </div>
+      {isLoading ? (
+        <div><DashboardSkeleton /></div>
+      ) : isMobile ? (
+        <Carousel opts={{ align: "start", loop: false }} className="-mx-2">
+          <CarouselContent className="-ml-2">
+            <CarouselItem className="basis-[75%] pl-2">
+              <KpiCard
+                label="Documentos"
+                value={String(docCount)}
+                trend={{ value: formatEUR(docTotal), direction: "neutral" }}
+                icon={FileText}
+                accent
+                sparkline={sparkDocs}
+              />
+            </CarouselItem>
+            <CarouselItem className="basis-[75%] pl-2">
+              <KpiCard
+                label="Movimentos"
+                value={String(txCount)}
+                trend={{ value: formatEUR(txTotal), direction: "neutral" }}
+                icon={Landmark}
+              />
+            </CarouselItem>
+            <CarouselItem className="basis-[75%] pl-2">
+              <KpiCard
+                label="Reconciliados"
+                value={String(reconciled)}
+                trend={{ value: `de ${docCount}`, direction: "neutral" }}
+                icon={CheckCircle2}
+              />
+            </CarouselItem>
+            <CarouselItem className="basis-[75%] pl-2">
+              <KpiCard
+                label="Pendentes"
+                value={String(unmatched)}
+                trend={{ value: `por reconciliar`, direction: "neutral" }}
+                icon={Clock}
+                variant="warning"
+              />
+            </CarouselItem>
+          </CarouselContent>
+        </Carousel>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiCard
+            label="Documentos"
+            value={String(docCount)}
+            trend={{ value: formatEUR(docTotal), direction: "neutral" }}
+            icon={FileText}
+            accent
+            sparkline={sparkDocs}
+          />
+          <KpiCard
+            label="Movimentos"
+            value={String(txCount)}
+            trend={{ value: formatEUR(txTotal), direction: "neutral" }}
+            icon={Landmark}
+          />
+          <KpiCard
+            label="Reconciliados"
+            value={String(reconciled)}
+            trend={{ value: `de ${docCount}`, direction: "neutral" }}
+            icon={CheckCircle2}
+          />
+          <KpiCard
+            label="Pendentes"
+            value={String(unmatched)}
+            trend={{ value: `por reconciliar`, direction: "neutral" }}
+            icon={Clock}
+            variant="warning"
+          />
+        </div>
+      )}
 
       {/* === DETAIL PANELS (always visible when data exists) === */}
       {hasData && (
