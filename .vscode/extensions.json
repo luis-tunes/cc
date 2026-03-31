@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "github.copilot",
+    "github.copilot-chat"
+  ]
+}
