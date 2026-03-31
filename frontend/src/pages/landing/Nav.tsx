@@ -35,18 +35,18 @@ export function Nav() {
       ref={navRef}
       className={`sticky top-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-[0_1px_3px_rgb(0_0_0/0.05)]"
+          ? "border-b-2 border-border/30 bg-card/80 backdrop-blur-xl shadow-[0_2px_8px_rgb(0_0_0/0.06)]"
           : "bg-transparent"
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <span className="text-sm font-extrabold text-primary">x</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border-2 border-primary/20">
+            <span className="text-sm font-black text-primary">⛵</span>
           </div>
           <div className="flex items-baseline">
-            <span className="text-xl font-extrabold tracking-tight text-foreground">xtim</span>
-            <span className="text-xl font-extrabold tracking-tight text-primary">.ai</span>
+            <span className="text-xl font-black tracking-tight text-foreground">xtim</span>
+            <span className="text-xl font-black tracking-tight text-primary">.ai</span>
           </div>
         </Link>
 
@@ -55,7 +55,7 @@ export function Nav() {
             <a
               key={l.href}
               href={l.href}
-              className="relative text-sm font-medium text-muted-foreground transition-colors hover:text-foreground after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all hover:after:w-full"
+              className="relative text-sm font-bold text-muted-foreground transition-colors hover:text-foreground after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-primary after:transition-all hover:after:w-full"
             >
               {l.label}
             </a>
@@ -73,7 +73,7 @@ export function Nav() {
           )}
           <Link
             to={ctaTo}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 sm:px-4 sm:py-2.5"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 sm:px-5 sm:py-2.5"
           >
             {ctaLabel}
             <ArrowRight className="h-3.5 w-3.5" />

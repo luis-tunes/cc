@@ -12,6 +12,7 @@ interface Feature {
   accentText: string;
   accentBadge: string;
   cssVar: string;
+  emoji: string;
 }
 
 const FEATURES: Feature[] = [
@@ -20,11 +21,12 @@ const FEATURES: Feature[] = [
     title: "OCR inteligente",
     description: "Digitalize faturas, recibos e notas de crédito. Extração automática de NIF, valores, IVA e datas.",
     highlight: "Extração automática",
-    stat: { value: "30", prefix: "<", suffix: "s", label: "tempo médio de extração" },
-    accentBg: "bg-tim-info/10 group-hover:bg-tim-info/20",
-    accentText: "text-tim-info",
-    accentBadge: "border-tim-info/20 bg-tim-info/[0.08] text-tim-info",
+    stat: { value: "3", prefix: "<", suffix: "s", label: "tempo médio de extração" },
+    accentBg: "bg-sky-100 dark:bg-sky-900/30 group-hover:bg-sky-200 dark:group-hover:bg-sky-800/40",
+    accentText: "text-sky-600 dark:text-sky-400",
+    accentBadge: "border-sky-300/40 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400",
     cssVar: "--tim-info",
+    emoji: "🔭",
   },
   {
     icon: Bot,
@@ -32,54 +34,57 @@ const FEATURES: Feature[] = [
     description: "O xtim.ai aprende com o seu histórico e sugere contas SNC automaticamente. Aprovação com um clique.",
     highlight: "Aprende consigo",
     stat: { value: "95", prefix: ">", suffix: "%", label: "taxa de acerto" },
-    accentBg: "bg-primary/10 group-hover:bg-primary/20",
-    accentText: "text-primary",
-    accentBadge: "border-primary/20 bg-primary/[0.08] text-primary",
+    accentBg: "bg-amber-100 dark:bg-amber-900/30 group-hover:bg-amber-200 dark:group-hover:bg-amber-800/40",
+    accentText: "text-amber-600 dark:text-amber-400",
+    accentBadge: "border-amber-300/40 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
     cssVar: "--primary",
+    emoji: "🤖",
   },
   {
     icon: Receipt,
     title: "Reconciliação automática",
     description: "Associação inteligente entre documentos e movimentos bancários por valor, data e NIF.",
     highlight: "95% automático",
-    accentBg: "bg-tim-success/10 group-hover:bg-tim-success/20",
-    accentText: "text-tim-success",
-    accentBadge: "border-tim-success/20 bg-tim-success/[0.08] text-tim-success",
+    accentBg: "bg-emerald-100 dark:bg-emerald-900/30 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-800/40",
+    accentText: "text-emerald-600 dark:text-emerald-400",
+    accentBadge: "border-emerald-300/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
     cssVar: "--tim-success",
+    emoji: "⚓",
   },
   {
     icon: BarChart3,
     title: "Dashboard financeiro",
     description: "Faturação, despesas, IVA e fluxo de caixa em tempo real. Pronto para decisões.",
     highlight: "Tempo real",
-    accentBg: "bg-tim-warning/10 group-hover:bg-tim-warning/20",
-    accentText: "text-tim-warning",
-    accentBadge: "border-tim-warning/20 bg-tim-warning/[0.08] text-tim-warning",
+    accentBg: "bg-orange-100 dark:bg-orange-900/30 group-hover:bg-orange-200 dark:group-hover:bg-orange-800/40",
+    accentText: "text-orange-600 dark:text-orange-400",
+    accentBadge: "border-orange-300/40 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400",
     cssVar: "--tim-warning",
+    emoji: "🗺️",
   },
   {
     icon: TrendingUp,
     title: "Relatórios e insights",
     description: "Demonstração de resultados, análise de fornecedores e tendências — pronto para o contabilista.",
     highlight: "Exportável",
-    accentBg: "bg-tim-purple/10 group-hover:bg-tim-purple/20",
-    accentText: "text-tim-purple",
-    accentBadge: "bg-tim-purple/[0.08] text-tim-purple border-tim-purple/20",
+    accentBg: "bg-violet-100 dark:bg-violet-900/30 group-hover:bg-violet-200 dark:group-hover:bg-violet-800/40",
+    accentText: "text-violet-600 dark:text-violet-400",
+    accentBadge: "bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-300/40",
     cssVar: "--tim-purple",
+    emoji: "🌊",
   },
   {
     icon: Shield,
     title: "Seguro e conforme",
     description: "Dados encriptados, RGPD. Interface 100% em português, pensada para quem não é contabilista.",
     highlight: "RGPD",
-    accentBg: "bg-tim-danger/10 group-hover:bg-tim-danger/20",
-    accentText: "text-tim-danger",
-    accentBadge: "border-tim-danger/20 bg-tim-danger/[0.08] text-tim-danger",
+    accentBg: "bg-rose-100 dark:bg-rose-900/30 group-hover:bg-rose-200 dark:group-hover:bg-rose-800/40",
+    accentText: "text-rose-600 dark:text-rose-400",
+    accentBadge: "border-rose-300/40 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
     cssVar: "--tim-danger",
+    emoji: "🛡️",
   },
 ];
-
-/* ── Card with mouse-tracking spotlight (Vercel/Linear style) ──── */
 
 function FeatureCard({ feature: f }: { feature: Feature }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -96,29 +101,24 @@ function FeatureCard({ feature: f }: { feature: Feature }) {
     <div
       ref={ref}
       onPointerMove={onPointerMove}
-      className="feature-card group relative h-full overflow-hidden rounded-2xl border border-border/50 bg-card p-6 sm:p-7"
+      className="ww-island-card group relative h-full p-6 sm:p-7"
       style={{ "--card-accent": `var(${f.cssVar})` } as React.CSSProperties}
     >
-      {/* Mouse-tracking inner glow */}
-      <div className="feature-card-spotlight" />
-      {/* Mouse-tracking border highlight */}
-      <div className="feature-card-border-glow" />
-
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${f.accentBg} transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg`}>
-            <f.icon className={`h-5 w-5 ${f.accentText} transition-transform duration-700 group-hover:scale-110`} />
+          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${f.accentBg} transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]`}>
+            <span className="text-2xl" role="img" aria-label={f.title}>{f.emoji}</span>
           </div>
-          <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${f.accentBadge} transition-all duration-300 group-hover:shadow-sm`}>
+          <span className={`rounded-full border-2 px-3 py-1 text-xs font-bold uppercase tracking-wide ${f.accentBadge} transition-all duration-300 group-hover:shadow-sm`}>
             {f.highlight}
           </span>
         </div>
-        <h3 className="mt-5 text-lg font-bold text-foreground">{f.title}</h3>
+        <h3 className="mt-5 text-lg font-black text-foreground">{f.title}</h3>
         <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
 
         {f.stat && (
-          <div className="mt-5 flex items-baseline gap-2 border-t border-border/50 pt-4">
-            <span className={`text-3xl font-extrabold tabular-nums ${f.accentText}`}>
+          <div className="mt-5 flex items-baseline gap-2 border-t-2 border-border/30 pt-4">
+            <span className={`text-3xl font-black tabular-nums ${f.accentText}`}>
               {f.stat.prefix}<CountUp value={f.stat.value} suffix={f.stat.suffix} />
             </span>
             <span className="text-xs text-muted-foreground">{f.stat.label}</span>
@@ -138,8 +138,8 @@ export function Features() {
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <FadeIn>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">Funcionalidades</p>
-            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">⚔️ Funcionalidades</p>
+            <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-5xl">
               Tudo o que precisa,{" "}
               <span className="tim-gradient-text animate-text-shimmer">nada que não precise</span>
             </h2>
@@ -149,7 +149,7 @@ export function Features() {
           </div>
         </FadeIn>
 
-        <div className="mt-14 grid gap-4 sm:mt-16 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid gap-5 sm:mt-16 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f, i) => (
             <FadeIn key={f.title} delay={i * 80}>
               <FeatureCard feature={f} />
