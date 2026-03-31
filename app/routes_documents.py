@@ -1,3 +1,4 @@
+import contextlib
 import csv
 import datetime
 import io
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 from app.auth import AuthInfo, require_auth
 from app.cache import cache_invalidate
 from app.db import get_conn, log_activity
+from app.entity_resolver import owner_entities_from_settings
 from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, WEBHOOK_RATE, limiter
 from app.parse import (
     _MIME_FROM_EXT,
@@ -21,6 +23,8 @@ from app.parse import (
     ingest_document,
     validate_nif,
 )
+from app.parsers.deterministic import run_deterministic_extraction
+from app.prompt_assembly import assemble_prompt
 from app.reconcile import reconcile_all
 
 logger = logging.getLogger(__name__)
@@ -196,8 +200,41 @@ async def upload_document(request: Request, file: UploadFile, background_tasks: 
         except Exception as exc:
             logger.warning("upload: failed to save file to disk: %s", exc)
 
+        # Load owner entities for prompt assembly
+        owner_entities = []
+        try:
+            with get_conn() as conn:
+                row = conn.execute(
+                    "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
+                    (tid,),
+                ).fetchone()
+                if row and row["data"]:
+                    import json as _json
+                    entity_data = row["data"] if isinstance(row["data"], dict) else _json.loads(row["data"])
+                    owner_entities = owner_entities_from_settings(entity_data)
+        except Exception:
+            pass
+
+        # Run deterministic extraction on OCR text (if available) for hints
+        hints = None
+        try:
+            from app.ocr import extract_text
+            raw_ocr = extract_text(content)
+            if raw_ocr and len(raw_ocr) >= 20:
+                hints = run_deterministic_extraction(raw_ocr)
+        except Exception:
+            pass
+
+        # Assemble tailored prompt
+        saft_code = hints.type_candidates[0][0] if hints and hints.type_candidates else None
+        assembled_prompt = assemble_prompt(
+            owner_entities=owner_entities or None,
+            hints=hints,
+            saft_code=saft_code,
+        )
+
         mime_for_vision = _MIME_FROM_EXT.get(ext, "application/pdf")
-        vision_result = _extract_with_vision(content, mime_for_vision)
+        vision_result = _extract_with_vision(content, mime_for_vision, prompt=assembled_prompt)
         extracted = False
         if vision_result and vision_result.get("total", 0) > 0:
             raw_text = ""
@@ -510,6 +547,47 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     if not row:
         raise HTTPException(status_code=404, detail="document not found")
     return row
+
+
+@router.get("/documents/{doc_id}/extraction")
+async def get_extraction_data(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    """Return the full structured extraction data for a document.
+
+    Includes: per-field confidence, validation warnings, direction, SAF-T code,
+    entity names, line items, VAT breakdown, ATCUD, and all enriched metadata.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT id, supplier_nif, client_nif, total, vat, date, type,
+                      notes, extraction_data, classification_source, status
+               FROM documents WHERE id = %s AND tenant_id = %s""",
+            (doc_id, auth.tenant_id),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    import json as _json
+
+    # Use extraction_data JSONB if available, fall back to notes
+    extraction = {}
+    if row.get("extraction_data") and isinstance(row["extraction_data"], dict):
+        extraction = row["extraction_data"]
+    elif row.get("notes"):
+        with contextlib.suppress(ValueError, TypeError):
+            extraction = _json.loads(row["notes"])
+
+    return {
+        "id": row["id"],
+        "supplier_nif": row["supplier_nif"],
+        "client_nif": row["client_nif"],
+        "total": float(row["total"]),
+        "vat": float(row["vat"]),
+        "date": str(row["date"]) if row["date"] else None,
+        "type": row["type"],
+        "status": row["status"],
+        "classification_source": row.get("classification_source"),
+        "extraction": extraction,
+    }
 
 
 @router.patch("/documents/{doc_id}", response_model=DocumentOut)
