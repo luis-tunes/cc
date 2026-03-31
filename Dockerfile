@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/*.py app/
 COPY app/*.yml app/
 COPY app/schemas/ app/schemas/
+COPY app/parsers/ app/parsers/
+COPY app/adapters/ app/adapters/
 
 # Non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
