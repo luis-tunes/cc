@@ -47,6 +47,7 @@ export interface UploadingFile {
   progress: number;
   status: "uploading" | "processing" | "extracted" | "failed";
   error?: string;
+  previewUrl?: string;
 }
 
 export const documentTypeLabels: Record<DocumentType, string> = {

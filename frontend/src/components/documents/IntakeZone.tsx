@@ -121,7 +121,15 @@ function QueueItem({
 
   return (
     <div className="flex items-center gap-2.5 rounded-md bg-card px-3 py-2 border">
-      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      {file.previewUrl ? (
+        <img
+          src={file.previewUrl}
+          alt={file.name}
+          className="h-8 w-8 shrink-0 rounded object-cover"
+        />
+      ) : (
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className="truncate text-xs font-medium text-foreground">

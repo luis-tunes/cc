@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { uploadDocument } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ImageLightbox } from "@/components/shared/ImageLightbox";
 
 interface UploadFile {
   id: string;
@@ -27,6 +28,8 @@ interface UploadFile {
   progress: number;
   errorMessage?: string;
   result?: any;
+  previewUrl?: string;
+  source?: "browse" | "camera";
 }
 
 interface GlobalUploadModalProps {
@@ -102,12 +105,14 @@ export function GlobalUploadModal({
   );
 
   const addFiles = useCallback(
-    (fileList: FileList | File[]) => {
+    (fileList: FileList | File[], source: "browse" | "camera" = "browse") => {
       const newFiles: UploadFile[] = Array.from(fileList).map((f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file: f,
         status: "queued" as const,
         progress: 0,
+        previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+        source,
       }));
       setFiles((prev) => [...prev, ...newFiles]);
       newFiles.forEach((uf) => processFile(uf));
@@ -125,11 +130,15 @@ export function GlobalUploadModal({
   );
 
   const handleClose = () => {
+    // Revoke preview URLs on close
+    files.forEach((f) => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
     onOpenChange(false);
     setTimeout(() => setFiles([]), 300);
   };
 
   const removeFile = (id: string) => {
+    const file = files.find((f) => f.id === id);
+    if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl);
     setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
@@ -213,7 +222,7 @@ export function GlobalUploadModal({
             capture="environment"
             className="hidden"
             onChange={(e) => {
-              if (e.target.files?.length) addFiles(e.target.files);
+              if (e.target.files?.length) addFiles(e.target.files, "camera");
               e.target.value = "";
             }}
           />
@@ -236,6 +245,17 @@ export function GlobalUploadModal({
           {/* File queue */}
           {files.length > 0 && (
             <div className="mt-4 space-y-2">
+              {/* Single camera capture: show larger preview */}
+              {files.length === 1 && files[0].source === "camera" && files[0].previewUrl && (
+                <div className="overflow-hidden rounded-lg bg-muted/30">
+                  <img
+                    src={files[0].previewUrl}
+                    alt={files[0].file.name}
+                    className="w-full max-h-48 object-contain"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>
                   {files.length} ficheiro{files.length > 1 ? "s" : ""}
@@ -315,9 +335,17 @@ function FileRow({
 
   return (
     <div className="flex items-center gap-3 rounded-md border border-border/50 bg-secondary/20 px-3 py-2">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary text-xs font-bold text-muted-foreground">
-        {ext}
-      </div>
+      {file.previewUrl ? (
+        <img
+          src={file.previewUrl}
+          alt={file.file.name}
+          className="h-10 w-10 shrink-0 rounded object-cover"
+        />
+      ) : (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-secondary text-xs font-bold text-muted-foreground">
+          {ext}
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium text-foreground">
           {file.file.name}
