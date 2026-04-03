@@ -1,4 +1,10 @@
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ConfidenceIndicatorProps {
   value: number; // 0–100
@@ -58,50 +64,74 @@ export function ConfidenceIndicator({
 }: ConfidenceIndicatorProps) {
   const clamped = Math.max(0, Math.min(100, value));
 
+  const hintText = clamped >= 80
+    ? "Leitura fiável — os dados extraídos são provavelmente corretos."
+    : clamped >= 50
+      ? "Confiança média — reveja os dados antes de aprovar."
+      : "Confiança baixa — os dados podem conter erros. Revise manualmente.";
+
   if (variant === "donut") {
     const d = size === "sm" ? 28 : 40;
     return (
-      <div className={cn("relative inline-flex items-center justify-center", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
-        <DonutRing value={clamped} diameter={d} />
-        {showLabel && (
-          <span
-            className={cn(
-              "absolute font-mono font-bold tabular-nums",
-              textColor(clamped),
-              size === "sm" ? "text-[9px]" : "text-xs",
+      <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={cn("relative inline-flex items-center justify-center cursor-help", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
+            <DonutRing value={clamped} diameter={d} />
+            {showLabel && (
+              <span
+                className={cn(
+                  "absolute font-mono font-bold tabular-nums",
+                  textColor(clamped),
+                  size === "sm" ? "text-[9px]" : "text-xs",
+                )}
+              >
+                {clamped}
+              </span>
             )}
-          >
-            {clamped}
-          </span>
-        )}
-      </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+          <p className="font-medium mb-0.5">Confiança: {clamped}%</p>
+          <p className="text-muted-foreground">{hintText}</p>
+        </TooltipContent>
+      </Tooltip>
+      </TooltipProvider>
     );
   }
 
   return (
-    <div className={cn("flex items-center gap-2", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
-      <div
-        className={cn(
-          "overflow-hidden rounded-full bg-muted",
-          size === "sm" ? "h-1.5 w-12" : "h-2 w-20"
-        )}
-      >
-        <div
-          className={cn("h-full rounded-full transition-all", bgColor(clamped))}
-          style={{ width: `${clamped}%` }}
-        />
-      </div>
-      {showLabel && (
-        <span
-          className={cn(
-            "font-mono font-medium",
-            size === "sm" ? "text-xs" : "text-sm",
-            textColor(clamped)
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className={cn("flex items-center gap-2 cursor-help", className)} role="meter" aria-valuenow={clamped} aria-valuemin={0} aria-valuemax={100} aria-label={`Confiança: ${clamped}%`}>
+          <div
+            className={cn(
+              "overflow-hidden rounded-full bg-muted",
+              size === "sm" ? "h-1.5 w-12" : "h-2 w-20"
+            )}
+          >
+            <div
+              className={cn("h-full rounded-full transition-all", bgColor(clamped))}
+              style={{ width: `${clamped}%` }}
+            />
+          </div>
+          {showLabel && (
+            <span
+              className={cn(
+                "font-mono font-medium",
+                size === "sm" ? "text-xs" : "text-sm",
+                textColor(clamped)
+              )}
+            >
+              {clamped}%
+            </span>
           )}
-        >
-          {clamped}%
-        </span>
-      )}
-    </div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+        <p className="font-medium mb-0.5">Confiança: {clamped}%</p>
+        <p className="text-muted-foreground">{hintText}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

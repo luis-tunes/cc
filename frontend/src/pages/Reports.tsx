@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHint } from "@/components/shared/PageHint";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { usePlReport, useTopSuppliers } from "@/hooks/use-tax";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -71,6 +72,9 @@ export default function Reports() {
         </div>
       }
     >
+      <PageHint id="reports">
+        Veja num relance como está o negócio: receitas, despesas, resultado e IVA. Pode alternar entre anos e exportar os dados para Excel.
+      </PageHint>
       {/* Annual KPI strip */}
       {totals && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 mb-6">

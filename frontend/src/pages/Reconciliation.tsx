@@ -9,6 +9,7 @@ import { GitMerge, CheckCircle2, PartyPopper } from "lucide-react";
 import { type ReconciliationPair } from "@/lib/reconciliation-data";
 import { useReconciliations, useRunReconciliation, usePatchReconciliation, type Reconciliation } from "@/hooks/use-reconciliation";
 import { toast } from "sonner";
+import { PageHint } from "@/components/shared/PageHint";
 
 /** Map backend Reconciliation to frontend ReconciliationPair */
 function toPair(r: Reconciliation): ReconciliationPair {
@@ -143,6 +144,9 @@ export default function Reconciliation() {
       title="Reconciliação"
       subtitle="Correspondência entre documentos e movimentos bancários"
     >
+      <PageHint id="reconciliation">
+        Reconciliar = verificar que cada fatura foi paga. Carregue em «Executar» e o sistema faz a correspondência automaticamente entre documentos e pagamentos.
+      </PageHint>
       {isLoading ? (
         <div className="space-y-3">
           <Skeleton className="h-12 w-full rounded-lg" />

@@ -4,6 +4,13 @@ import type { LucideIcon } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { useChartColors } from "@/hooks/use-chart-colors";
 import { useEffect, useId, useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { explanations } from "@/components/shared/HelpTooltip";
 
 /* ── Animated number ───────────────────────────────────────────────── */
 
@@ -66,6 +73,8 @@ interface KpiCardProps {
   compact?: boolean;
   className?: string;
   sparkline?: number[];
+  /** Dictionary key for hover tooltip — defaults to label */
+  hint?: string;
 }
 
 export function KpiCard({
@@ -78,6 +87,7 @@ export function KpiCard({
   compact = false,
   className,
   sparkline,
+  hint,
 }: KpiCardProps) {
   const chartColors = useChartColors();
   const gradientId = useId();
@@ -105,14 +115,32 @@ export function KpiCard({
       )}
     >
       <div className="flex items-start justify-between">
-        <p
-          className={cn(
-            "font-medium uppercase tracking-wider text-muted-foreground",
-            compact ? "text-xs" : "text-sm"
-          )}
-        >
-          {label}
-        </p>
+        {(() => {
+          const hintKey = hint ?? label;
+          const explanation = explanations[hintKey];
+          const labelEl = (
+            <p
+              className={cn(
+                "font-medium uppercase tracking-wider text-muted-foreground",
+                compact ? "text-xs" : "text-sm",
+                explanation && "cursor-help border-b border-dotted border-muted-foreground/30"
+              )}
+            >
+              {label}
+            </p>
+          );
+          if (!explanation) return labelEl;
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>{labelEl}</TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                  {explanation}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        })()}
         {Icon && (
           <Icon
             className={cn(

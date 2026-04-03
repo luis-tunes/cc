@@ -10,6 +10,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Plus, Trash2, Tags, Zap, GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHint } from "@/components/shared/PageHint";
 import { useClassificationRules, useCreateClassificationRule, useUpdateClassificationRule, useDeleteClassificationRule } from "@/hooks/use-classifications";
 import type { ClassificationRule, ClassificationRuleCreate } from "@/lib/api";
 
@@ -120,6 +121,9 @@ export default function Classifications() {
         </Button>
       }
     >
+      <PageHint id="classifications">
+        Crie regras para classificar faturas automaticamente. Por exemplo: «quando o NIF é 500100144, usar a conta 62 — Fornecimentos e Serviços Externos».
+      </PageHint>
       <div className="mb-4 flex items-center gap-2 rounded-lg border border-tim-info/20 bg-tim-info/5 px-4 py-3">
         <Zap className="h-4 w-4 shrink-0 text-tim-info" />
         <p className="text-sm text-muted-foreground">

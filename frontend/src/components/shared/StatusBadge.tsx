@@ -11,6 +11,13 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { explanations } from "@/components/shared/HelpTooltip";
 
 export type StatusType =
   | "pendente"
@@ -103,11 +110,14 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, className, showIcon = false }: StatusBadgeProps) {
   const config = statusConfig[status];
   const Icon = config.icon;
-  return (
+  const explanation = explanations[config.label];
+
+  const badge = (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium",
         config.className,
+        explanation && "cursor-help",
         className
       )}
     >
@@ -122,5 +132,18 @@ export function StatusBadge({ status, className, showIcon = false }: StatusBadge
       )}
       {config.label}
     </span>
+  );
+
+  if (!explanation) return badge;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+          {explanation}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
