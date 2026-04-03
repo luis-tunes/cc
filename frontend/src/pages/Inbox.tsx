@@ -18,6 +18,7 @@ import { useDocuments } from "@/hooks/use-documents";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
+import { PageHint } from "@/components/shared/PageHint";
 
 export default function InboxPage() {
   const { documents: allDocuments, isLoading, error, refetch } = useDocuments();
@@ -182,6 +183,9 @@ export default function InboxPage() {
         </Button>
       }
     >
+      <PageHint id="inbox">
+        Esta é a sua caixa de entrada. Arraste aqui as faturas e recibos que recebe — o sistema lê automaticamente os dados com OCR e inteligência artificial.
+      </PageHint>
       {error ? (
         <ErrorState onRetry={refetch} />
       ) : isLoading ? (

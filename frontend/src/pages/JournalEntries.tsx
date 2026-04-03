@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHint } from "@/components/shared/PageHint";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -328,6 +329,9 @@ export default function JournalEntries() {
         </Button>
       }
     >
+      <PageHint id="journal-entries">
+        Cada lançamento regista um movimento contabilístico com linhas de débito e crédito. O total de débitos tem de igualar os créditos para o lançamento ficar equilibrado.
+      </PageHint>
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center mb-6">
         <Select value={filterJournal} onValueChange={(v) => { setFilterJournal(v); setPage(0); }}>

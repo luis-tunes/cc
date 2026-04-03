@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageHint } from "@/components/shared/PageHint";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -175,6 +176,9 @@ export default function ChartOfAccounts() {
         </div>
       }
     >
+      <PageHint id="chart-of-accounts">
+        O Plano de Contas é a estrutura da sua contabilidade. Clique em «Inicializar SNC» para começar com o modelo padrão português (classes 1 a 8).
+      </PageHint>
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center mb-6">
         <div className="relative flex-1">

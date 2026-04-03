@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { DocumentListSkeleton } from "@/components/shared/LoadingSkeletons";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { PageHint } from "@/components/shared/PageHint";
 
 type ViewTab = "todos" | "revisao" | "classificados" | "reconciliados";
 
@@ -193,6 +194,9 @@ export default function Documents() {
         </Button>
       }
     >
+      <PageHint id="documents">
+        Aqui encontra todos os seus documentos organizados por estado. Pode aprovar, classificar ou reconciliar em massa usando os botões de ação.
+      </PageHint>
       <div className="space-y-4">
         {/* KPI Row */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

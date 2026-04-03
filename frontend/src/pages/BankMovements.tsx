@@ -13,6 +13,7 @@ import { type BankMovement } from "@/lib/movements-data";
 import { useBankTransactions, useEnrichedMovements, useUploadBankCSV, useClassifyAll } from "@/hooks/use-bank-transactions";
 import type { BankTransaction, EnrichedMovement } from "@/lib/api";
 import { toast } from "sonner";
+import { PageHint } from "@/components/shared/PageHint";
 
 /** Map backend transaction → frontend BankMovement shape.
  *  Uses persisted classification from bank_transactions columns,
@@ -144,6 +145,9 @@ export default function BankMovements() {
         </div>
       }
     >
+      <PageHint id="movements">
+        Aqui importa o extrato do banco (ficheiro CSV). Depois, o sistema cruza estes movimentos com as suas faturas para verificar que tudo foi pago.
+      </PageHint>
       {isLoading ? (
         <TableSkeleton rows={8} />
       ) : isEmpty && showImport ? (
