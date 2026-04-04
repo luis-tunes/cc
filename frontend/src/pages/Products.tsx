@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  UtensilsCrossed, Plus, TrendingUp, ToggleRight, History,
+  UtensilsCrossed, Plus, TrendingUp, ToggleRight, History, Upload,
 } from "lucide-react";
-import { useProducts, useDeleteProduct, useStockEvents } from "@/hooks/use-inventory";
+import { useProducts, useDeleteProduct, useStockEvents, useImportProducts } from "@/hooks/use-inventory";
+import { ImportCSVDialog } from "@/components/shared/ImportCSVDialog";
 import type { Product } from "@/lib/api";
 
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -23,11 +24,13 @@ const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFracti
 export default function Products() {
   const { data: products = [], isLoading, isError, refetch } = useProducts();
   const deleteProd = useDeleteProduct();
+  const importProducts = useImportProducts();
   const { data: productionEvents = [] } = useStockEvents({ event_type: "saída", limit: 100 });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [produceProduct, setProduceProduct] = useState<Product | null>(null);
 
@@ -103,10 +106,16 @@ export default function Products() {
       title="Produto Acabado"
       subtitle="Produtos, receitas e custos"
       actions={
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Novo Produto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="mr-1.5 h-4 w-4" />
+            Importar CSV
+          </Button>
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Novo Produto
+          </Button>
+        </div>
       }
     >
       {/* KPI Cards */}
@@ -187,6 +196,20 @@ export default function Products() {
       {/* Dialogs */}
       <AddProductDialog open={dialogOpen} onOpenChange={handleDialogChange} editProduct={editProduct} />
       <ProduceDialog open={!!produceProduct} onOpenChange={(open) => { if (!open) setProduceProduct(null); }} product={produceProduct} />
+      <ImportCSVDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="Importar Produtos"
+        description="Importe produtos em massa a partir de um ficheiro CSV. Os produtos são criados sem receita — pode adicionar ingredientes depois."
+        templateColumns={["codigo", "nome", "pvp", "categoria", "ativo"]}
+        templateExample={[
+          ["P001", "Marmita Frango", "8.50", "refeição", "sim"],
+          ["P002", "Sopa Legumes", "5.00", "sopa", "sim"],
+          ["P003", "Sobremesa", "3.50", "sobremesa", "não"],
+        ]}
+        onImport={(file) => importProducts.mutateAsync(file)}
+        isPending={importProducts.isPending}
+      />
     </PageContainer>
   );
 }

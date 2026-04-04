@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Package, Plus, ArrowDownToLine, AlertTriangle,
-  XCircle, TrendingUp, Wheat, Wrench,
+  XCircle, TrendingUp, Wheat, Wrench, Upload,
 } from "lucide-react";
 import {
   useIngredients,
@@ -22,7 +22,9 @@ import {
   useInventoryStats,
   useDeleteIngredient,
   useSuppliers,
+  useImportIngredients,
 } from "@/hooks/use-inventory";
+import { ImportCSVDialog } from "@/components/shared/ImportCSVDialog";
 import type { Ingredient } from "@/lib/api";
 
 const eur = (v: number) => `€\u202f${v.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -42,10 +44,12 @@ export default function Inventory() {
   const { data: stats } = useInventoryStats();
   const { data: suppliers = [] } = useSuppliers();
   const deleteIng = useDeleteIngredient();
+  const importIngredients = useImportIngredients();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAddIngredient, setShowAddIngredient] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("materias-primas");
   const [defaultCategory, setDefaultCategory] = useState("");
   const [stockEventDialog, setStockEventDialog] = useState<{
@@ -145,6 +149,10 @@ export default function Inventory() {
       subtitle="Matérias primas, consumíveis e movimentos de stock"
       actions={
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="mr-1.5 h-4 w-4" />
+            Importar CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setStockEventDialog({ open: true })}>
             <ArrowDownToLine className="mr-1.5 h-4 w-4" />
             Registar Movimento
@@ -261,6 +269,20 @@ export default function Inventory() {
         ingredients={ingredients}
         preselectedIngredientId={stockEventDialog.ingredientId}
         preselectedType={stockEventDialog.type}
+      />
+      <ImportCSVDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="Importar Ingredientes"
+        description="Importe ingredientes em massa a partir de um ficheiro CSV. Apenas os campos nome e unidade são obrigatórios."
+        templateColumns={["nome", "unidade", "categoria", "stock_minimo", "custo"]}
+        templateExample={[
+          ["Arroz", "kg", "cereais", "10", "1.50"],
+          ["Azeite", "L", "gorduras", "5", "4.80"],
+          ["Sal", "g", "temperos", "500", "0.30"],
+        ]}
+        onImport={(file) => importIngredients.mutateAsync(file)}
+        isPending={importIngredients.isPending}
       />
     </PageContainer>
   );

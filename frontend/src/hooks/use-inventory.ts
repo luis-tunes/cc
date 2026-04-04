@@ -22,6 +22,8 @@ import {
   fetchStockImpact,
   fetchUnitFamilies,
   addPricePoint,
+  importIngredientsCSV,
+  importProductsCSV,
   type Ingredient,
   type StockEvent,
   type InventoryStats,
@@ -32,6 +34,7 @@ import {
   type StockImpact,
   type UnitFamily,
   type PricePoint,
+  type BulkImportResult,
 } from "@/lib/api";
 
 // ── Ingredients ──────────────────────────────────────────────────────
@@ -267,6 +270,35 @@ export function useAddPricePoint() {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
       toast.success("Preço registado");
+    },
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+}
+
+// ── Bulk Import ──────────────────────────────────────────────────────
+
+export function useImportIngredients() {
+  const qc = useQueryClient();
+  return useMutation<BulkImportResult, Error, File>({
+    mutationFn: importIngredientsCSV,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory-stats"] });
+      toast.success(`${data.imported} ingredientes importados`);
+    },
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+}
+
+export function useImportProducts() {
+  const qc = useQueryClient();
+  return useMutation<BulkImportResult, Error, File>({
+    mutationFn: importProductsCSV,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      const parts = [`${data.imported} produtos importados`];
+      if (data.skipped) parts.push(`${data.skipped} duplicados ignorados`);
+      toast.success(parts.join(", "));
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });

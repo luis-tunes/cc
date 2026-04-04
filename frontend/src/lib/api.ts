@@ -715,6 +715,27 @@ export async function addPricePoint(body: { ingredient_id: number; supplier_id: 
   return request<PricePoint>("/price-history", { method: "POST", body: JSON.stringify(body) });
 }
 
+// ── Bulk Import ─────────────────────────────────────────────────────────────
+
+export interface BulkImportResult {
+  imported: number;
+  skipped?: number;
+  errors: string[];
+  total_rows: number;
+}
+
+export async function importIngredientsCSV(file: File): Promise<BulkImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return requestFormData<BulkImportResult>("/ingredients/import", form);
+}
+
+export async function importProductsCSV(file: File): Promise<BulkImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return requestFormData<BulkImportResult>("/products/import", form);
+}
+
 // ── Tax Center ──────────────────────────────────────────────────────────────
 
 export interface IvaPeriod {

@@ -1,13 +1,15 @@
+import csv
 import datetime
+import io
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.auth import AuthInfo, require_auth
 from app.db import get_conn, log_activity
-from app.limiter import EXPENSIVE_RATE, limiter
+from app.limiter import EXPENSIVE_RATE, UPLOAD_RATE, limiter
 from app.parse import validate_nif
 
 logger = logging.getLogger(__name__)
@@ -938,3 +940,196 @@ async def add_price_point(request: Request, body: PricePointCreate, auth: AuthIn
         log_activity(conn, tid, "price_history", row["id"], "created", f"ing={body.ingredient_id} sup={body.supplier_id}")
         conn.commit()
     return dict(row)
+
+
+# ── Bulk Import ───────────────────────────────────────────────────────
+
+MAX_IMPORT_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_IMPORT_ROWS = 5000
+
+INGREDIENTS_REQUIRED_COLS = {"nome", "unidade"}
+INGREDIENTS_OPTIONAL_COLS = {"categoria", "stock_minimo", "custo"}
+
+PRODUCTS_REQUIRED_COLS = {"codigo", "nome", "pvp"}
+PRODUCTS_OPTIONAL_COLS = {"categoria", "ativo"}
+
+
+def _parse_csv_text(content: bytes) -> tuple[str, list[str]]:
+    """Decode bytes and detect delimiter. Returns (text, fieldnames or [])."""
+    text = content.decode("utf-8-sig")
+    # Detect delimiter: semicolon or comma
+    first_line = text.split("\n", 1)[0]
+    delimiter = ";" if ";" in first_line else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    fieldnames = [f.strip().lower() for f in (reader.fieldnames or [])]
+    return text, fieldnames
+
+
+def _read_csv_rows(text: str, delimiter: str) -> list[dict[str, str]]:
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    rows: list[dict[str, str]] = []
+    for row in reader:
+        normalized = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+        rows.append(normalized)
+    return rows
+
+
+def _parse_decimal(value: str, field_name: str, line_num: int) -> Decimal:
+    value = value.replace(",", ".").strip()
+    if not value:
+        return Decimal("0")
+    try:
+        d = Decimal(value)
+        if d < 0:
+            raise ValueError(f"Linha {line_num}: {field_name} não pode ser negativo")
+        return d
+    except (InvalidOperation, ValueError) as e:
+        if isinstance(e, ValueError):
+            raise
+        raise ValueError(f"Linha {line_num}: {field_name} inválido '{value}'") from e
+
+
+@router.post("/ingredients/import")
+@limiter.limit(UPLOAD_RATE)
+async def import_ingredients_csv(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail=f"Ficheiro demasiado grande (máx {MAX_IMPORT_BYTES // (1024*1024)} MB)")
+
+    text, fieldnames = _parse_csv_text(content)
+    if not fieldnames:
+        raise HTTPException(status_code=422, detail="Ficheiro CSV vazio ou sem cabeçalho")
+
+    missing = INGREDIENTS_REQUIRED_COLS - set(fieldnames)
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Colunas obrigatórias em falta: {', '.join(sorted(missing))}. "
+                   f"Colunas encontradas: {', '.join(fieldnames)}. "
+                   f"Formato esperado: nome;unidade;categoria;stock_minimo;custo",
+        )
+
+    delimiter = ";" if ";" in text.split("\n", 1)[0] else ","
+    rows = _read_csv_rows(text, delimiter)
+    if not rows:
+        raise HTTPException(status_code=422, detail="Ficheiro CSV sem dados (apenas cabeçalho)")
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise HTTPException(status_code=422, detail=f"Máximo de {MAX_IMPORT_ROWS} linhas permitido")
+
+    tid = auth.tenant_id
+    imported = 0
+    errors: list[str] = []
+
+    with get_conn() as conn:
+        for line_num, row in enumerate(rows, start=2):
+            name = row.get("nome", "").strip()
+            if not name:
+                errors.append(f"Linha {line_num}: nome vazio")
+                continue
+
+            unit = row.get("unidade", "kg").strip() or "kg"
+            category = row.get("categoria", "").strip()
+
+            try:
+                min_threshold = _parse_decimal(row.get("stock_minimo", "0"), "stock_minimo", line_num)
+                cost = _parse_decimal(row.get("custo", "0"), "custo", line_num)
+            except ValueError as e:
+                errors.append(str(e))
+                continue
+
+            r = conn.execute(
+                """INSERT INTO ingredients (tenant_id, name, category, unit, min_threshold, supplier_id, last_cost, avg_cost)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (tid, name, category, unit, min_threshold, None, cost, cost),
+            ).fetchone()
+            log_activity(conn, tid, "ingredient", r["id"], "created", f"import: {name}")
+            imported += 1
+
+        conn.commit()
+
+    if imported == 0 and errors:
+        raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:10]))
+
+    return {"imported": imported, "errors": errors[:20], "total_rows": len(rows)}
+
+
+@router.post("/products/import")
+@limiter.limit(UPLOAD_RATE)
+async def import_products_csv(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail=f"Ficheiro demasiado grande (máx {MAX_IMPORT_BYTES // (1024*1024)} MB)")
+
+    text, fieldnames = _parse_csv_text(content)
+    if not fieldnames:
+        raise HTTPException(status_code=422, detail="Ficheiro CSV vazio ou sem cabeçalho")
+
+    missing = PRODUCTS_REQUIRED_COLS - set(fieldnames)
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Colunas obrigatórias em falta: {', '.join(sorted(missing))}. "
+                   f"Colunas encontradas: {', '.join(fieldnames)}. "
+                   f"Formato esperado: codigo;nome;pvp;categoria;ativo",
+        )
+
+    delimiter = ";" if ";" in text.split("\n", 1)[0] else ","
+    rows = _read_csv_rows(text, delimiter)
+    if not rows:
+        raise HTTPException(status_code=422, detail="Ficheiro CSV sem dados (apenas cabeçalho)")
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise HTTPException(status_code=422, detail=f"Máximo de {MAX_IMPORT_ROWS} linhas permitido")
+
+    tid = auth.tenant_id
+    imported = 0
+    skipped = 0
+    errors: list[str] = []
+
+    with get_conn() as conn:
+        # Pre-load existing product codes to skip duplicates
+        existing_rows = conn.execute(
+            "SELECT code FROM products WHERE tenant_id = %s", (tid,),
+        ).fetchall()
+        existing_codes = {r["code"].lower() for r in existing_rows}
+
+        for line_num, row in enumerate(rows, start=2):
+            code = row.get("codigo", "").strip()
+            name = row.get("nome", "").strip()
+            if not code:
+                errors.append(f"Linha {line_num}: código vazio")
+                continue
+            if not name:
+                errors.append(f"Linha {line_num}: nome vazio")
+                continue
+
+            if code.lower() in existing_codes:
+                skipped += 1
+                continue
+
+            try:
+                pvp = _parse_decimal(row.get("pvp", "0"), "pvp", line_num)
+            except ValueError as e:
+                errors.append(str(e))
+                continue
+
+            category = row.get("categoria", "").strip()
+            active_raw = row.get("ativo", "sim").strip().lower()
+            active = active_raw not in ("não", "nao", "false", "0", "n", "inativo")
+
+            margin = Decimal("0")  # No recipe yet → margin = 0
+            conn.execute(
+                """INSERT INTO products (tenant_id, code, name, category, recipe_version, estimated_cost, pvp, margin, active)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (tid, code, name, category, "v1", Decimal("0"), pvp, margin, active),
+            ).fetchone()
+            existing_codes.add(code.lower())
+            imported += 1
+
+        conn.commit()
+
+    if imported == 0 and errors and skipped == 0:
+        raise HTTPException(status_code=422, detail="Nenhuma linha importada. Erros: " + "; ".join(errors[:10]))
+
+    return {"imported": imported, "skipped": skipped, "errors": errors[:20], "total_rows": len(rows)}
