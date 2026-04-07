@@ -123,7 +123,9 @@ export function DocumentList({
                 )}
               </div>
               {doc.needsReview && (
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" aria-label="Aguarda revisão" title="Aguarda revisão" />
+                <span title="Aguarda revisão">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" aria-label="Aguarda revisão" />
+                </span>
               )}
               {onDelete && (
                 <button
@@ -249,7 +251,9 @@ export function DocumentList({
                 </TableCell>
                 <TableCell>
                   {doc.needsReview && (
-                    <AlertTriangle className="h-4 w-4 text-tim-warning" aria-label="Aguarda revisão" title="Aguarda revisão" />
+                    <span title="Aguarda revisão">
+                      <AlertTriangle className="h-4 w-4 text-tim-warning" aria-label="Aguarda revisão" />
+                    </span>
                   )}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>

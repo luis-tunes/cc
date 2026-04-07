@@ -407,7 +407,7 @@ async def process_staged_document(request: Request, doc_id: int, background_task
     try:
         result = _extract_with_vision(content, mime, assembled_prompt)
         if result:
-            normalized = _normalize_llm_result(result, owner_entities=owner_entities)
+            normalized = _normalize_llm_result(result, raw_text="")
             total = normalized.get("total", Decimal(0))
             vat = normalized.get("vat", Decimal(0))
             nif = normalized.get("supplier_nif", "")
@@ -690,7 +690,7 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
                        (SELECT r.status FROM reconciliations r
                         WHERE r.document_id = id
                         ORDER BY r.created_at DESC LIMIT 1) AS reconciliation_status
-                FROM documents WHERE id = %s AND tenant_id = %s""",
+                FROM documents WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL""",
             (doc_id, auth.tenant_id),
         ).fetchone()
     if not row:

@@ -383,10 +383,23 @@ class FakeConn:
             doc = next((d for d in _tables["documents"] if d["id"] == doc_id), {})  # type: ignore[arg-type]
             if not doc:
                 return FakeCursor([])
-            field_names = [f.strip().split("=")[0].strip() for f in set_part.split(",")]
-            for i, fname in enumerate(field_names):
-                if i < set_param_count:
-                    doc[fname] = params[i]
+            # Parse field assignments, handling both %s params and SQL constants like NOW(), NULL
+            assignments = [f.strip() for f in set_part.split(",")]
+            param_idx = 0
+            for assignment in assignments:
+                parts = assignment.split("=", 1)
+                if len(parts) != 2:
+                    continue
+                fname = parts[0].strip()
+                value_expr = parts[1].strip().lower()
+                if "%s" in parts[1]:
+                    if param_idx < len(params):
+                        doc[fname] = params[param_idx]
+                    param_idx += 1
+                elif "now()" in value_expr:
+                    doc[fname] = "2025-01-01T00:00:00+00:00"
+                elif value_expr == "null":
+                    doc[fname] = None
             return FakeCursor([doc])
         if sql_lower.startswith("select"):
             docs = list(_tables["documents"])
