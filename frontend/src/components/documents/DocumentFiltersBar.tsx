@@ -104,7 +104,7 @@ export function DocumentFiltersBar({
             update({ needsReview: filters.needsReview === true ? null : true })
           }
         >
-          Requer revisão
+          Aguarda revisão
         </Button>
 
         <Input

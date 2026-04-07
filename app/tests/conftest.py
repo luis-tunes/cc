@@ -315,6 +315,7 @@ class FakeConn:
                 "snc_account": None,
                 "classification_source": None,
                 "reconciliation_status": None,
+                "deleted_at": None,
             }
             if params:
                 # Upload route: ('','',0,0,'outro',filename,status,tid) — 8 params
@@ -389,6 +390,11 @@ class FakeConn:
             return FakeCursor([doc])
         if sql_lower.startswith("select"):
             docs = list(_tables["documents"])
+            # Filter out soft-deleted documents
+            if "deleted_at is null" in sql_lower:
+                docs = [d for d in docs if d.get("deleted_at") is None]
+            if "deleted_at is not null" in sql_lower:
+                docs = [d for d in docs if d.get("deleted_at") is not None]
             # Filter by paperless_id IS NULL (used by pending-doc lookup)
             if "paperless_id is null" in sql_lower:
                 docs = [d for d in docs if d.get("paperless_id") is None]

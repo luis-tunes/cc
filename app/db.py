@@ -145,6 +145,14 @@ def _init_db_schema():
                 END $$;
             """)
 
+        # Soft-delete column for documents (undo support)
+        conn.execute("""
+            DO $$ BEGIN
+                ALTER TABLE documents ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;
+        """)
+
         # Key-value settings per tenant (entity profile, preferences, etc.)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tenant_settings (

@@ -220,7 +220,7 @@ export default function Documents() {
                 <TabsTrigger value="todos" className="text-xs h-6 px-3">Todos</TabsTrigger>
                 <TabsTrigger value="revisao" className="text-xs h-6 px-3">
                   <AlertTriangle className="mr-1 h-3 w-3" />
-                  Revisão ({kpis.pendingReview})
+                  Para rever ({kpis.pendingReview})
                 </TabsTrigger>
                 <TabsTrigger value="classificados" className="text-xs h-6 px-3">Classificados</TabsTrigger>
                 <TabsTrigger value="reconciliados" className="text-xs h-6 px-3">Reconciliados</TabsTrigger>
