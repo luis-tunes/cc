@@ -206,7 +206,7 @@ export function DocumentList({
                   <div className="flex items-center gap-3">
                     <img
                       src={documentThumbnailUrl(Number(doc.id))}
-                      alt=""
+                      alt={`Pré-visualização de ${doc.fileName}`}
                       className="h-[34px] w-[24px] shrink-0 rounded border border-border object-cover transition-transform hover:scale-105 cursor-zoom-in"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />

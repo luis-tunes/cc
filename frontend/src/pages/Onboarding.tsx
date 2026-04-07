@@ -95,7 +95,12 @@ export default function Onboarding() {
   const progressPercent = ((step + 1) / 4) * 100;
 
   const canAdvance = () => {
-    if (step === 0) return company.name.trim() !== "" && company.nif.length === 9 && validateNif(company.nif) && company.vatRegime !== "";
+    if (step === 0) {
+      const hasName = company.name.trim() !== "";
+      const hasValidNif = company.nif.length === 9 && validateNif(company.nif);
+      const hasVatRegime = company.vatRegime !== "";
+      return hasName && hasValidNif && hasVatRegime;
+    }
     if (step === 1) return uploadedFile !== null;
     if (step === 2) return classificationResult !== null;
     if (step === 3) return approved;
@@ -123,8 +128,6 @@ export default function Onboarding() {
       const result = await uploadDocumentStaging(file);
       setUploadedFile({ id: result.id, name: result.filename });
       toast.success("Documento carregado com sucesso");
-      // Auto-advance to step 3 after 1s
-      setTimeout(() => setStep(2), 1000);
     } catch (err: any) {
       toast.error(err.message || "Erro ao carregar documento");
     } finally {
