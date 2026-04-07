@@ -18,9 +18,11 @@ import {
   Plug,
   AlertTriangle,
   Trash2,
+  Play,
 } from "lucide-react";
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
+import { documentThumbnailUrl } from "@/lib/api";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,7 @@ interface DocumentListProps {
   onToggleAll: () => void;
   onOpenDocument: (doc: DocumentRecord) => void;
   onDelete?: (id: string) => void;
+  onProcess?: (id: string) => void;
   className?: string;
 }
 
@@ -48,6 +51,7 @@ export function DocumentList({
   onToggleAll,
   onOpenDocument,
   onDelete,
+  onProcess,
   className,
 }: DocumentListProps) {
   const allSelected =
@@ -94,9 +98,34 @@ export function DocumentList({
                 {doc.date && (
                   <p className="mt-1 text-xs text-muted-foreground">{doc.date}</p>
                 )}
+                {doc.classificationStatus === "staging" && (
+                  <div className="mt-2 flex gap-2">
+                    {onProcess && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs bg-tim-success hover:bg-tim-success/90"
+                        onClick={(e) => { e.stopPropagation(); onProcess(doc.id); }}
+                      >
+                        <Play className="mr-1 h-3 w-3" /> Processar
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-tim-danger hover:text-tim-danger"
+                        onClick={(e) => { e.stopPropagation(); onDelete(doc.id); }}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" /> Remover
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
               {doc.needsReview && (
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" />
+                <span title="Aguarda revisão">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tim-warning" aria-label="Aguarda revisão" />
+                </span>
               )}
               {onDelete && (
                 <button
@@ -175,6 +204,12 @@ export function DocumentList({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
+                    <img
+                      src={documentThumbnailUrl(Number(doc.id))}
+                      alt={`Pré-visualização de ${doc.fileName}`}
+                      className="h-[34px] w-[24px] shrink-0 rounded border border-border object-cover transition-transform hover:scale-105 cursor-zoom-in"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
                     <FileIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground max-w-[240px]">
@@ -216,11 +251,35 @@ export function DocumentList({
                 </TableCell>
                 <TableCell>
                   {doc.needsReview && (
-                    <AlertTriangle className="h-4 w-4 text-tim-warning" />
+                    <span title="Aguarda revisão">
+                      <AlertTriangle className="h-4 w-4 text-tim-warning" aria-label="Aguarda revisão" />
+                    </span>
                   )}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  {onDelete && (
+                  {doc.classificationStatus === "staging" ? (
+                    <div className="flex items-center gap-1">
+                      {onProcess && (
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-tim-success hover:bg-tim-success/90"
+                          onClick={() => onProcess(doc.id)}
+                        >
+                          <Play className="mr-1 h-3 w-3" /> Processar
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-tim-danger hover:text-tim-danger"
+                          onClick={() => onDelete(doc.id)}
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" /> Remover
+                        </Button>
+                      )}
+                    </div>
+                  ) : onDelete ? (
                     <button
                       onClick={() => onDelete?.(doc.id)}
                       className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
@@ -228,7 +287,7 @@ export function DocumentList({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  )}
+                  ) : null}
                 </TableCell>
               </TableRow>
             );

@@ -23,10 +23,7 @@ import {
   Activity,
   BookOpen,
   Shield,
-  BookMarked,
-  FileSpreadsheet,
   Calculator,
-  Scale,
   Users,
   Wand2,
   type LucideIcon,
@@ -75,17 +72,6 @@ export const navigation: NavGroup[] = [
       { title: "Centro Fiscal", path: "/centro-fiscal", icon: Receipt, status: "active", proOnly: true },
       { title: "Obrigações", path: "/obrigacoes", icon: CalendarCheck, status: "active", proOnly: true },
       { title: "Relatórios", path: "/relatorios", icon: BarChart3, status: "active", proOnly: true },
-    ],
-  },
-  {
-    label: "Contabilidade",
-    items: [
-      { title: "Plano de Contas", path: "/plano-contas", icon: BookMarked, status: "active", proOnly: true },
-      { title: "Lançamentos", path: "/lancamentos", icon: FileSpreadsheet, status: "active", proOnly: true },
-      { title: "Balancete", path: "/balancete", icon: Calculator, status: "active", proOnly: true },
-      { title: "Razão", path: "/razao", icon: BookOpen, status: "active", proOnly: true },
-      { title: "Balanço", path: "/balanco", icon: Scale, status: "active", proOnly: true },
-      { title: "Dem. Resultados", path: "/dem-resultados", icon: BarChart3, status: "active", proOnly: true },
     ],
   },
   {

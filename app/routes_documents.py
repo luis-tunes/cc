@@ -107,7 +107,7 @@ class BulkDeletePayload(BaseModel):
     ids: list[int]
 
 
-VALID_DOC_STATUSES = {"pendente", "pendente ocr", "a processar", "extraído", "aprovado", "rejeitado", "classificado", "revisto", "arquivado"}
+VALID_DOC_STATUSES = {"pendente", "pendente ocr", "a processar", "extraído", "aprovado", "rejeitado", "classificado", "revisto", "arquivado", "staging"}
 
 # SNC accounts for content-based suggestion
 _SNC_SUGGEST = {
@@ -291,6 +291,155 @@ async def upload_document(request: Request, file: UploadFile, background_tasks: 
         raise HTTPException(status_code=500, detail="internal error during upload") from None
 
 
+@router.post("/documents/upload-staging", status_code=201)
+@limiter.limit(UPLOAD_RATE)
+async def upload_document_staging(request: Request, file: UploadFile, auth: AuthInfo = Depends(require_auth)):
+    """Upload a file to staging without triggering OCR/classification."""
+    if not file.filename:
+        raise HTTPException(status_code=422, detail="filename is required")
+    ext = os.path.splitext(file.filename.lower())[1]
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unsupported file type '{ext}'; accepted: PDF, JPG, PNG, TIFF",
+        )
+    try:
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+        logger.info("upload-staging: file=%s size=%d ext=%s", file.filename, len(content), ext)
+        tid = auth.tenant_id
+
+        with get_conn() as conn:
+            row = conn.execute(
+                "INSERT INTO documents (supplier_nif, client_nif, total, vat, type, filename, status, tenant_id) VALUES ('','',0,0,'outro',%s,'staging',%s) RETURNING id",
+                (file.filename, tid),
+            ).fetchone()
+            log_activity(conn, tid or "", "document", row["id"], "uploaded_staging", file.filename)
+            conn.commit()
+            local_id = row["id"]
+
+        # Save file to disk
+        try:
+            tenant_dir = _safe_path(UPLOADS_DIR, tid or "_global")
+            os.makedirs(tenant_dir, exist_ok=True)
+            file_path = _safe_path(tenant_dir, f"{local_id}{ext}")
+            with open(file_path, "wb") as f:
+                f.write(content)
+        except Exception as exc:
+            logger.warning("upload-staging: failed to save file to disk: %s", exc)
+
+        return {"status": "staging", "filename": file.filename, "id": local_id}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("upload-staging: unexpected error for file=%s", getattr(file, 'filename', '?'))
+        raise HTTPException(status_code=500, detail="internal error during staging upload") from None
+
+
+@router.post("/documents/{doc_id}/process", status_code=200)
+@limiter.limit(UPLOAD_RATE)
+async def process_staged_document(request: Request, doc_id: int, background_tasks: BackgroundTasks, auth: AuthInfo = Depends(require_auth)):
+    """Trigger OCR/classification pipeline on a staging document."""
+    tid = auth.tenant_id
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, filename, status FROM documents WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL",
+            (doc_id, tid),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="document not found")
+        if row["status"] != "staging":
+            raise HTTPException(status_code=422, detail="document is not in staging status")
+
+        # Transition to 'pendente ocr' to begin processing
+        conn.execute("UPDATE documents SET status = 'pendente ocr' WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+        log_activity(conn, tid or "", "document", doc_id, "process_started")
+        conn.commit()
+
+    # Read file from disk
+    filename = row["filename"] or ""
+    ext = os.path.splitext(filename.lower())[1] or ".pdf"
+    try:
+        tenant_dir = _safe_path(UPLOADS_DIR, tid or "_global")
+        file_path = _safe_path(tenant_dir, f"{doc_id}{ext}")
+        with open(file_path, "rb") as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="file not found on disk") from None
+
+    mime = MIME_MAP.get(ext, "application/octet-stream")
+
+    # Load owner entities for prompt assembly
+    owner_entities = []
+    try:
+        with get_conn() as conn:
+            settings_row = conn.execute(
+                "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'entity_profile'",
+                (tid,),
+            ).fetchone()
+            if settings_row and settings_row["data"]:
+                import json as _json
+                entity_data = settings_row["data"] if isinstance(settings_row["data"], dict) else _json.loads(settings_row["data"])
+                owner_entities = owner_entities_from_settings(entity_data)
+    except Exception:
+        pass
+
+    # Run deterministic extraction for hints
+    hints = None
+    try:
+        from app.ocr import extract_text
+        raw_ocr = extract_text(content)
+        if raw_ocr and len(raw_ocr) >= 20:
+            hints = run_deterministic_extraction(raw_ocr)
+    except Exception:
+        pass
+
+    # Run vision extraction
+    saft_code = hints.type_candidates[0][0] if hints and hints.type_candidates else None
+    assembled_prompt = assemble_prompt(
+        owner_entities=owner_entities,
+        hints=hints,
+        saft_code=saft_code,
+    )
+
+    extracted = False
+    try:
+        result = _extract_with_vision(content, mime, assembled_prompt)
+        if result:
+            normalized = _normalize_llm_result(result, raw_text="")
+            total = normalized.get("total", Decimal(0))
+            vat = normalized.get("vat", Decimal(0))
+            nif = normalized.get("supplier_nif", "")
+            doc_date = normalized.get("date")
+            doc_type = normalized.get("type", "outro")
+            confidence = normalized.get("confidence", 0)
+            new_status = "extraído" if confidence >= 60 or total > 0 else "pendente"
+            notes = normalized.get("notes")
+            classification_source = normalized.get("classification_source", "vision")
+            raw_text = normalized.get("raw_text", "")
+            with get_conn() as conn:
+                conn.execute(
+                    """UPDATE documents SET supplier_nif=%s, total=%s, vat=%s, date=%s, type=%s,
+                       status=%s, raw_text=%s, notes=%s, classification_source=%s
+                       WHERE id=%s AND tenant_id=%s""",
+                    (nif, total, vat, doc_date, doc_type, new_status, raw_text, notes, classification_source, doc_id, tid),
+                )
+                conn.commit()
+            extracted = True
+    except Exception as exc:
+        logger.warning("process: vision extraction failed for doc=%d: %s", doc_id, exc)
+
+    if not extracted:
+        with get_conn() as conn:
+            conn.execute("UPDATE documents SET status = 'pendente' WHERE id = %s AND tenant_id = %s", (doc_id, tid))
+            conn.commit()
+
+    cache_invalidate(f"dashboard:{tid}")
+    background_tasks.add_task(_auto_reconcile, tid)
+    return {"status": "processing", "id": doc_id}
+
+
 @router.get("/debug/upload-check")
 async def upload_preflight():
     """Test DB and Paperless connectivity. Only works when AUTH_DISABLED=1."""
@@ -332,7 +481,7 @@ async def list_documents(
     offset: int = Query(default=0, ge=0),
     auth: AuthInfo = Depends(require_auth),
 ):
-    clauses: list[str] = ["d.tenant_id = %s"]
+    clauses: list[str] = ["d.tenant_id = %s", "d.deleted_at IS NULL"]
     params: list = [auth.tenant_id]
     if supplier_nif:
         clauses.append("d.supplier_nif = %s")
@@ -541,7 +690,7 @@ async def get_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
                        (SELECT r.status FROM reconciliations r
                         WHERE r.document_id = id
                         ORDER BY r.created_at DESC LIMIT 1) AS reconciliation_status
-                FROM documents WHERE id = %s AND tenant_id = %s""",
+                FROM documents WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL""",
             (doc_id, auth.tenant_id),
         ).fetchone()
     if not row:
@@ -628,14 +777,25 @@ async def update_document(doc_id: int, patch: DocumentPatch, auth: AuthInfo = De
 @router.delete("/documents/{doc_id}", status_code=204)
 async def delete_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
     with get_conn() as conn:
-        row = conn.execute("SELECT id, paperless_id FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id)).fetchone()
+        row = conn.execute("SELECT id, paperless_id FROM documents WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL", (doc_id, auth.tenant_id)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="document not found")
-        conn.execute("DELETE FROM reconciliations WHERE document_id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
-        conn.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
+        conn.execute("UPDATE documents SET deleted_at = NOW() WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
         log_activity(conn, auth.tenant_id, "document", doc_id, "deleted")
         conn.commit()
     return None
+
+
+@router.post("/documents/{doc_id}/restore", status_code=200)
+async def restore_document(doc_id: int, auth: AuthInfo = Depends(require_auth)):
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM documents WHERE id = %s AND tenant_id = %s AND deleted_at IS NOT NULL", (doc_id, auth.tenant_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="document not found or not deleted")
+        conn.execute("UPDATE documents SET deleted_at = NULL WHERE id = %s AND tenant_id = %s", (doc_id, auth.tenant_id))
+        log_activity(conn, auth.tenant_id, "document", doc_id, "restored")
+        conn.commit()
+    return {"status": "restored", "id": doc_id}
 
 
 @router.post("/documents/bulk-delete", status_code=204)
@@ -648,13 +808,12 @@ async def bulk_delete_documents(request: Request, payload: BulkDeletePayload, au
     tid = auth.tenant_id
     with get_conn() as conn:
         existing = conn.execute(
-            "SELECT id FROM documents WHERE id = ANY(%s) AND tenant_id = %s",
+            "SELECT id FROM documents WHERE id = ANY(%s) AND tenant_id = %s AND deleted_at IS NULL",
             (payload.ids, tid),
         ).fetchall()
         existing_ids = [r["id"] for r in existing]
         if existing_ids:
-            conn.execute("DELETE FROM reconciliations WHERE document_id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
-            conn.execute("DELETE FROM documents WHERE id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
+            conn.execute("UPDATE documents SET deleted_at = NOW() WHERE id = ANY(%s) AND tenant_id = %s", (existing_ids, tid))
             for doc_id in existing_ids:
                 log_activity(conn, tid, "document", doc_id, "deleted")
         conn.commit()

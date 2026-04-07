@@ -341,6 +341,20 @@ export async function reprocessDocument(id: number): Promise<void> {
   await request<void>(`/documents/${id}/reprocess`, { method: "POST" });
 }
 
+export async function uploadDocumentStaging(file: File): Promise<{ status: string; filename: string; id: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  return requestFormData("/documents/upload-staging", form);
+}
+
+export async function processDocument(id: number): Promise<void> {
+  await request<void>(`/documents/${id}/process`, { method: "POST" });
+}
+
+export async function restoreDocument(id: number): Promise<void> {
+  await request<void>(`/documents/${id}/restore`, { method: "POST" });
+}
+
 // ── Bank Transactions ────────────────────────────────────────────────
 
 export async function fetchBankTransactions(params?: {

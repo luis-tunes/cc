@@ -6,13 +6,15 @@ interface ImageLightboxProps {
   alt: string;
   open: boolean;
   onClose: () => void;
+  /** When true, renders a PDF viewer instead of an image */
+  isPdf?: boolean;
 }
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 5;
 const ZOOM_STEP = 0.3;
 
-export function ImageLightbox({ src, alt, open, onClose }: ImageLightboxProps) {
+export function ImageLightbox({ src, alt, open, onClose, isPdf = false }: ImageLightboxProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -171,16 +173,24 @@ export function ImageLightbox({ src, alt, open, onClose }: ImageLightboxProps) {
         <ToolbarButton icon={X} label="Fechar" onClick={onClose} />
       </div>
 
-      {/* Image */}
+      {/* Content — PDF or Image */}
       <div
         className="flex items-center justify-center"
         style={{ width: "90vw", height: "90vh" }}
         onClick={(e) => e.stopPropagation()}
-        onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        onWheel={isPdf ? undefined : handleWheel}
+        onPointerDown={isPdf ? undefined : handlePointerDown}
+        onPointerMove={isPdf ? undefined : handlePointerMove}
+        onPointerUp={isPdf ? undefined : handlePointerUp}
       >
+        {isPdf ? (
+          <iframe
+            src={src}
+            title={alt}
+            className="h-full w-full rounded-lg border-0 bg-white"
+            style={{ maxHeight: "90vh", maxWidth: "90vw" }}
+          />
+        ) : (
         <img
           src={src}
           alt={alt}
@@ -191,6 +201,7 @@ export function ImageLightbox({ src, alt, open, onClose }: ImageLightboxProps) {
             cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "default",
           }}
         />
+        )}
       </div>
     </div>
   );

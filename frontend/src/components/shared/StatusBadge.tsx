@@ -9,6 +9,7 @@ import {
   Archive,
   AlertTriangle,
   XCircle,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -29,7 +30,8 @@ export type StatusType =
   | "arquivado"
   | "atrasado"
   | "anomalia"
-  | "rejeitado";
+  | "rejeitado"
+  | "staging";
 
 interface StatusDef {
   label: string;
@@ -98,6 +100,12 @@ const statusConfig: Record<StatusType, StatusDef> = {
     className: "bg-tim-danger/15 text-tim-danger border border-tim-danger/30",
     dotColor: "bg-tim-danger",
     icon: XCircle,
+  },
+  staging: {
+    label: "Aguardando confirmação",
+    className: "bg-tim-warning/15 text-tim-warning border border-tim-warning/30",
+    dotColor: "bg-tim-warning",
+    icon: Hourglass,
   },
 };
 

@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@clerk/react";
-import { ArrowRight, ChevronRight, Sparkles, Compass, Wind, Anchor } from "lucide-react";
+import { ArrowRight, Sparkles, Compass, Wind, Anchor } from "lucide-react";
 import { FadeIn } from "./shared";
 
 export function Hero() {
   const { isSignedIn } = useAuth();
   const ctaTo = isSignedIn ? "/painel" : "/auth/sign-up";
-  const ctaLabel = isSignedIn ? "Ir para o painel" : "Começar a aventura";
+  const ctaLabel = isSignedIn ? "Ir para o painel" : "Experimentar grátis";
 
   return (
     <section className="relative overflow-hidden min-h-[90vh] flex items-center">
@@ -119,24 +119,29 @@ export function Hero() {
             <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4">
               <Link
                 to={ctaTo}
-                className="tim-glow-button group relative z-10 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-primary px-9 py-4 text-base font-black text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 hover:-translate-y-1.5 hover:scale-[1.02] sm:w-auto"
+                className="tim-glow-button group relative z-10 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-primary px-9 py-4 text-base font-black text-primary-foreground shadow-xl shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 hover:-translate-y-1.5 hover:scale-[1.02] sm:w-auto min-h-[52px]"
               >
                 {ctaLabel}
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1.5" />
               </Link>
               <a
                 href="#product-theater"
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-sky-200/60 dark:border-border/60 bg-white/50 dark:bg-card/50 backdrop-blur-sm px-7 py-4 text-sm font-bold text-foreground transition-all hover:bg-white/80 dark:hover:bg-card hover:border-sky-300/80 dark:hover:border-border hover:shadow-lg sm:w-auto"
+                className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted-foreground underline-offset-4 hover:underline hover:text-foreground transition-colors sm:w-auto"
               >
-                Ver em 60 segundos
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                Ver como funciona ↓
               </a>
             </div>
           </FadeIn>
 
           <FadeIn delay={500} direction="none">
-            <p className="mt-8 text-sm text-muted-foreground/60 font-medium">
-              Restauração · Comércio · Serviços · Hotelaria — 100% em português · Sem cartão de crédito
+            <p className="mt-6 text-sm text-muted-foreground/70 font-medium">
+              Sem cartão de crédito · Pronto em 30 segundos
+            </p>
+          </FadeIn>
+
+          <FadeIn delay={600} direction="none">
+            <p className="mt-2 text-sm text-muted-foreground/60 font-medium">
+              Restauração · Comércio · Serviços · Hotelaria — 100% em português
             </p>
           </FadeIn>
         </div>

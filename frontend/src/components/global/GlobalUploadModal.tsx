@@ -17,7 +17,8 @@ import {
   Camera,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { uploadDocument } from "@/lib/api";
+import { toast } from "sonner";
+import { uploadDocumentStaging, deleteDocument } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ImageLightbox } from "@/components/shared/ImageLightbox";
 
@@ -69,22 +70,31 @@ export function GlobalUploadModal({
           prev.map((f) => (f.id === uf.id ? { ...f, progress: 60 } : f))
         );
 
-        // Upload via API client (includes auth token)
-        const result = await uploadDocument(uf.file);
+        // Upload to staging via API client (includes auth token)
+        const result = await uploadDocumentStaging(uf.file);
 
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uf.id
-              ? { ...f, status: "processing", progress: 100 }
+              ? { ...f, status: "success", progress: 100, result }
               : f
           )
         );
 
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === uf.id ? { ...f, status: "success", result } : f
-          )
-        );
+        // Show undo toast
+        toast("Documento carregado", {
+          description: `${uf.file.name} — aguardando confirmação`,
+          action: {
+            label: "Desfazer",
+            onClick: () => {
+              if (result?.id) {
+                deleteDocument(result.id).catch(() => {});
+              }
+              setFiles((prev) => prev.filter((f) => f.id !== uf.id));
+            },
+          },
+          duration: 5000,
+        });
 
         onDocumentProcessed?.(result);
       } catch (err: any) {

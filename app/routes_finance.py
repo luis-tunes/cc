@@ -457,6 +457,36 @@ async def put_entity(request_body: EntityProfileBody, auth: AuthInfo = Depends(r
     return request_body.model_dump()
 
 
+# --- Onboarding Status ---
+
+@router.get("/users/me/onboarding")
+async def get_onboarding(auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT data FROM tenant_settings WHERE tenant_id = %s AND key = 'onboarding'",
+            (tid,),
+        ).fetchone()
+    if row:
+        return row["data"]
+    return {"onboarding_completed": False}
+
+
+@router.put("/users/me/onboarding")
+async def put_onboarding(request: Request, auth: AuthInfo = Depends(require_auth)):
+    tid = auth.tenant_id
+    body = await request.json()
+    data_json = _json.dumps(body)
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO tenant_settings (tenant_id, key, data) VALUES (%s, 'onboarding', %s)
+               ON CONFLICT (tenant_id, key) DO UPDATE SET data = %s, updated_at = now()""",
+            (tid, data_json, data_json),
+        )
+        conn.commit()
+    return body
+
+
 # --- Tax Center ---
 
 @router.get("/tax/iva-periods")

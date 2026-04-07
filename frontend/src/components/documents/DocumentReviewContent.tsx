@@ -34,20 +34,7 @@ import type { DocumentRecord, ExtractedField } from "@/lib/documents-data";
 import { documentTypeLabels, type DocumentType } from "@/lib/documents-data";
 import { documentThumbnailUrl, documentPreviewUrl } from "@/lib/api";
 import type { DocumentActions } from "./DocumentReviewDrawer";
-
-// SNC account options for reclassification
-const SNC_ACCOUNTS = [
-  { value: "62", label: "62 — Fornecimentos e Serviços Externos" },
-  { value: "31", label: "31 — Compras" },
-  { value: "71", label: "71 — Vendas" },
-  { value: "72", label: "72 — Prestações de Serviços" },
-  { value: "43", label: "43 — Ativos Fixos Tangíveis" },
-  { value: "24", label: "24 — Estado e Outros Entes Públicos" },
-  { value: "21", label: "21 — Clientes" },
-  { value: "22", label: "22 — Fornecedores" },
-  { value: "63", label: "63 — Gastos com o Pessoal" },
-  { value: "69", label: "69 — Gastos e Perdas de Financiamento" },
-];
+import { ReclassifyModal } from "./ReclassifyModal";
 
 interface DocumentReviewContentProps {
   document: DocumentRecord;
@@ -401,48 +388,17 @@ export function DocumentReviewContent({
           </div>
         )}
 
-        {/* Reclassify panel */}
-        {showReclassify && (
-          <div className="px-5 py-4 bg-secondary/20">
-            <SectionTitle>Reclassificar Documento</SectionTitle>
-            <div className="mt-3 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Conta SNC</label>
-                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                  <SelectTrigger className="mt-1 h-8 text-xs">
-                    <SelectValue placeholder="Selecionar conta…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SNC_ACCOUNTS.map((a) => (
-                      <SelectItem key={a.value} value={a.value} className="text-xs">{a.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Tipo de documento</label>
-                <Select value={selectedDocType || document.documentType} onValueChange={(v) => setSelectedDocType(v as DocumentType)}>
-                  <SelectTrigger className="mt-1 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(documentTypeLabels).map(([k, v]) => (
-                      <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" className="h-7 text-xs" disabled={!selectedAccount} onClick={handleReclassify}>
-                  <Tags className="mr-1 h-3 w-3" /> Aplicar classificação
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowReclassify(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Reclassify modal */}
+        <ReclassifyModal
+          open={showReclassify}
+          onOpenChange={setShowReclassify}
+          currentAccount={document.extractedFields?.find(f => f.label === "Conta SNC")?.interpretedValue}
+          currentDocType={document.documentType}
+          onReclassify={(account, docType) => {
+            actions.onReclassify(document.id, account, docType);
+            setShowReclassify(false);
+          }}
+        />
 
         {/* Reject panel */}
         {showReject && (
@@ -535,7 +491,7 @@ export function DocumentReviewContent({
               size="sm"
               variant="outline"
               className="h-9 text-sm"
-              onClick={() => { setShowReclassify(!showReclassify); setShowReject(false); setShowDeleteConfirm(false); }}
+              onClick={() => { setShowReclassify(true); setShowReject(false); setShowDeleteConfirm(false); }}
             >
               <Tags className="mr-1.5 h-4 w-4" />
               Reclassificar
