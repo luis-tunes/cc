@@ -53,6 +53,7 @@ const InvoicesPage = lazy(() => import("@/pages/Invoices"));
 const AgedReceivablesPage = lazy(() => import("@/pages/AgedReceivables"));
 const MovementRulesPage = lazy(() => import("@/pages/MovementRules"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const OnboardingPage = lazy(() => import("@/pages/Onboarding"));
 
 function PageLoader() {
   return (
@@ -80,6 +81,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PricingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Onboarding — protected, full-page wizard */}
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute>
+                <OnboardingPage />
               </ProtectedRoute>
             }
           />

@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { navigation } from "./navigation";
 
 describe("navigation config", () => {
-  it("has 7 groups", () => {
-    expect(navigation).toHaveLength(7);
+  it("has 6 groups", () => {
+    expect(navigation).toHaveLength(6);
     expect(navigation.map((g) => g.label)).toEqual([
-      "Home", "Documentos", "Financeiro", "Contabilidade", "Negócio", "Inteligência", "Sistema",
+      "Home", "Documentos", "Financeiro", "Negócio", "Inteligência", "Sistema",
     ]);
   });
 

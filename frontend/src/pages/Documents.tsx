@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { DocumentList } from "@/components/documents/DocumentList";
+import { DocumentPipeline } from "@/components/documents/DocumentPipeline";
 import { DocumentFiltersBar, type DocumentFilters } from "@/components/documents/DocumentFiltersBar";
 import { DocumentReviewDrawer } from "@/components/documents/DocumentReviewDrawer";
 import { DocumentReviewPanel } from "@/components/documents/DocumentReviewPanel";
@@ -17,6 +19,8 @@ import {
   CheckCircle2,
   Clock,
   Upload,
+  LayoutList,
+  Columns3,
 } from "lucide-react";
 import { type DocumentRecord } from "@/lib/documents-data";
 import { useDocuments } from "@/hooks/use-documents";
@@ -31,6 +35,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PageHint } from "@/components/shared/PageHint";
 
 type ViewTab = "todos" | "revisao" | "classificados" | "reconciliados";
+type ViewMode = "list" | "pipeline";
 
 export default function Documents() {
   const queryClient = useQueryClient();
@@ -63,6 +68,18 @@ export default function Documents() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return (localStorage.getItem("tim-doc-view") as ViewMode) || "list";
+    } catch {
+      return "list";
+    }
+  });
+
+  const toggleViewMode = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    try { localStorage.setItem("tim-doc-view", mode); } catch {}
+  }, []);
 
   const filtered = useMemo(() => {
     let docs = [...documents];
@@ -226,6 +243,28 @@ export default function Documents() {
                 <TabsTrigger value="reconciliados" className="text-xs h-6 px-3">Reconciliados</TabsTrigger>
               </TabsList>
             </div>
+            <div className="flex items-center gap-1 rounded-md border bg-muted/50 p-0.5">
+              <button
+                className={cn(
+                  "rounded px-2 py-1 text-xs font-medium transition-colors",
+                  viewMode === "list" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => toggleViewMode("list")}
+                aria-label="Vista em lista"
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+              </button>
+              <button
+                className={cn(
+                  "rounded px-2 py-1 text-xs font-medium transition-colors",
+                  viewMode === "pipeline" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => toggleViewMode("pipeline")}
+                aria-label="Vista pipeline"
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </Tabs>
 
@@ -252,6 +291,14 @@ export default function Documents() {
         ) : isLoading ? (
           <DocumentListSkeleton rows={6} />
         ) : filtered.length > 0 ? (
+          viewMode === "pipeline" ? (
+            <DocumentPipeline
+              documents={filtered}
+              onOpenDocument={handleOpenDocument}
+              onDelete={actions.onDelete}
+              onProcess={actions.onProcess}
+            />
+          ) : (
           <div className={activeDoc && !isMobile ? "" : ""}>
             {activeDoc && !isMobile ? (
               <ResizablePanelGroup orientation="horizontal" className="rounded-lg">
@@ -287,6 +334,7 @@ export default function Documents() {
               />
             )}
           </div>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 py-16">
             <FileText className="h-10 w-10 text-muted-foreground/40" />
