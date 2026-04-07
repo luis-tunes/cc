@@ -532,16 +532,16 @@
 
 /* Wind Waker cel-shaded card style */
 .ww-card {
-  border: 2.5px solid hsl(var(--foreground) / 0.08);
+  border: 2px solid hsl(var(--foreground) / 0.08);
   border-radius: 1.25rem;
   background: hsl(var(--card));
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .ww-card:hover {
-  transform: translateY(-6px) rotate(-0.5deg);
-  border-color: hsl(var(--primary) / 0.3);
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.2);
   box-shadow:
-    0 20px 60px -15px hsl(var(--primary) / 0.15),
+    0 15px 40px -12px hsl(var(--primary) / 0.1),
     0 0 0 1px hsl(var(--primary) / 0.05);
 }
 
@@ -580,7 +580,7 @@
 
 /* Wind Waker island card with thick outlines */
 .ww-island-card {
-  border: 3px solid hsl(var(--foreground) / 0.06);
+  border: 2px solid hsl(var(--foreground) / 0.06);
   border-radius: 1.5rem;
   background: hsl(var(--card));
   position: relative;
@@ -596,9 +596,9 @@
   pointer-events: none;
 }
 .ww-island-card:hover {
-  transform: translateY(-8px);
-  border-color: hsl(var(--primary) / 0.25);
-  box-shadow: 0 30px 60px -20px hsl(var(--primary) / 0.12);
+  transform: translateY(-4px);
+  border-color: hsl(var(--primary) / 0.2);
+  box-shadow: 0 20px 40px -15px hsl(var(--primary) / 0.1);
 }
 
 /* Pipeline step highlight pulse */

@@ -9,7 +9,6 @@ const TESTIMONIALS = [
     role: "Dono de restaurante",
     sector: "Restauração, Lisboa",
     initials: "RM",
-    emoji: "🍽️",
     color: "from-amber-200 to-orange-200 dark:from-amber-900/40 dark:to-orange-900/40",
   },
   {
@@ -18,7 +17,6 @@ const TESTIMONIALS = [
     role: "Gestora de loja",
     sector: "Comércio, Porto",
     initials: "AS",
-    emoji: "🏪",
     color: "from-sky-200 to-cyan-200 dark:from-sky-900/40 dark:to-cyan-900/40",
   },
   {
@@ -27,15 +25,14 @@ const TESTIMONIALS = [
     role: "Freelancer",
     sector: "Serviços, Braga",
     initials: "MT",
-    emoji: "💻",
     color: "from-emerald-200 to-teal-200 dark:from-emerald-900/40 dark:to-teal-900/40",
   },
 ];
 
 const METRICS = [
-  { value: "500", suffix: "+", label: "documentos processados", emoji: "📄" },
-  { value: "32", suffix: "", label: "empresas ativas", emoji: "🏢" },
-  { value: "4.9", suffix: "★", label: "satisfação média", emoji: "⭐" },
+  { value: "500", suffix: "+", label: "documentos processados" },
+  { value: "32", suffix: "", label: "empresas ativas" },
+  { value: "4.9", suffix: "★", label: "satisfação média" },
 ];
 
 const TRUST_BADGES = [
@@ -88,26 +85,26 @@ export function Testimonials() {
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <FadeIn>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">💬 Testemunhos</p>
-            <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-5xl">
-              O que dizem os nossos navegadores
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">Testemunhos</p>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+              O que dizem os nossos clientes
             </h2>
           </div>
         </FadeIn>
 
         {/* Pull quote */}
         <FadeIn delay={150}>
-          <div className="mx-auto mt-12 max-w-3xl rounded-3xl bg-gradient-to-br from-amber-50/50 to-sky-50/30 dark:from-amber-950/10 dark:to-sky-950/10 border-2 border-amber-200/30 dark:border-amber-800/20 p-8 sm:mt-16 sm:p-12 shadow-lg">
-            <span className="text-4xl">💬</span>
-            <blockquote className="mt-4 text-xl font-bold italic leading-relaxed text-foreground/90 sm:text-2xl md:text-3xl">
+          <div className="mx-auto mt-12 max-w-3xl rounded-3xl bg-gradient-to-br from-amber-50/50 to-sky-50/30 dark:from-amber-950/10 dark:to-sky-950/10 border border-amber-200/30 dark:border-amber-800/20 p-8 sm:mt-16 sm:p-12 shadow-lg">
+            <Quote className="h-8 w-8 text-primary/30" />
+            <blockquote className="mt-4 text-xl font-medium italic leading-relaxed text-foreground/90 sm:text-2xl md:text-3xl">
               &ldquo;{pullQuote.quote}&rdquo;
             </blockquote>
             <div className="mt-6 flex items-center gap-3">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${pullQuote.color} text-xl ring-2 ring-primary/10 border-2 border-white/50 dark:border-card/50`}>
-                {pullQuote.emoji}
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${pullQuote.color} text-sm font-bold ring-2 ring-primary/10 border border-white/50 dark:border-card/50`}>
+                {pullQuote.initials}
               </div>
               <div>
-                <p className="text-sm font-black text-foreground">{pullQuote.author}</p>
+                <p className="text-sm font-bold text-foreground">{pullQuote.author}</p>
                 <p className="text-xs text-muted-foreground">{pullQuote.role} · {pullQuote.sector}</p>
               </div>
             </div>
@@ -141,12 +138,12 @@ export function Testimonials() {
                   <blockquote className="relative mt-4 text-sm leading-relaxed text-foreground/85 font-medium">
                     &ldquo;{t.quote}&rdquo;
                   </blockquote>
-                  <div className="mt-5 flex items-center gap-3 border-t-2 border-border/30 pt-4">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${t.color} text-lg ring-2 ring-primary/10 border border-white/50 dark:border-card/50`}>
-                      {t.emoji}
+                  <div className="mt-5 flex items-center gap-3 border-t border-border/30 pt-4">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${t.color} text-xs font-bold ring-2 ring-primary/10 border border-white/50 dark:border-card/50`}>
+                      {t.initials}
                     </div>
                     <div>
-                      <p className="text-sm font-black text-foreground">{t.author}</p>
+                      <p className="text-sm font-bold text-foreground">{t.author}</p>
                       <p className="text-xs text-muted-foreground">{t.role}</p>
                     </div>
                   </div>
@@ -156,10 +153,10 @@ export function Testimonials() {
 
             {/* Join card */}
             <FadeIn delay={400}>
-              <div className="relative min-w-[280px] shrink-0 snap-center overflow-hidden rounded-3xl border-2 border-dashed border-primary/25 bg-gradient-to-br from-primary/[0.04] to-transparent p-6 md:min-w-0">
+              <div className="relative min-w-[280px] shrink-0 snap-center overflow-hidden rounded-3xl border border-dashed border-primary/25 bg-gradient-to-br from-primary/[0.04] to-transparent p-6 md:min-w-0">
                 <div className="flex h-full flex-col items-center justify-center text-center py-4">
-                  <span className="text-4xl">🚢</span>
-                  <p className="mt-3 text-sm font-black text-foreground">E muitos mais...</p>
+                  <Zap className="h-8 w-8 text-primary/40" />
+                  <p className="mt-3 text-sm font-bold text-foreground">E muitos mais...</p>
                   <p className="mt-1 text-xs text-muted-foreground">Junte-se a empresários por todo o país</p>
                 </div>
               </div>
@@ -179,8 +176,7 @@ export function Testimonials() {
           <div className="mt-14 grid grid-cols-3 gap-4 sm:mt-16 sm:gap-6">
             {METRICS.map((m) => (
               <div key={m.label} className="text-center">
-                <span className="text-2xl">{m.emoji}</span>
-                <p className="mt-1 text-2xl font-black tabular-nums text-foreground sm:text-3xl md:text-4xl">
+                <p className="text-2xl font-extrabold tabular-nums text-foreground sm:text-3xl md:text-4xl">
                   <CountUp value={m.value} suffix={m.suffix} />
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{m.label}</p>
@@ -193,7 +189,7 @@ export function Testimonials() {
         <FadeIn delay={400} direction="none">
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3 sm:mt-12 sm:gap-4">
             {TRUST_BADGES.map((b) => (
-              <div key={b.label} className="flex items-center gap-2 rounded-2xl border-2 border-border/30 bg-card px-4 py-2.5 shadow-sm">
+              <div key={b.label} className="flex items-center gap-2 rounded-2xl border border-border/30 bg-card px-4 py-2.5 shadow-sm">
                 <b.icon className={`h-4 w-4 ${b.color}`} />
                 <span className="text-xs font-bold text-muted-foreground">{b.label}</span>
               </div>

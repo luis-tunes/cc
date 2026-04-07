@@ -9,7 +9,7 @@ import { Footer } from "./landing/Footer";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background antialiased scroll-smooth">
+    <div className="min-h-screen bg-background antialiased scroll-smooth overscroll-none">
       <Nav />
       <Hero />
       <ProductTheater />

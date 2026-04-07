@@ -91,8 +91,8 @@ export function Pricing() {
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <FadeIn>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">💰 Preços</p>
-            <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">Preços</p>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl">
               Simples e transparente
             </h2>
             <p className="mt-5 text-base text-muted-foreground sm:text-lg">
@@ -105,16 +105,16 @@ export function Pricing() {
           {/* Pricing card */}
           <FadeIn>
             <div className="lg:sticky lg:top-24">
-              <div className="relative overflow-hidden rounded-3xl border-3 border-primary/30 bg-card p-7 shadow-2xl sm:p-9 animate-treasure-glow">
+              <div className="relative overflow-hidden rounded-3xl border-2 border-primary/30 bg-card p-7 shadow-2xl sm:p-9">
                 <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-amber-400/[0.08] blur-xl" />
                 <div className="absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-emerald-400/[0.06] blur-xl" />
 
                 <div className="relative">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black text-foreground flex items-center gap-2">
-                      <span>🏴‍☠️</span> Profissional
+                    <h3 className="text-xl font-extrabold text-foreground">
+                      Profissional
                     </h3>
-                    <span className="rounded-full border-2 border-primary/30 bg-primary/[0.08] px-3 py-1 text-[0.65rem] font-black uppercase tracking-wide text-primary">
+                    <span className="rounded-full border border-primary/30 bg-primary/[0.08] px-3 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-primary">
                       Preço de lançamento
                     </span>
                   </div>
@@ -123,11 +123,11 @@ export function Pricing() {
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">A partir de</span>
                     <div className="mt-1 flex items-baseline gap-2">
                       <span className="text-lg text-muted-foreground/50 line-through">&euro;250</span>
-                      <span className="text-5xl font-black tracking-tight text-foreground sm:text-6xl">&euro;150</span>
+                      <span className="text-5xl font-extrabold tracking-tight text-foreground sm:text-6xl">&euro;150</span>
                       <span className="text-base text-muted-foreground">/mês + IVA</span>
                     </div>
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Menos de 5&euro;/dia — menos do que um café e pastel de nata ☕
+                      Menos de 5&euro;/dia — para toda a sua contabilidade
                     </p>
                   </div>
 
@@ -146,9 +146,9 @@ export function Pricing() {
 
                   <Link
                     to={isSignedIn ? "/painel" : "/auth/sign-up"}
-                    className="tim-glow-button group relative z-10 mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 text-base font-black text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-1 hover:scale-[1.01]"
+                    className="tim-glow-button group relative z-10 mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 text-base font-bold text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/35 hover:-translate-y-1 hover:scale-[1.01]"
                   >
-                    {isSignedIn ? "Ir para o painel" : "🚀 Experimentar 14 dias grátis"}
+                    {isSignedIn ? "Ir para o painel" : "Experimentar 14 dias grátis"}
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Link>
 
@@ -177,8 +177,8 @@ export function Pricing() {
           {/* FAQ */}
           <FadeIn delay={150}>
             <div>
-              <h3 className="text-lg font-black text-foreground sm:text-xl flex items-center gap-2">
-                <span>❓</span> Perguntas frequentes
+              <h3 className="text-lg font-bold text-foreground sm:text-xl">
+                Perguntas frequentes
               </h3>
               <div className="mt-6 space-y-2">
                 {FAQS.map((faq, i) => (

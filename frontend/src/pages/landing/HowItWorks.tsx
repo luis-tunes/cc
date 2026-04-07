@@ -10,10 +10,9 @@ const STEPS = [
     accentBg: "bg-sky-500",
     iconBg: "bg-sky-100 dark:bg-sky-900/30",
     iconColor: "text-sky-600 dark:text-sky-400",
-    emoji: "📜",
     illustration: (
-      <div className="rounded-2xl border-2 border-dashed border-sky-300/40 bg-sky-50/50 dark:bg-sky-900/10 p-6 text-center transition-all hover:border-sky-400/60 hover:bg-sky-100/50 dark:hover:bg-sky-900/20">
-        <span className="text-3xl">📤</span>
+      <div className="rounded-2xl border border-dashed border-sky-300/40 bg-sky-50/50 dark:bg-sky-900/10 p-6 text-center transition-all hover:border-sky-400/60 hover:bg-sky-100/50 dark:hover:bg-sky-900/20">
+        <Upload className="mx-auto h-8 w-8 text-sky-500" />
         <p className="mt-2 text-xs font-bold text-sky-600 dark:text-sky-400">Arraste ficheiros aqui</p>
         <div className="mt-3 flex justify-center gap-2">
           <span className="rounded-lg bg-sky-100 dark:bg-sky-900/30 px-2.5 py-1 text-[10px] font-bold text-sky-600 dark:text-sky-400 border border-sky-200/50">PDF</span>
@@ -31,9 +30,8 @@ const STEPS = [
     accentBg: "bg-amber-500",
     iconBg: "bg-amber-100 dark:bg-amber-900/30",
     iconColor: "text-amber-600 dark:text-amber-400",
-    emoji: "🧭",
     illustration: (
-      <div className="space-y-2 rounded-2xl border-2 border-amber-200/40 bg-amber-50/50 dark:bg-amber-900/10 p-4">
+      <div className="space-y-2 rounded-2xl border border-amber-200/40 bg-amber-50/50 dark:bg-amber-900/10 p-4">
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground font-medium">NIF</span>
           <span className="text-xs font-bold text-foreground">509 123 456</span>
@@ -44,8 +42,8 @@ const STEPS = [
         </div>
         <div className="h-0.5 bg-amber-200/50" />
         <div className="flex items-center gap-2">
-          <span className="text-sm">🤖</span>
-          <span className="text-[10px] font-black text-amber-600 dark:text-amber-400">Conta 62 — FSE</span>
+          <Bot className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Conta 62 — FSE</span>
         </div>
       </div>
     ),
@@ -58,9 +56,8 @@ const STEPS = [
     accentBg: "bg-orange-500",
     iconBg: "bg-orange-100 dark:bg-orange-900/30",
     iconColor: "text-orange-600 dark:text-orange-400",
-    emoji: "⚓",
     illustration: (
-      <div className="rounded-2xl border-2 border-orange-200/40 bg-orange-50/50 dark:bg-orange-900/10 p-4">
+      <div className="rounded-2xl border border-orange-200/40 bg-orange-50/50 dark:bg-orange-900/10 p-4">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between rounded-xl bg-card px-3 py-2 text-[10px] border border-border/30">
             <span className="text-muted-foreground">28/03 — Compra</span>
@@ -82,15 +79,14 @@ const STEPS = [
     accentBg: "bg-emerald-500",
     iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
     iconColor: "text-emerald-600 dark:text-emerald-400",
-    emoji: "🏝️",
     illustration: (
-      <div className="rounded-2xl border-2 border-emerald-200/40 bg-emerald-50/50 dark:bg-emerald-900/10 p-4">
+      <div className="rounded-2xl border border-emerald-200/40 bg-emerald-50/50 dark:bg-emerald-900/10 p-4">
         <div className="flex items-end justify-between gap-1.5 h-16">
           {[40, 55, 35, 65, 50, 70, 80].map((h, i) => (
             <div key={i} className="flex-1 rounded-t-lg bg-emerald-400/40 dark:bg-emerald-500/30 transition-all hover:bg-emerald-500/60" style={{ height: `${h}%` }} />
           ))}
         </div>
-        <p className="mt-2 text-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400">📊 Faturação mensal</p>
+        <p className="mt-2 text-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Faturação mensal</p>
       </div>
     ),
   },
@@ -98,15 +94,15 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section id="como-funciona" className="relative border-y-2 border-border/20 py-20 sm:py-24 md:py-32 overflow-hidden">
+    <section id="como-funciona" className="relative border-y border-border/20 py-20 sm:py-24 md:py-32 overflow-hidden">
       {/* Subtle ocean background */}
       <div className="absolute inset-0 bg-gradient-to-b from-sky-50/30 via-background to-sky-50/20 dark:from-sky-950/10 dark:via-background dark:to-sky-950/5" />
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <FadeIn>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">🗺️ Como funciona</p>
-            <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">Como funciona</p>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl">
               Do papel ao digital em 4 passos
             </h2>
             <p className="mt-5 text-base text-muted-foreground sm:text-lg">
@@ -129,15 +125,15 @@ export function HowItWorks() {
                   {/* Text side */}
                   <div className={`flex gap-5 lg:gap-6 ${isEven ? "lg:order-1" : "lg:order-2 lg:flex-row-reverse lg:text-right"}`}>
                     <div className="relative shrink-0">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-3 border-border/30 bg-card shadow-lg">
-                        <span className="text-2xl">{step.emoji}</span>
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-border/30 bg-card shadow-lg">
+                        <step.icon className={`h-7 w-7 ${step.iconColor}`} />
                       </div>
                       <div className={`absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full ${step.accentBg} text-[10px] font-black text-white shadow-md border-2 border-white dark:border-card`}>
                         {step.number}
                       </div>
                     </div>
                     <div className="pt-1 lg:pt-3">
-                      <h3 className="text-base font-black text-foreground sm:text-lg">{step.title}</h3>
+                      <h3 className="text-base font-bold text-foreground sm:text-lg">{step.title}</h3>
                       <p className="mt-2 text-sm leading-relaxed text-muted-foreground max-w-md">{step.description}</p>
                     </div>
                   </div>

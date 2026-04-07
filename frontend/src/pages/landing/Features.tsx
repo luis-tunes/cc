@@ -12,7 +12,6 @@ interface Feature {
   accentText: string;
   accentBadge: string;
   cssVar: string;
-  emoji: string;
 }
 
 const FEATURES: Feature[] = [
@@ -26,7 +25,6 @@ const FEATURES: Feature[] = [
     accentText: "text-sky-600 dark:text-sky-400",
     accentBadge: "border-sky-300/40 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400",
     cssVar: "--tim-info",
-    emoji: "🔭",
   },
   {
     icon: Bot,
@@ -38,7 +36,6 @@ const FEATURES: Feature[] = [
     accentText: "text-amber-600 dark:text-amber-400",
     accentBadge: "border-amber-300/40 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
     cssVar: "--primary",
-    emoji: "🤖",
   },
   {
     icon: Receipt,
@@ -49,7 +46,6 @@ const FEATURES: Feature[] = [
     accentText: "text-emerald-600 dark:text-emerald-400",
     accentBadge: "border-emerald-300/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
     cssVar: "--tim-success",
-    emoji: "⚓",
   },
   {
     icon: BarChart3,
@@ -60,7 +56,6 @@ const FEATURES: Feature[] = [
     accentText: "text-orange-600 dark:text-orange-400",
     accentBadge: "border-orange-300/40 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400",
     cssVar: "--tim-warning",
-    emoji: "🗺️",
   },
   {
     icon: TrendingUp,
@@ -71,7 +66,6 @@ const FEATURES: Feature[] = [
     accentText: "text-violet-600 dark:text-violet-400",
     accentBadge: "bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-300/40",
     cssVar: "--tim-purple",
-    emoji: "🌊",
   },
   {
     icon: Shield,
@@ -82,7 +76,6 @@ const FEATURES: Feature[] = [
     accentText: "text-rose-600 dark:text-rose-400",
     accentBadge: "border-rose-300/40 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
     cssVar: "--tim-danger",
-    emoji: "🛡️",
   },
 ];
 
@@ -106,19 +99,19 @@ function FeatureCard({ feature: f }: { feature: Feature }) {
     >
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
-          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${f.accentBg} transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]`}>
-            <span className="text-2xl" role="img" aria-label={f.title}>{f.emoji}</span>
+          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${f.accentBg} transition-all duration-500 group-hover:scale-105`}>
+            <f.icon className={`h-6 w-6 ${f.accentText}`} />
           </div>
-          <span className={`rounded-full border-2 px-3 py-1 text-xs font-bold uppercase tracking-wide ${f.accentBadge} transition-all duration-300 group-hover:shadow-sm`}>
+          <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${f.accentBadge} transition-all duration-300 group-hover:shadow-sm`}>
             {f.highlight}
           </span>
         </div>
-        <h3 className="mt-5 text-lg font-black text-foreground">{f.title}</h3>
+        <h3 className="mt-5 text-lg font-bold text-foreground">{f.title}</h3>
         <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{f.description}</p>
 
         {f.stat && (
-          <div className="mt-5 flex items-baseline gap-2 border-t-2 border-border/30 pt-4">
-            <span className={`text-3xl font-black tabular-nums ${f.accentText}`}>
+          <div className="mt-5 flex items-baseline gap-2 border-t border-border/30 pt-4">
+            <span className={`text-3xl font-extrabold tabular-nums ${f.accentText}`}>
               {f.stat.prefix}<CountUp value={f.stat.value} suffix={f.stat.suffix} />
             </span>
             <span className="text-xs text-muted-foreground">{f.stat.label}</span>
@@ -138,8 +131,8 @@ export function Features() {
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <FadeIn>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">⚔️ Funcionalidades</p>
-            <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary">Funcionalidades</p>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl">
               Tudo o que precisa,{" "}
               <span className="tim-gradient-text animate-text-shimmer">nada que não precise</span>
             </h2>
