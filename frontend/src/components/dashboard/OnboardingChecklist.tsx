@@ -3,13 +3,13 @@ import {
   CheckCircle2, 
   Lock, 
   ChevronRight, 
+  ChevronDown,
   Building2, 
   Settings2, 
   Landmark, 
   Upload, 
   FileSearch, 
   GitMerge, 
-  Eye,
   Sparkles,
   ArrowRight
 } from "lucide-react";
@@ -24,6 +24,8 @@ interface OnboardingChecklistProps {
   classified?: number;
 }
 
+type StepState = "complete" | "available" | "locked";
+
 interface OnboardingStep {
   id: string;
   title: string;
@@ -33,6 +35,8 @@ interface OnboardingStep {
   path: string;
   cta: string;
   secondaryCta?: string;
+  /** When true, secondary CTA skips to the next available step instead of navigating to path */
+  secondarySkips?: boolean;
   check: (props: OnboardingChecklistProps, hasEntity: boolean, hasFinancialContext: boolean) => boolean;
   isAvailable: (props: OnboardingChecklistProps, hasEntity: boolean, hasFinancialContext: boolean) => boolean;
 }
@@ -58,6 +62,7 @@ const steps: OnboardingStep[] = [
     path: "/entidade",
     cta: "Definir contexto financeiro", 
     secondaryCta: "Configurar mais tarde",
+    secondarySkips: true,
     check: (_, __, hasFinancialContext) => hasFinancialContext,
     isAvailable: (_, hasEntity) => hasEntity,
   },
@@ -123,9 +128,11 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
     const isComplete = step.check(props, hasEntity, hasFinancialContext);
     const isAvailable = step.isAvailable(props, hasEntity, hasFinancialContext);
     
+    const state: StepState = isComplete ? "complete" : isAvailable ? "available" : "locked";
+    
     return {
       ...step,
-      state: isComplete ? 'complete' : (isAvailable ? 'available' : 'locked') as 'complete' | 'available' | 'locked'
+      state,
     };
   });
 
@@ -272,8 +279,12 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
                       <button
                         onClick={(e) => toggleExpanded(step.id, e)}
                         className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={isExpanded ? "Recolher detalhes" : "Expandir detalhes"}
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <ChevronDown className={cn(
+                          "h-3.5 w-3.5 transition-transform duration-200",
+                          isExpanded && "rotate-180"
+                        )} />
                       </button>
                     )}
                   </div>
@@ -290,8 +301,7 @@ export function OnboardingChecklist(props: OnboardingChecklistProps) {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            // For financial context step, skip to next available step
-                            if (step.id === 'financial-context') {
+                            if (step.secondarySkips) {
                               const nextAvailable = stepStates.find((s, i) => 
                                 i > index && s.state === 'available'
                               );
