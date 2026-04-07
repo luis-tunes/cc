@@ -71,6 +71,7 @@ export function DocumentFiltersBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os estados</SelectItem>
+            <SelectItem value="staging">Aguardando confirmação</SelectItem>
             <SelectItem value="pendente">Pendente</SelectItem>
             <SelectItem value="importado">Importado</SelectItem>
             <SelectItem value="extraído">Extraído</SelectItem>

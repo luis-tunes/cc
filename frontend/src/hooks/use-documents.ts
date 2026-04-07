@@ -42,6 +42,7 @@ export function toDocumentRecord(doc: Document): DocumentRecord {
     revisto: "revisto",
     erro: "rejeitado",
     arquivado: "arquivado",
+    staging: "staging",
   };
 
   const hasReconciliation = !!doc.reconciliation_status;
@@ -98,7 +99,7 @@ export function useDocuments() {
       const docs = query.state.data;
       if (!docs) return false;
       const hasPending = docs.some((d) =>
-        ["pendente", "a processar"].includes(d.classificationStatus)
+        ["pendente", "a processar", "staging"].includes(d.classificationStatus)
       );
       return hasPending ? 5000 : false;
     },

@@ -263,6 +263,7 @@ export default function Documents() {
                     onToggleAll={handleToggleAll}
                     onOpenDocument={handleOpenDocument}
                     onDelete={actions.onDelete}
+                    onProcess={actions.onProcess}
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle className="mx-1" />
@@ -282,6 +283,7 @@ export default function Documents() {
                 onToggleAll={handleToggleAll}
                 onOpenDocument={handleOpenDocument}
                 onDelete={actions.onDelete}
+                onProcess={actions.onProcess}
               />
             )}
           </div>

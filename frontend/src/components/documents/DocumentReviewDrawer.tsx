@@ -18,6 +18,7 @@ export interface DocumentActions {
   onAddNote: (id: string, note: string) => void;
   onDelete: (id: string) => void;
   onReprocess: (id: string) => void;
+  onProcess?: (id: string) => void;
 }
 
 interface DocumentReviewDrawerProps {

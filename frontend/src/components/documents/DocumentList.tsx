@@ -18,6 +18,7 @@ import {
   Plug,
   AlertTriangle,
   Trash2,
+  Play,
 } from "lucide-react";
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
@@ -32,6 +33,7 @@ interface DocumentListProps {
   onToggleAll: () => void;
   onOpenDocument: (doc: DocumentRecord) => void;
   onDelete?: (id: string) => void;
+  onProcess?: (id: string) => void;
   className?: string;
 }
 
@@ -48,6 +50,7 @@ export function DocumentList({
   onToggleAll,
   onOpenDocument,
   onDelete,
+  onProcess,
   className,
 }: DocumentListProps) {
   const allSelected =
@@ -93,6 +96,29 @@ export function DocumentList({
                 </div>
                 {doc.date && (
                   <p className="mt-1 text-xs text-muted-foreground">{doc.date}</p>
+                )}
+                {doc.classificationStatus === "staging" && (
+                  <div className="mt-2 flex gap-2">
+                    {onProcess && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs bg-tim-success hover:bg-tim-success/90"
+                        onClick={(e) => { e.stopPropagation(); onProcess(doc.id); }}
+                      >
+                        <Play className="mr-1 h-3 w-3" /> Processar
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-tim-danger hover:text-tim-danger"
+                        onClick={(e) => { e.stopPropagation(); onDelete(doc.id); }}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" /> Remover
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
               {doc.needsReview && (
@@ -220,7 +246,29 @@ export function DocumentList({
                   )}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  {onDelete && (
+                  {doc.classificationStatus === "staging" ? (
+                    <div className="flex items-center gap-1">
+                      {onProcess && (
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-tim-success hover:bg-tim-success/90"
+                          onClick={() => onProcess(doc.id)}
+                        >
+                          <Play className="mr-1 h-3 w-3" /> Processar
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-tim-danger hover:text-tim-danger"
+                          onClick={() => onDelete(doc.id)}
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" /> Remover
+                        </Button>
+                      )}
+                    </div>
+                  ) : onDelete ? (
                     <button
                       onClick={() => onDelete?.(doc.id)}
                       className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
@@ -228,7 +276,7 @@ export function DocumentList({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  )}
+                  ) : null}
                 </TableCell>
               </TableRow>
             );
