@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { DocumentRecord } from "@/lib/documents-data";
 import { documentTypeLabels } from "@/lib/documents-data";
+import { documentThumbnailUrl } from "@/lib/api";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -201,6 +202,12 @@ export function DocumentList({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
+                    <img
+                      src={documentThumbnailUrl(Number(doc.id))}
+                      alt=""
+                      className="h-[34px] w-[24px] shrink-0 rounded border border-border object-cover transition-transform hover:scale-105 cursor-zoom-in"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
                     <FileIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground max-w-[240px]">
